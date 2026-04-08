@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OKYU HRM – Human Resource Management</title>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<!-- Supabase Client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<!-- Stylesheets -->
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/modal.css">
+<link rel="stylesheet" href="css/notifications.css">
+<link rel="stylesheet" href="css/schedule.css">
+<link rel="stylesheet" href="css/print.css">
+</head>
+<body>
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- LOGIN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-theme"><div class="theme-toggle" onclick="toggleTheme()"><div class="theme-icons"><span>🌙</span><span>☀️</span></div><div class="theme-toggle-knob"></div></div></div>
+  <div class="login-box">
+    <div class="login-logo">OKYU</div>
+    <div class="login-sub">Human Resource Management</div>
+    <div class="login-error" id="loginError">Ungültige Anmeldedaten</div>
+
+    <!-- Login Mode Tabs -->
+    <div class="login-tabs" style="display:flex;gap:0;margin-bottom:16px;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
+      <button class="login-tab active" id="tabSupabase" onclick="switchLoginMode('supabase')" style="flex:1;padding:8px;font-size:.82rem;font-weight:600;border:none;cursor:pointer;background:var(--accent);color:#fff;transition:all .2s">🔐 Anmelden</button>
+      <button class="login-tab" id="tabRegister" onclick="switchLoginMode('register')" style="flex:1;padding:8px;font-size:.82rem;font-weight:600;border:none;cursor:pointer;background:var(--bg-card);color:var(--text-secondary);transition:all .2s">📝 Registrieren</button>
+    </div>
+
+    <!-- Supabase Login -->
+    <div id="loginSupabase">
+      <label>E-Mail</label>
+      <input type="email" id="loginEmail" placeholder="name@okyu.de" autocomplete="email" />
+      <label>Passwort</label>
+      <input type="password" id="loginPass" placeholder="Passwort eingeben" autocomplete="current-password" />
+      <button class="login-btn" id="loginBtn" onclick="doLogin()">Anmelden</button>
+    </div>
+
+    <!-- Registration Form -->
+    <div id="loginRegister" style="display:none">
+      <label>Vollständiger Name</label>
+      <input type="text" id="regName" placeholder="z.B. Max Mustermann" autocomplete="name" />
+      <label>E-Mail</label>
+      <input type="email" id="regEmail" placeholder="name@okyu.de" autocomplete="email" />
+      <label>Passwort (min. 6 Zeichen)</label>
+      <input type="password" id="regPass" placeholder="Passwort wählen" autocomplete="new-password" />
+      <label>Geburtstag</label>
+      <input type="date" id="regBirthday" />
+      <label>Standort</label>
+      <select id="regLocation">
+        <option value="origami">Origami Restaurant</option>
+        <option value="okyu">Okyu Restaurant</option>
+        <option value="enso">Enso Sushi & Grill</option>
+      </select>
+      <label>Bereich</label>
+      <select id="regDept">
+        <option value="Küche">Küche</option>
+        <option value="Service">Service</option>
+        <option value="Bar">Bar</option>
+        <option value="Sushi">Sushi</option>
+        <option value="Ausbildung">Ausbildung</option>
+        <option value="Verwaltung">Verwaltung</option>
+      </select>
+      <label>Position</label>
+      <input type="text" id="regPosition" placeholder="z.B. Koch, Kellner, Azubi..." />
+      <button class="login-btn" id="regBtn" onclick="doRegister()">Konto erstellen</button>
+      <div class="role-hint" style="margin-top:8px">
+        ⏳ Dein Konto muss erst vom Admin <strong>genehmigt</strong> werden, bevor du dich anmelden kannst.
+      </div>
+    </div>
+
+    <!-- Pending Screen -->
+    <div id="loginPending" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:3rem;margin-bottom:12px">⏳</div>
+      <div style="font-size:1.1rem;font-weight:700;margin-bottom:8px">Konto wartet auf Freigabe</div>
+      <p style="font-size:.85rem;color:var(--text-secondary);line-height:1.6">Dein Konto wurde erstellt, aber noch nicht vom Admin genehmigt.<br>Bitte warte auf die Bestätigung.</p>
+      <button class="login-btn" onclick="doLogout()" style="margin-top:16px;background:var(--bg-card);color:var(--text-primary)">← Zurück zum Login</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app hidden" id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">OKYU</div>
+      <div class="sidebar-brand-sub">HR Management System</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav"></nav>
+    <div class="sidebar-footer">
+      <div class="avatar" id="userAvatar">A</div>
+      <div class="user-info"><div class="user-name" id="userName">Admin</div><div class="user-role" id="userRole">Geschäftsführung</div></div>
+      <button class="logout-btn" onclick="doLogout()" title="Abmelden">⏻</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="header">
+      <div class="header-left">
+        <button class="btn" style="display:none" id="menuBtn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <h1 class="page-title" id="pageTitle">Dashboard</h1>
+        <select class="location-select" id="locationSelect" onchange="currentLocation=this.value;renderPage(getCurrentPage())"></select>
+      </div>
+      <div class="header-right">
+        <span style="font-size:.78rem;color:var(--text-muted)" id="dateDisplay"></span>
+        <div class="theme-toggle" onclick="toggleTheme()"><div class="theme-icons"><span>🌙</span><span>☀️</span></div><div class="theme-toggle-knob"></div></div>
+        <button class="notif-btn" onclick="toggleNotifications()">🔔<span class="notif-dot" id="notifDot"></span></button>
+      </div>
+    </header>
+    <div class="content" id="contentArea"></div>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS PANEL -->
+<div class="notif-overlay" id="notifOverlay" onclick="toggleNotifications()"></div>
+<div class="notif-panel" id="notifPanel">
+  <div class="notif-panel-header"><span style="font-size:1rem;font-weight:600">Benachrichtigungen</span><button class="modal-close" onclick="toggleNotifications()">✕</button></div>
+  <div class="notif-list" id="notifList"></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header"><span class="modal-title" id="modalTitle"></span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<!-- JavaScript (modular) -->
+<script src="js/config.js"></script>
+<script src="js/permissions.js"></script>
+<script src="js/state.js"></script>
+<script src="js/data.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/data-loader.js"></script>
+<script src="js/data-sync.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app-core.js"></script>
+
+<script>
+// Login mode switcher
+function switchLoginMode(mode) {
+  document.getElementById('loginSupabase').style.display = mode === 'supabase' ? '' : 'none';
+  document.getElementById('loginRegister').style.display = mode === 'register' ? '' : 'none';
+  document.getElementById('tabSupabase').style.background = mode === 'supabase' ? 'var(--accent)' : 'var(--bg-card)';
+  document.getElementById('tabSupabase').style.color = mode === 'supabase' ? '#fff' : 'var(--text-secondary)';
+  document.getElementById('tabRegister').style.background = mode === 'register' ? 'var(--accent)' : 'var(--bg-card)';
+  document.getElementById('tabRegister').style.color = mode === 'register' ? '#fff' : 'var(--text-secondary)';
+  document.getElementById('loginError').style.display = 'none';
+}
+</script>
+</body>
+</html>

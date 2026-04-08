@@ -1,0 +1,363 @@
+/* ═══════════════════════════════════════════════════════════
+   OKYU HRM – Schedule & Calendar Styles
+   ═══════════════════════════════════════════════════════════ */
+
+/* --- Schedule Controls --- */
+.schedule-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0;
+}
+
+.view-toggle .btn {
+  border-radius: 0;
+}
+
+.view-toggle .btn:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.view-toggle .btn:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.view-toggle .btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* --- Shift Cells & Blocks --- */
+.shift-cell {
+  min-height: 52px;
+  position: relative;
+  transition: background 0.15s;
+}
+
+.shift-cell.drag-over {
+  background: var(--drag-bg) !important;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.shift-block {
+  background: rgba(108, 92, 231, 0.15);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin: 2px 0;
+  font-size: 0.75rem;
+  cursor: grab;
+  user-select: none;
+  transition: opacity 0.15s, transform 0.15s;
+  position: relative;
+}
+
+.shift-block:active {
+  cursor: grabbing;
+}
+
+.shift-block.dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+/* Shift colors by department */
+.shift-block.kitchen {
+  border-left-color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.shift-block.service {
+  border-left-color: var(--info);
+  background: var(--info-bg);
+}
+
+.shift-block.bar {
+  border-left-color: var(--success);
+  background: var(--success-bg);
+}
+
+.shift-block.azubi {
+  border-left-color: #a29bfe;
+  background: rgba(162, 155, 254, 0.12);
+}
+
+.shift-block.schule {
+  border-left-color: #00cec9;
+  background: rgba(0, 206, 201, 0.15);
+  border-left-width: 4px;
+}
+.shift-block.schule .shift-name::before {
+  content: '🎓 ';
+}
+
+.shift-block .shift-name {
+  font-weight: 600;
+}
+
+.shift-block .shift-time {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+/* Shift action buttons (hover) */
+.shift-block .shift-actions {
+  position: absolute;
+  right: 4px;
+  top: 2px;
+  display: none;
+  gap: 2px;
+}
+
+.shift-block:hover .shift-actions {
+  display: flex;
+}
+
+.shift-action-btn {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.shift-action-btn:hover           { background: var(--accent); color: #fff; }
+.shift-action-btn.sick-btn:hover  { background: var(--danger); }
+.shift-action-btn.vac-btn:hover   { background: var(--info); }
+.shift-action-btn.late-btn:hover  { background: var(--late-color); }
+
+/* ─── Compact blocks for special days (K/U/S) ─── */
+.compact-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  border-left: none !important;
+  border-radius: 6px;
+  padding: 4px 8px;
+  position: relative;
+}
+
+.compact-letter {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+/* K = Krank */
+.compact-block.is-sick {
+  background: #e74c3c;
+  opacity: 1;
+}
+.compact-block.is-sick .compact-letter {
+  color: #fff;
+}
+
+/* U/B = Urlaub ganzer Tag */
+.compact-block.is-vacation {
+  background: #27ae60;
+  opacity: 1;
+}
+.compact-block.is-vacation .compact-letter {
+  color: #fff;
+}
+
+/* A = Urlaub halber Tag */
+.compact-block.vac-half {
+  background: #f0dca0;
+}
+.compact-block.vac-half .compact-letter {
+  color: #5a4e2f;
+}
+
+/* S = Schule (override from .schule) */
+.compact-block.schule {
+  background: #00b4d8;
+  border-left-width: 0 !important;
+  opacity: 1;
+}
+.compact-block.schule .compact-letter {
+  color: #fff;
+}
+.compact-block.schule .shift-name::before {
+  content: none;
+}
+.compact-block.schule .shift-time {
+  color: rgba(255,255,255,0.8);
+  font-size: 0.6rem;
+  margin-left: 6px;
+}
+
+/* Regular shift status modifiers (non-compact fallback) */
+.shift-block.is-late {
+  border-right: 3px solid var(--late-color);
+  background-image: repeating-linear-gradient(
+    -45deg, transparent, transparent 8px,
+    rgba(232,67,147,.06) 8px, rgba(232,67,147,.06) 12px
+  );
+}
+
+/* ─── Cell-level highlights for special days ─── */
+td:has(.shift-block.is-sick) {
+  background: rgba(231, 76, 60, 0.04) !important;
+  box-shadow: inset 0 0 0 1px rgba(231, 76, 60, 0.12);
+}
+
+td:has(.shift-block.is-vacation) {
+  background: rgba(9, 132, 227, 0.04) !important;
+  box-shadow: inset 0 0 0 1px rgba(9, 132, 227, 0.12);
+}
+
+td:has(.shift-block.schule) {
+  background: rgba(0, 206, 201, 0.06) !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 206, 201, 0.15);
+}
+
+td:has(.shift-block.is-late) {
+  background: rgba(253, 121, 168, 0.04) !important;
+}
+
+/* ─── Ruhetag (closed day) ─── */
+td:has(.ruhetag-cell) {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    rgba(0, 0, 0, 0.04) 6px,
+    rgba(0, 0, 0, 0.04) 8px
+  ) !important;
+}
+
+.ruhetag-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  opacity: 0.5;
+}
+
+.ruhetag-label {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  font-style: italic;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.late-marker {
+  font-size: 0.6rem;
+  color: var(--late-color);
+  font-weight: 700;
+}
+
+/* --- Calendar Grid --- */
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.calendar-nav button {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+
+.calendar-nav button:hover {
+  border-color: var(--accent);
+  color: var(--accent-light);
+}
+
+.calendar-month {
+  font-size: 1rem;
+  font-weight: 600;
+  min-width: 180px;
+  text-align: center;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-day-header {
+  padding: 8px;
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.cal-day {
+  background: var(--bg-card);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  min-height: 70px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.cal-day:hover {
+  border-color: var(--border-light);
+}
+
+.cal-day.other-month {
+  opacity: 0.3;
+}
+
+.cal-day.today {
+  border-color: var(--accent);
+}
+
+.cal-day-num {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.cal-event {
+  font-size: 0.65rem;
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-event.vacation { background: var(--info-bg);   color: var(--info); }
+.cal-event.sick     { background: var(--danger-bg); color: var(--danger); }

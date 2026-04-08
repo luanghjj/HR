@@ -1,0 +1,78 @@
+/* ═══════════════════════════════════════════════════════════
+   OKYU HRM – Print Styles
+   ═══════════════════════════════════════════════════════════ */
+
+@media print {
+  .sidebar,
+  .header,
+  .notif-panel,
+  .notif-overlay,
+  .btn,
+  .schedule-controls,
+  .shift-actions,
+  .theme-toggle,
+  .perm-banner {
+    display: none !important;
+  }
+
+  .main {
+    margin-left: 0 !important;
+  }
+
+  .content {
+    padding: 0 !important;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .stat-card,
+  .table-wrap {
+    border-color: #ccc !important;
+    background: #fff !important;
+  }
+
+  .stat-value,
+  .table-title,
+  .page-title {
+    color: #000 !important;
+  }
+
+  td,
+  th {
+    color: #333 !important;
+  }
+}
+
+/* --- Responsive --- */
+@media (max-width: 900px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+
+  .sidebar.open {
+    transform: none;
+  }
+
+  .main {
+    margin-left: 0;
+  }
+
+  .stats-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
+    padding: 0 16px;
+  }
+
+  .content {
+    padding: 20px 16px;
+  }
+}

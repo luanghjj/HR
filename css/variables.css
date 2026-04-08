@@ -1,0 +1,77 @@
+/* ═══════════════════════════════════════════════════════════
+   OKYU HRM – CSS Variables (Theme Tokens)
+   ═══════════════════════════════════════════════════════════ */
+
+[data-theme="dark"] {
+  --bg-primary: #0a0a0f;
+  --bg-secondary: #12121a;
+  --bg-card: #1a1a26;
+  --bg-card-hover: #22222f;
+  --bg-input: #14141e;
+
+  --border: #2a2a3a;
+  --border-light: #333348;
+
+  --text-primary: #e8e8f0;
+  --text-secondary: #8888a0;
+  --text-muted: #555570;
+
+  --accent: #6c5ce7;
+  --accent-light: #a29bfe;
+  --accent-dark: #4834d4;
+
+  --success: #00b894;
+  --success-bg: rgba(0, 184, 148, 0.1);
+  --warning: #fdcb6e;
+  --warning-bg: rgba(253, 203, 110, 0.1);
+  --danger: #e17055;
+  --danger-bg: rgba(225, 112, 85, 0.1);
+  --info: #74b9ff;
+  --info-bg: rgba(116, 185, 255, 0.1);
+
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  --drag-bg: rgba(108, 92, 231, 0.25);
+  --late-color: #fd79a8;
+  --late-bg: rgba(253, 121, 168, 0.12);
+}
+
+[data-theme="light"] {
+  --bg-primary: #f0f2f5;
+  --bg-secondary: #fff;
+  --bg-card: #fff;
+  --bg-card-hover: #f5f6f8;
+  --bg-input: #f0f2f5;
+
+  --border: #dfe1e6;
+  --border-light: #c8ccd4;
+
+  --text-primary: #1a1a2e;
+  --text-secondary: #5a5a7a;
+  --text-muted: #8a8aa0;
+
+  --accent: #6c5ce7;
+  --accent-light: #6c5ce7;
+  --accent-dark: #4834d4;
+
+  --success: #00a884;
+  --success-bg: rgba(0, 168, 132, 0.1);
+  --warning: #e5a600;
+  --warning-bg: rgba(229, 166, 0, 0.1);
+  --danger: #d63031;
+  --danger-bg: rgba(214, 48, 49, 0.1);
+  --info: #0984e3;
+  --info-bg: rgba(9, 132, 227, 0.1);
+
+  --shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  --drag-bg: rgba(108, 92, 231, 0.12);
+  --late-color: #e84393;
+  --late-bg: rgba(232, 67, 147, 0.1);
+}
+
+:root {
+  --sidebar-w: 260px;
+  --header-h: 64px;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --transition: all 0.2s ease;
+}

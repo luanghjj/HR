@@ -1,0 +1,258 @@
+// ═══════════════════════════════════════════════════════════
+// OKYU HRM – Data Loader (Supabase)
+// Replaces static data.js with live Supabase queries
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Load all data from Supabase into global variables.
+ * Maps Supabase column names (snake_case) → JS property names (camelCase)
+ * Returns true if successful, false if fallback to demo data needed.
+ */
+async function loadDataFromSupabase() {
+  try {
+    console.log('[Data] Loading from Supabase...');
+
+    // Load user profiles (USERS array)
+    const { data: profiles, error: profErr } = await sb.from('user_profiles').select('*');
+    if (profErr) console.warn('[Data] user_profiles:', profErr.message);
+    if (profiles && profiles.length > 0) {
+      USERS.length = 0;
+      profiles.forEach(p => USERS.push({
+        id: p.user_id,
+        name: p.name,
+        role: p.role,
+        location: p.location,
+        avatar: p.avatar,
+        empId: p.emp_id,
+        lastLogin: new Date().toLocaleDateString('de-DE'),
+        status: p.status || 'active',
+        regBirthday: p.reg_birthday || null,
+        regDept: p.reg_dept || null,
+        regPosition: p.reg_position || null,
+        regEmail: p.reg_email || null
+      }));
+    }
+
+    // Load locations
+    const { data: locs, error: locsErr } = await sb.from('locations').select('*');
+    if (locsErr) throw new Error('locations: ' + locsErr.message);
+    if (locs && locs.length > 0) {
+      LOCS.length = 0;
+      locs.forEach(l => LOCS.push(l));
+    }
+
+    // Load departments
+    const { data: depts, error: deptsErr } = await sb.from('departments').select('*');
+    if (deptsErr) throw new Error('departments: ' + deptsErr.message);
+    if (depts && depts.length > 0) {
+      DEPTS.length = 0;
+      depts.forEach(d => DEPTS.push(d));
+    }
+
+    // Load employees (snake_case → camelCase mapping)
+    const { data: emps, error: empsErr } = await sb.from('employees').select('*').order('id');
+    if (empsErr) throw new Error('employees: ' + empsErr.message);
+    if (emps && emps.length > 0) {
+      EMPS.length = 0;
+      emps.forEach(e => EMPS.push({
+        id: e.id,
+        name: e.name,
+        location: e.location,
+        dept: e.dept,
+        position: e.position,
+        status: e.status,
+        start: e.start_date,
+        avatar: e.avatar,
+        vacTotal: e.vac_total,
+        vacUsed: e.vac_used,
+        sickDays: e.sick_days,
+        lateCount: e.late_count,
+        sollStunden: e.soll_stunden,
+        bruttoGehalt: parseFloat(e.brutto_gehalt) || 0,
+        schuleTage: e.schule_tage,
+        birthday: e.birthday || '',
+        probEnd: e.prob_end || ''
+      }));
+    }
+
+    // Load vacations
+    const { data: vacs, error: vacsErr } = await sb.from('vacations').select('*').order('id');
+    if (vacsErr) throw new Error('vacations: ' + vacsErr.message);
+    if (vacs && vacs.length > 0) {
+      VACS.length = 0;
+      vacs.forEach(v => VACS.push({
+        id: v.id,
+        empId: v.emp_id,
+        empName: v.emp_name,
+        location: v.location,
+        from: v.from_date,
+        to: v.to_date,
+        days: v.days,
+        status: v.status,
+        note: v.note || ''
+      }));
+    }
+
+    // Load sick leaves
+    const { data: sicks, error: sicksErr } = await sb.from('sick_leaves').select('*').order('id');
+    if (sicksErr) throw new Error('sick_leaves: ' + sicksErr.message);
+    if (sicks && sicks.length > 0) {
+      SICKS.length = 0;
+      sicks.forEach(s => SICKS.push({
+        id: s.id,
+        empId: s.emp_id,
+        empName: s.emp_name,
+        location: s.location,
+        from: s.from_date,
+        to: s.to_date,
+        days: s.days,
+        status: s.status,
+        hasAU: s.has_au,
+        note: s.note || '',
+        auUrl: s.au_url || null
+      }));
+    }
+
+    // Load documents
+    const { data: docs, error: docsErr } = await sb.from('documents').select('*').order('id');
+    if (docsErr) throw new Error('documents: ' + docsErr.message);
+    if (docs && docs.length > 0) {
+      DOCS.length = 0;
+      docs.forEach(d => DOCS.push({
+        id: d.id,
+        empId: d.emp_id,
+        empName: d.emp_name,
+        name: d.name,
+        type: d.type,
+        date: d.doc_date,
+        icon: d.icon,
+        fileUrl: d.file_url || null,
+        fileSize: d.file_size || 0,
+        fileName: d.file_name || d.name
+      }));
+    }
+
+    // Load shifts (2 weeks around current date)
+    const shiftStart = new Date();
+    shiftStart.setDate(shiftStart.getDate() - 7);
+    const shiftEnd = new Date();
+    shiftEnd.setDate(shiftEnd.getDate() + 14);
+    const { data: shifts, error: shiftsErr } = await sb.from('shifts')
+      .select('*')
+      .gte('shift_date', shiftStart.toISOString().split('T')[0])
+      .lte('shift_date', shiftEnd.toISOString().split('T')[0])
+      .order('shift_date');
+    if (shiftsErr) console.warn('[Data] shifts:', shiftsErr.message);
+    if (shifts && shifts.length > 0) {
+      SHIFTS.length = 0;
+      shifts.forEach(s => SHIFTS.push({
+        id: s.id,
+        empId: s.emp_id,
+        empName: s.emp_name,
+        dept: s.dept,
+        location: s.location,
+        date: s.shift_date,
+        from: s.shift_from?.substring(0,5) || '09:00',
+        to: s.shift_to?.substring(0,5) || '17:00',
+        label: s.label || '',
+        colorClass: s.label === 'Schule' ? 'schule' : (s.color_class || getDeptColorClass(s.dept)),
+        isSick: s.is_sick || false,
+        isVacation: s.is_vacation || false,
+        isLate: s.is_late || false,
+        lateMin: s.late_min || 0,
+        vacHalf: s.vac_half || false
+      }));
+      window._shiftsFromDB = true;
+      console.log('[Data] ✓ ' + shifts.length + ' shifts loaded from Supabase');
+    } else {
+      window._shiftsFromDB = false;
+    }
+
+    // Load Azubi data: school schedule
+    const { data: schule } = await sb.from('schule_schedule').select('*').order('id');
+    if (schule) {
+      SCHULE_SCHEDULE.length = 0;
+      schule.forEach(s => SCHULE_SCHEDULE.push({
+        id: s.id, empId: s.emp_id, wochentag: s.wochentag,
+        schule: s.schule, klasse: s.klasse,
+        von: s.von, bis: s.bis, aktiv: s.aktiv
+      }));
+    }
+
+    // Load Azubi data: training logs
+    const { data: nachweise } = await sb.from('ausbildungsnachweise').select('*').order('woche_start', { ascending: false });
+    if (nachweise) {
+      AUSBILDUNGSNACHWEISE.length = 0;
+      nachweise.forEach(n => AUSBILDUNGSNACHWEISE.push({
+        id: n.id, empId: n.emp_id, empName: n.emp_name,
+        wocheStart: n.woche_start, wocheEnd: n.woche_end,
+        betriebTaetigkeiten: n.betrieb_taetigkeiten || '',
+        schuleThemen: n.schule_themen || '',
+        betriebStunden: parseFloat(n.betrieb_stunden) || 0,
+        schuleStunden: parseFloat(n.schule_stunden) || 0,
+        notizen: n.notizen || '',
+        status: n.status,
+        ausbilderKommentar: n.ausbilder_kommentar || ''
+      }));
+    }
+
+    // Load Azubi data: evaluations
+    const { data: bewertungen } = await sb.from('azubi_bewertungen').select('*').order('datum', { ascending: false });
+    if (bewertungen) {
+      AZUBI_BEWERTUNGEN.length = 0;
+      bewertungen.forEach(b => AZUBI_BEWERTUNGEN.push({
+        id: b.id, empId: b.emp_id, empName: b.emp_name,
+        datum: b.datum, bewerter: b.bewerter,
+        kategorie: b.kategorie, note: b.note,
+        kommentar: b.kommentar || ''
+      }));
+    }
+
+    // Load time records (today + last 30 days for history)
+    const trStart = new Date();
+    trStart.setDate(trStart.getDate() - 30);
+    const { data: timeRecs, error: trErr } = await sb.from('time_records')
+      .select('*')
+      .gte('check_in', trStart.toISOString())
+      .order('check_in', { ascending: false });
+    if (trErr) console.warn('[Data] time_records:', trErr.message);
+    if (timeRecs && timeRecs.length > 0) {
+      TIME_RECORDS.length = 0;
+      timeRecs.forEach(r => TIME_RECORDS.push({
+        id: r.id,
+        empId: r.emp_id,
+        location: r.location,
+        checkIn: r.check_in,
+        checkOut: r.check_out,
+        checkInLat: r.check_in_lat,
+        checkInLng: r.check_in_lng,
+        checkOutLat: r.check_out_lat,
+        checkOutLng: r.check_out_lng,
+        distanceM: r.distance_m,
+        shiftId: r.shift_id,
+        isLate: r.is_late,
+        lateMin: r.late_min,
+        totalHours: r.total_hours,
+        note: r.note
+      }));
+    }
+
+    // Set activeCheckIn if user has open check-in today
+    if (currentUser?.empId) {
+      const today = isoDate(new Date());
+      activeCheckIn = TIME_RECORDS.find(r =>
+        r.empId === currentUser.empId &&
+        r.checkIn?.startsWith(today) &&
+        !r.checkOut
+      ) || null;
+    }
+
+    console.log(`[Data] ✓ Loaded: ${LOCS.length} locations, ${DEPTS.length} depts, ${EMPS.length} employees, ${VACS.length} vacations, ${SICKS.length} sick leaves, ${DOCS.length} documents, ${SCHULE_SCHEDULE.length} school days, ${AUSBILDUNGSNACHWEISE.length} training logs, ${AZUBI_BEWERTUNGEN.length} evaluations, ${TIME_RECORDS.length} time records`);
+    return true;
+
+  } catch (err) {
+    console.warn('[Data] ⚠️ Supabase load failed:', err.message);
+    console.log('[Data] Using demo data from data.js');
+    return false;
+  }
+}
