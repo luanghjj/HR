@@ -29,7 +29,8 @@ async function loadDataFromSupabase() {
         regBirthday: p.reg_birthday || null,
         regDept: p.reg_dept || null,
         regPosition: p.reg_position || null,
-        regEmail: p.reg_email || null
+        regEmail: p.reg_email || null,
+        bannerUrl: p.banner_url || null
       }));
     }
 

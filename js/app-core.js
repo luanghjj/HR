@@ -377,7 +377,7 @@ function renderDashboard(){
     const attOffset=circ-(attPct/100)*circ;
 
     const bannerKey = 'okyu_banner_'+currentUser.id;
-    const bannerImg = localStorage.getItem(bannerKey) || '';
+    const bannerImg = currentUser.bannerUrl || localStorage.getItem(bannerKey) || '';
     const bannerStyle = bannerImg ? `background-image:url('${bannerImg}');background-size:cover;background-position:center;` : '';
     const locLogos = {origami:'🍣',enso:'🍜',okyu_central:'🏢'};
     const locLogo = locLogos[currentLocation] || locLogos[currentUser.location] || '🏢';
@@ -564,24 +564,40 @@ function changeDashBanner(input){
       welcome.style.backgroundSize='cover';
       welcome.style.backgroundPosition='center';
     }
-    toast('Hintergrundbild gespeichert ✓');
+    toast('Bild wird hochgeladen...');
 
-    // Also upload to Supabase Storage
+    // Upload to Supabase Storage → save URL to user_profiles
     try {
       const ext=file.name.split('.').pop();
-      const path=`banners/${currentUser.id}.${ext}`;
+      const path=`banners/${currentUser.id}_${Date.now()}.${ext}`;
       const {data,error}=await sb.storage.from('uploads').upload(path, file, {upsert:true});
       if(!error){
         const {data:urlData}=sb.storage.from('uploads').getPublicUrl(path);
         if(urlData?.publicUrl){
-          await sb.from('user_profiles').update({banner_url:urlData.publicUrl}).eq('user_id',currentUser.id);
-          localStorage.setItem(bannerKey, urlData.publicUrl);
-          console.log('[Banner] ✓ Uploaded:', urlData.publicUrl);
+          const publicUrl=urlData.publicUrl;
+          // Save to DB
+          const {error:dbErr}=await sb.from('user_profiles').update({banner_url:publicUrl}).eq('user_id',currentUser.id);
+          if(!dbErr){
+            currentUser.bannerUrl=publicUrl;
+            // Also update USERS array
+            const u=USERS.find(x=>x.id===currentUser.id);
+            if(u) u.bannerUrl=publicUrl;
+            localStorage.setItem(bannerKey, publicUrl);
+            toast('Hintergrundbild gespeichert ✓');
+            console.log('[Banner] ✓ Saved to DB:', publicUrl);
+          } else {
+            console.warn('[Banner] DB save error:', dbErr.message);
+            toast('Upload OK, DB-Fehler: '+dbErr.message,'warn');
+          }
         }
       } else {
-        console.warn('[Banner] Upload failed, using local only:', error.message);
+        console.warn('[Banner] Upload error:', error.message);
+        toast('Storage-Fehler – Bild nur lokal gespeichert','warn');
       }
-    } catch(e){ console.warn('[Banner] Storage not available, local only'); }
+    } catch(e){
+      console.warn('[Banner] Storage not available:', e.message);
+      toast('Bild nur lokal gespeichert (Storage nicht verfügbar)','warn');
+    }
   };
   reader.readAsDataURL(file);
 }
