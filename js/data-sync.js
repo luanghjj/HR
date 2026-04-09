@@ -319,3 +319,67 @@ async function syncAddDocument(doc) {
     else console.log('[Sync] ✓ Document saved:', doc.name);
   } catch (e) { console.warn('[Sync] Document:', e.message); }
 }
+
+// ═══ CHECKLISTS ═══
+
+/**
+ * Update checklist items in Supabase
+ */
+async function syncChecklist(checklist) {
+  try {
+    if (!checklist.id || typeof checklist.id !== 'number') return;
+    const { error } = await sb.from('checklists').update({
+      items: checklist.items,
+      updated_at: new Date().toISOString()
+    }).eq('id', checklist.id);
+    if (error) console.warn('[Sync] Checklist update error:', error.message);
+    else console.log('[Sync] ✓ Checklist updated:', checklist.id);
+  } catch (e) { console.warn('[Sync] Checklist:', e.message); }
+}
+
+/**
+ * Add new checklist to Supabase
+ */
+async function syncAddChecklist(checklist) {
+  try {
+    const { data, error } = await sb.from('checklists').insert({
+      type:     checklist.type,
+      emp_id:   checklist.empId || null,
+      emp_name: checklist.empName || 'Alle Mitarbeiter',
+      location: checklist.location || null,
+      items:    checklist.items || []
+    }).select().single();
+    if (error) console.warn('[Sync] Add checklist error:', error.message);
+    else { checklist.id = data.id; console.log('[Sync] ✓ Checklist added:', data.id); }
+  } catch (e) { console.warn('[Sync] Checklist add:', e.message); }
+}
+
+// ═══ SHIFT TEMPLATES ═══
+
+/**
+ * Save a new shift template to Supabase
+ */
+async function syncAddTemplate(template) {
+  try {
+    const { data, error } = await sb.from('shift_templates').insert({
+      location:   template.location,
+      name:       template.name,
+      shifts:     template.shifts || [],
+      created_by: window.currentUser?.id || null
+    }).select().single();
+    if (error) console.warn('[Sync] Add template error:', error.message);
+    else { template.id = data.id; console.log('[Sync] ✓ Template saved:', template.name); }
+  } catch (e) { console.warn('[Sync] Template add:', e.message); }
+}
+
+/**
+ * Delete a shift template from Supabase
+ */
+async function syncDeleteTemplate(templateId) {
+  try {
+    if (!templateId || typeof templateId !== 'number') return;
+    const { error } = await sb.from('shift_templates').delete().eq('id', templateId);
+    if (error) console.warn('[Sync] Delete template error:', error.message);
+    else console.log('[Sync] ✓ Template deleted:', templateId);
+  } catch (e) { console.warn('[Sync] Template delete:', e.message); }
+}

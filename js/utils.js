@@ -19,6 +19,14 @@ function getWeekStart(date) {
   return new Date(date.getFullYear(), date.getMonth(), diff);
 }
 
+/** Get ISO week number */
+function getISOWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
 /** Get location name by ID */
 function getLocationName(locationId) {
   return LOCS.find(l => l.id === locationId)?.name || locationId;
@@ -60,6 +68,32 @@ function toast(message, type) {
   toastEl.textContent = message;
   container.appendChild(toastEl);
   setTimeout(() => toastEl.remove(), 3000);
+}
+
+/**
+ * Show the full-screen loading overlay
+ * @param {string} [msg] - Optional message (default: 'Laden...')
+ */
+function showLoading(msg) {
+  const overlay = document.getElementById('loadingOverlay');
+  if (!overlay) return;
+  const msgEl = document.getElementById('loadingMsg');
+  if (msgEl) msgEl.textContent = msg || 'Laden...';
+  overlay.style.opacity = '1';
+  overlay.style.display = 'flex';
+  overlay.style.pointerEvents = 'all';
+}
+
+/**
+ * Hide the full-screen loading overlay (fade out then remove from flow)
+ */
+function hideLoading() {
+  const overlay = document.getElementById('loadingOverlay');
+  if (!overlay) return;
+  overlay.style.opacity = '0';
+  overlay.style.pointerEvents = 'none';
+  // Remove from view after transition
+  setTimeout(() => { overlay.style.display = 'none'; }, 400);
 }
 
 /** Get currently active page ID */

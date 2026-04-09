@@ -1,0 +1,256 @@
+/* ═══════════════════════════════════════════════════════════
+   OKYU HRM – Mitarbeiter Page v2 (Stitch Design)
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Stat strip ─── */
+.emp-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+@media (max-width: 900px) { .emp-stats-grid { grid-template-columns: repeat(2,1fr); } }
+
+.emp-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 20px 14px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  transition: box-shadow .15s;
+}
+.emp-stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.emp-stat-card.is-warn { border-left: 4px solid rgba(239,68,68,.25); }
+
+.emp-stat-bg-icon {
+  position: absolute;
+  top: 10px; right: 10px;
+  opacity: .07; color: var(--accent);
+  pointer-events: none; transition: opacity .2s;
+}
+.emp-stat-card:hover .emp-stat-bg-icon { opacity: .14; }
+.emp-stat-bg-icon .ms { font-size: 2.8rem; }
+
+.emp-stat-micro {
+  font-size: .6rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-muted); margin-bottom: 6px;
+}
+.emp-stat-num {
+  font-size: 2.2rem; font-weight: 900;
+  color: var(--text-primary); line-height: 1;
+  letter-spacing: -.03em; margin-bottom: 10px;
+}
+.emp-stat-sub { font-size: .68rem; color: var(--text-muted); }
+
+/* ─── Table card – overflow:hidden clips the border-radius ─── */
+.emp-table-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.06);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+/* ─── Toolbar ─── */
+.emp-toolbar {
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 12px;
+  padding: 14px 18px;
+  background: rgba(0,0,0,.012);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.emp-toolbar-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.emp-toolbar-right { display: flex; align-items: center; gap: 8px; }
+
+.emp-filter-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: 9px;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text-secondary);
+  font-size: .78rem; font-weight: 600; cursor: pointer;
+  transition: .15s;
+}
+.emp-filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.emp-filter-divider { width: 1px; height: 22px; background: var(--border); }
+
+.emp-filter-pills { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.emp-filter-pill {
+  padding: 4px 12px; border-radius: 20px; border: none;
+  font-size: .72rem; font-weight: 600; cursor: pointer;
+  background: var(--bg-input); color: var(--text-secondary);
+  transition: .15s;
+}
+.emp-filter-pill.active {
+  background: var(--accent); color: #fff;
+  box-shadow: 0 2px 8px rgba(99,102,241,.25);
+}
+.emp-filter-pill:not(.active):hover {
+  background: rgba(99,102,241,.1); color: var(--accent);
+}
+
+.emp-search-wrap { position: relative; }
+.emp-search {
+  width: 180px; padding: 7px 10px 7px 32px;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: var(--bg-input); color: var(--text-primary);
+  font-size: .8rem; outline: none; transition: .15s;
+}
+.emp-search:focus { border-color: var(--accent); width: 220px; }
+
+.emp-add-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 14px; border-radius: 20px; border: none;
+  background: var(--accent); color: #fff;
+  font-size: .78rem; font-weight: 700; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(99,102,241,.25); transition: .15s;
+}
+.emp-add-btn:hover { opacity: .9; transform: scale(.98); }
+
+/* ─── Scroll wrapper: this is the horizontal scroll container ─── */
+.emp-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ─── TABLE: key is width:100% but NO min-width fights layout ─── */
+.emp-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  table-layout: auto;      /* natural column sizes */
+  font-size: .82rem;
+}
+
+.emp-table thead tr { background: rgba(0,0,0,.014); }
+/* Override global th { padding: 12px 20px; background: var(--bg-input) } from components.css */
+.emp-table thead th {
+  padding: 9px 10px !important;
+  background: transparent !important;
+  font-size: .58rem !important; font-weight: 900 !important;
+  text-transform: uppercase !important; letter-spacing: .06em !important;
+  color: var(--text-muted) !important;
+  border-bottom: 1px solid var(--border) !important;
+  white-space: nowrap !important;
+}
+.emp-table thead th.tc { text-align: center !important; }
+
+/* Override global td { padding: 12px 20px } and tr:nth-child(even) from components.css */
+.emp-row td {
+  padding: 10px 10px !important;
+  border-bottom: 1px solid var(--border) !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+  font-size: .82rem !important;
+  color: var(--text-secondary) !important;
+  background: transparent !important;
+}
+.emp-row:last-child td { border-bottom: none !important; }
+.emp-row td.tc { text-align: center !important; }
+/* Override tr:hover td and tr:nth-child(even) td from global */
+.emp-row:hover td { background: rgba(99,102,241,.025) !important; }
+.emp-row:nth-child(even) td { background: transparent !important; }
+.emp-row:nth-child(even):hover td { background: rgba(99,102,241,.025) !important; }
+
+/* ─── Name cell ─── */
+.emp-cell { display: flex; align-items: center; gap: 9px; }
+
+.emp-avatar-v2 {
+  width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+  background: rgba(99,102,241,.1); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: .72rem;
+  border: 1px solid rgba(99,102,241,.15);
+}
+.emp-name-v2 {
+  font-size: .82rem; font-weight: 700; color: var(--text-primary);
+  white-space: nowrap;
+}
+.emp-email { font-size: .62rem; color: var(--text-muted); margin-top: 1px; white-space: nowrap; }
+
+/* ─── Location / dept ─── */
+.emp-loc {
+  font-size: .78rem; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap;
+}
+.emp-dept-tag {
+  display: inline-block;
+  font-size: .6rem; font-weight: 900;
+  text-transform: uppercase; letter-spacing: .05em;
+  padding: 2px 7px; border-radius: 4px;
+  background: rgba(99,102,241,.07);
+  white-space: nowrap;
+}
+.emp-pos-text { font-size: .78rem; color: var(--text-secondary); white-space: nowrap; }
+
+/* ─── Vacation cell ─── */
+.emp-vac-wrap { min-width: 70px; }
+.emp-vac-nums {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 6px; margin-bottom: 3px;
+}
+.emp-vac-bar { height: 3px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
+.emp-vac-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width .3s; }
+
+/* ─── Pills ─── */
+.emp-pill {
+  display: inline-block;
+  padding: 2px 7px; border-radius: 20px;
+  font-size: .7rem; font-weight: 700; white-space: nowrap;
+}
+.emp-pill.vac  { background: rgba(99,102,241,.1);  color: var(--accent); }
+.emp-pill.sick { background: rgba(239,68,68,.08);  color: #ef4444; }
+.emp-pill.late { background: rgba(245,158,11,.1);  color: #f59e0b; }
+
+/* ─── Monospace numbers ─── */
+.emp-mono {
+  font-family: 'Space Mono', monospace;
+  font-size: .76rem; color: var(--text-secondary); white-space: nowrap;
+}
+.emp-mono.emp-salary { font-weight: 700; color: var(--text-primary); font-size: .78rem; }
+.emp-mono.emp-hourly { color: var(--text-muted); font-size: .7rem; }
+
+/* ─── Actions (visible on row hover) ─── */
+.emp-actions {
+  display: flex; align-items: center; gap: 6px; justify-content: flex-end;
+  opacity: 0; transition: opacity .15s;
+}
+.emp-row:hover .emp-actions { opacity: 1; }
+
+.emp-icon-btn {
+  width: 26px; height: 26px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--bg-input);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text-muted); transition: .15s; flex-shrink: 0;
+}
+.emp-icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.emp-icon-btn .ms { font-size: .9rem; }
+
+.emp-detail-btn {
+  padding: 4px 10px; border-radius: 7px; border: none;
+  background: var(--accent); color: #fff;
+  font-size: .67rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  cursor: pointer; transition: .15s; white-space: nowrap; flex-shrink: 0;
+}
+.emp-detail-btn:hover { opacity: .85; }
+
+/* ─── Pagination ─── */
+.emp-pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px;
+  background: rgba(0,0,0,.012);
+  border-top: 1px solid var(--border);
+}
+.emp-pag-info { font-size: .72rem; color: var(--text-muted); }
+.emp-pag-info strong { color: var(--text-primary); }
+
+/* ─── Badge tweak ─── */
+.emp-row .badge { font-size: .65rem; }

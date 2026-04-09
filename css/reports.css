@@ -1,0 +1,396 @@
+/* ═══════════════════════════════════════════════════════════
+   OKYU HRM – Berichte & Auswertungen Premium Styles
+   Matching "The Workspace" reference design
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Page Header ─── */
+.rep-page-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.rep-eyebrow {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.rep-page-title {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -.04em;
+  color: var(--text-primary);
+  margin: 0;
+  font-family: 'Manrope', sans-serif;
+  line-height: 1.1;
+}
+.rep-hd-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.rep-btn-ghost {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: var(--bg-card);
+  border: none;
+  border-radius: 999px;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,.07);
+  transition: background .15s, box-shadow .15s;
+}
+.rep-btn-ghost:hover { background: var(--bg-input); box-shadow: 0 2px 8px rgba(0,0,0,.1); }
+.rep-btn-ghost .ms { font-size: 1.1rem; }
+.rep-btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 22px;
+  background: var(--accent);
+  border: none;
+  border-radius: 999px;
+  font-size: .82rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(59,79,210,.3);
+  transition: background .15s, box-shadow .15s, transform .1s;
+}
+.rep-btn-primary:hover { box-shadow: 0 6px 24px rgba(59,79,210,.4); transform: translateY(-1px); }
+.rep-btn-primary .ms { font-size: 1.1rem; }
+
+/* ─── KPI Cards Grid ─── */
+.rep-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 28px;
+}
+@media (max-width: 1100px) { .rep-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px)  { .rep-kpi-grid { grid-template-columns: 1fr; } }
+
+.rep-kpi-card {
+  background: var(--bg-card);
+  border-radius: 24px;
+  padding: 22px;
+  box-shadow: 0 4px 32px rgba(32,54,189,.04);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow .2s, transform .2s;
+}
+.rep-kpi-card:hover {
+  box-shadow: 0 8px 40px rgba(32,54,189,.09);
+  transform: translateY(-2px);
+}
+/* Highlight card (accent gradient) */
+.rep-kpi-card.highlight {
+  background: linear-gradient(135deg, var(--accent), #3e52d5);
+  color: #fff;
+  box-shadow: 0 8px 32px rgba(59,79,210,.28);
+}
+.rep-kpi-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.rep-kpi-icon {
+  width: 44px; height: 44px;
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.rep-kpi-icon .ms { font-size: 1.3rem; }
+.rep-kpi-icon.blue    { background: rgba(59,79,210,.08); color: var(--accent); }
+.rep-kpi-icon.teal    { background: rgba(0,81,92,.08);   color: #00515c; }
+.rep-kpi-icon.red     { background: rgba(186,26,26,.08); color: #ba1a1a; }
+.rep-kpi-icon.white   { background: rgba(255,255,255,.22); color: #fff; }
+.rep-kpi-badge {
+  font-size: .65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.rep-kpi-badge.up    { background: rgba(59,79,210,.1);  color: var(--accent); }
+.rep-kpi-badge.ok    { background: rgba(0,81,92,.1);    color: #00515c; }
+.rep-kpi-badge.down  { background: rgba(186,26,26,.1);  color: #ba1a1a; }
+.rep-kpi-badge.star  { background: rgba(255,255,255,.18); color: #fff; }
+.rep-kpi-badge .ms   { font-size: .7rem; }
+.rep-kpi-label { font-size: .8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
+.rep-kpi-card.highlight .rep-kpi-label { color: rgba(255,255,255,.75); }
+.rep-kpi-value { font-size: 1.6rem; font-weight: 900; color: var(--text-primary); font-family: 'Manrope', sans-serif; letter-spacing: -.03em; line-height: 1; }
+.rep-kpi-card.highlight .rep-kpi-value { color: #fff; font-size: 2rem; }
+.rep-kpi-bg-icon {
+  position: absolute;
+  bottom: -16px; right: -16px;
+  font-size: 5.5rem;
+  opacity: .05;
+  pointer-events: none;
+  transition: transform .5s;
+}
+.rep-kpi-card:hover .rep-kpi-bg-icon { transform: scale(1.1); }
+.rep-kpi-card.highlight .rep-kpi-bg-icon { opacity: .15; }
+
+/* ─── Bento Charts Row ─── */
+.rep-charts-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+@media (max-width: 1000px) { .rep-charts-row { grid-template-columns: 1fr; } }
+
+.rep-chart-card {
+  background: var(--bg-card);
+  border-radius: 24px;
+  padding: 28px 28px 24px;
+  box-shadow: 0 4px 32px rgba(32,54,189,.04);
+}
+.rep-chart-card-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+}
+.rep-chart-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: 'Manrope', sans-serif;
+}
+.rep-chart-legend { display: flex; align-items: center; gap: 6px; font-size: .75rem; font-weight: 600; color: var(--text-muted); }
+.rep-chart-legend-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+
+/* Cost breakdown bars */
+.rep-bar-rows { display: flex; flex-direction: column; gap: 22px; }
+.rep-bar-row-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.rep-bar-row-right { display: flex; align-items: center; gap: 8px; }
+.rep-bar-row-amt { color: var(--text-muted); font-weight: 600; }
+.rep-bar-pct-badge {
+  font-size: .65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.rep-bar-pct-badge.blue  { background: rgba(59,79,210,.1);  color: var(--accent); }
+.rep-bar-pct-badge.teal  { background: rgba(0,81,92,.1);    color: #00515c; }
+.rep-bar-pct-badge.red   { background: rgba(186,26,26,.1);  color: #ba1a1a; }
+.rep-bar-pct-badge.amber { background: rgba(245,158,11,.1); color: #d97706; }
+.rep-bar-track {
+  height: 14px;
+  background: var(--bg-input);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.rep-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width .8s cubic-bezier(.25,.46,.45,.94);
+}
+
+/* Hours gauge grid */
+.rep-gauge-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px 16px;
+  margin-bottom: 20px;
+}
+.rep-gauge-item { display: flex; flex-direction: column; align-items: center; }
+.rep-gauge-wrap { position: relative; width: 88px; height: 50px; margin-bottom: 6px; }
+.rep-gauge-wrap svg { width: 88px; height: 50px; overflow: visible; }
+.rep-gauge-pct {
+  position: absolute;
+  inset-x: 0;
+  bottom: 0;
+  text-align: center;
+  font-size: .85rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: 'Manrope', sans-serif;
+}
+.rep-gauge-label {
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+}
+.rep-gauge-info {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--bg-input);
+  border-radius: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.rep-gauge-info .ms { color: var(--accent); font-size: 1.1rem; flex-shrink: 0; }
+.rep-gauge-info-text { font-size: .7rem; line-height: 1.5; color: var(--text-muted); font-style: italic; }
+
+/* ─── Delays Table (premium) ─── */
+.rep-delays-card {
+  background: var(--bg-card);
+  border-radius: 26px;
+  padding: 28px;
+  box-shadow: 0 8px 56px rgba(32,54,189,.06);
+  overflow: hidden;
+}
+.rep-delays-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 0 4px;
+}
+.rep-delays-hd-left { display: flex; align-items: center; gap: 12px; }
+.rep-delays-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: 'Manrope', sans-serif;
+}
+.rep-kritisch-badge {
+  background: rgba(186,26,26,.12);
+  color: #ba1a1a;
+  font-size: .6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.rep-see-all {
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.rep-see-all:hover { text-decoration: underline; }
+
+.rep-delays-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 12px;
+}
+.rep-delays-table thead th {
+  font-size: .62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  color: var(--text-muted);
+  padding: 0 20px 4px;
+  text-align: left;
+}
+.rep-delays-table thead th:last-child { text-align: right; }
+.rep-delays-table tbody tr {
+  transition: background .13s;
+}
+.rep-delays-table tbody td {
+  padding: 14px 20px;
+  background: rgba(var(--bg-input-rgb, 241,243,244), .3);
+  font-size: .875rem;
+  vertical-align: middle;
+}
+.rep-delays-table tbody tr:hover td { background: transparent; }
+.rep-delays-table tbody td:first-child { border-radius: 16px 0 0 16px; }
+.rep-delays-table tbody td:last-child  { border-radius: 0 16px 16px 0; text-align: right; }
+
+.rep-emp-cell { display: flex; align-items: center; gap: 12px; }
+.rep-emp-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  font-size: .78rem;
+  font-weight: 700;
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.rep-emp-name  { font-weight: 700; color: var(--text-primary); }
+.rep-emp-pos   { font-size: .7rem; color: var(--text-muted); }
+.rep-dept-tag  {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: .65rem;
+  font-weight: 700;
+}
+.rep-late-count { font-weight: 700; color: var(--text-primary); }
+.rep-late-dur   { font-weight: 600; }
+.rep-late-dur.danger { color: #ba1a1a; }
+.rep-status-dot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.rep-status-dot .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.rep-action-btn {
+  padding: 8px;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--accent);
+  transition: background .13s;
+}
+.rep-action-btn:hover { background: rgba(59,79,210,.1); }
+.rep-action-btn .ms { font-size: 1.1rem; }
+
+/* ─── Sick Days / Dept bars section (admin) ─── */
+.rep-extra-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+@media (max-width: 900px) { .rep-extra-grid { grid-template-columns: 1fr; } }
+
+.rep-mini-card {
+  background: var(--bg-card);
+  border-radius: 24px;
+  padding: 24px 24px 20px;
+  box-shadow: 0 4px 28px rgba(32,54,189,.04);
+}
+.rep-mini-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: 'Manrope', sans-serif;
+  margin-bottom: 20px;
+}
+.rep-mini-bar-rows { display: flex; flex-direction: column; gap: 14px; }
+.rep-mini-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 5px;
+}
+.rep-mini-bar-label span:last-child { color: var(--text-muted); font-family: monospace; }
+.rep-mini-track { height: 10px; background: var(--bg-input); border-radius: 999px; overflow: hidden; }
+.rep-mini-fill  { height: 100%; border-radius: 999px; transition: width .7s ease; }

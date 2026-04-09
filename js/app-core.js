@@ -7,43 +7,44 @@ function toggleTheme(){const h=document.documentElement;const n=h.getAttribute('
 
 // ═══ DYNAMIC SIDEBAR ═══
 function buildSidebar(){
+  const mi = (name) => `<span class="ms">${name}</span>`;
   let html='';
-  html+='<div class="nav-section">Übersicht</div>';
-  html+='<div class="nav-item active" onclick="navigate(\'dashboard\',this)"><span class="nav-icon">📊</span> Dashboard</div>';
+  html+=`<div class="nav-section">Übersicht</div>`;
+  html+=`<div class="nav-item active" onclick="navigate('dashboard',this)">${mi('grid_view')} Dashboard</div>`;
 
   if(can('seeAllEmployees')){
-    html+='<div class="nav-section">Personal</div>';
-    html+='<div class="nav-item" onclick="navigate(\'employees\',this)"><span class="nav-icon">👥</span> Mitarbeiter</div>';
+    html+=`<div class="nav-section">Personal</div>`;
+    html+=`<div class="nav-item" onclick="navigate('employees',this)">${mi('people')} Mitarbeiter</div>`;
   }
   if(can('seeDepartments')){
-    if(!can('seeAllEmployees')) html+='<div class="nav-section">Personal</div>';
-    html+='<div class="nav-item" onclick="navigate(\'departments\',this)"><span class="nav-icon">🏢</span> Bereiche</div>';
+    if(!can('seeAllEmployees')) html+=`<div class="nav-section">Personal</div>`;
+    html+=`<div class="nav-item" onclick="navigate('departments',this)">${mi('domain')} Bereiche</div>`;
   }
 
-  html+='<div class="nav-section">Planung</div>';
-  html+='<div class="nav-item" onclick="navigate(\'schedule\',this)"><span class="nav-icon">📅</span> Arbeitsplan</div>';
-  html+='<div class="nav-item" onclick="navigate(\'vacation\',this)"><span class="nav-icon">🏖️</span> '+(can('seeAllVacations')?'Urlaubsplan':'Mein Urlaub')+'<span class="nav-badge" id="vacBadge" style="display:none">0</span></div>';
-  html+='<div class="nav-item" onclick="navigate(\'sick\',this)"><span class="nav-icon">🏥</span> '+(can('seeAllSick')?'Krankmeldungen':'Meine Krankmeldungen')+'<span class="nav-badge" id="sickBadge" style="display:none">0</span></div>';
+  html+=`<div class="nav-section">Planung</div>`;
+  html+=`<div class="nav-item" onclick="navigate('schedule',this)">${mi('calendar_month')} Arbeitsplan</div>`;
+  html+=`<div class="nav-item" onclick="navigate('vacation',this)">${mi('beach_access')} ${can('seeAllVacations')?'Urlaubsplan':'Mein Urlaub'}<span class="nav-badge" id="vacBadge" style="display:none">0</span></div>`;
+  html+=`<div class="nav-item" onclick="navigate('sick',this)">${mi('medical_services')} ${can('seeAllSick')?'Krankmeldungen':'Meine Krankmeldungen'}<span class="nav-badge" id="sickBadge" style="display:none">0</span></div>`;
 
-  html+='<div class="nav-section">Dokumente</div>';
-  html+='<div class="nav-item" onclick="navigate(\'documents\',this)"><span class="nav-icon">📁</span> '+(can('seeAllDocs')?'Unterlagen':'Meine Unterlagen')+'</div>';
-  html+='<div class="nav-item" onclick="navigate(\'checklists\',this)"><span class="nav-icon">✅</span> Checklisten</div>';
+  html+=`<div class="nav-section">Dokumente</div>`;
+  html+=`<div class="nav-item" onclick="navigate('documents',this)">${mi('folder')} ${can('seeAllDocs')?'Unterlagen':'Meine Unterlagen'}</div>`;
+  html+=`<div class="nav-item" onclick="navigate('checklists',this)">${mi('checklist')} Checklisten</div>`;
 
   // Ausbildung: visible to azubi (own data) + manager/inhaber (all azubis)
   if(currentUser.role==='azubi' || can('seeAllEmployees')){
-    html+='<div class="nav-section">Ausbildung</div>';
-    html+='<div class="nav-item" onclick="navigate(\'ausbildung\',this)"><span class="nav-icon">🎓</span> '+(currentUser.role==='azubi'?'Meine Ausbildung':'Ausbildung')+'</div>';
+    html+=`<div class="nav-section">Ausbildung</div>`;
+    html+=`<div class="nav-item" onclick="navigate('ausbildung',this)">${mi('school')} ${currentUser.role==='azubi'?'Meine Ausbildung':'Ausbildung'}</div>`;
   }
 
   if(can('seeAllEmployees')){
-    html+='<div class="nav-section">Auswertung</div>';
-    html+='<div class="nav-item" onclick="navigate(\'calendar\',this)"><span class="nav-icon">🗓️</span> Personalkalender</div>';
-    html+='<div class="nav-item" onclick="navigate(\'reports\',this)"><span class="nav-icon">📈</span> Berichte</div>';
+    html+=`<div class="nav-section">Auswertung</div>`;
+    html+=`<div class="nav-item" onclick="navigate('calendar',this)">${mi('event_note')} Personalkalender</div>`;
+    html+=`<div class="nav-item" onclick="navigate('reports',this)">${mi('analytics')} Berichte</div>`;
   }
 
   if(can('manageAccess')){
-    html+='<div class="nav-section">System</div>';
-    html+='<div class="nav-item" onclick="navigate(\'access\',this)"><span class="nav-icon">🔐</span> Zugangsverwaltung</div>';
+    html+=`<div class="nav-section">System</div>`;
+    html+=`<div class="nav-item" onclick="navigate('access',this)">${mi('admin_panel_settings')} Zugangsverwaltung</div>`;
   }
   document.getElementById('sidebarNav').innerHTML=html;
 }
@@ -383,98 +384,213 @@ function renderDashboard(){
     const locLogo = locLogos[currentLocation] || locLogos[currentUser.location] || '🏢';
 
     pg.innerHTML=`
+      <!-- Welcome Banner -->
       <div class="dash-welcome" style="${bannerStyle}">
         <div class="dash-welcome-overlay"></div>
-        <div class="dash-clock" id="dashClock">${timeStr}</div>
-        <div style="position:relative;display:flex;align-items:center;gap:16px">
-          <div class="dash-logo">${locLogo}</div>
-          <div>
-            <div class="dash-greeting">${greeting}, ${currentUser.name.split(' ')[0]} 👋</div>
-            <div class="dash-subtitle">${dateStr} · ${getLocationName(currentLocation)} · ${emps.length} Mitarbeiter</div>
+        <div style="position:relative;z-index:1">
+          <div class="dash-greeting-badge">Willkommen zurück</div>
+          <div class="dash-greeting">${currentUser.name.split(' ')[0]}<br>${currentUser.name.split(' ').slice(1).join(' ')}.</div>
+          <div class="dash-subtitle">Es sind heute ${todayShifts.length} Schichten geplant. ${emps.filter(e=>sickEmpIds.has(e.id)).length} Mitarbeiter krank gemeldet.</div>
+          ${can('editSchedules')?`<label class="dash-upload-btn" title="Hintergrundbild ändern">
+            <input type="file" accept="image/*" style="display:none" onchange="changeDashBanner(this)">
+            <span class="ms" style="font-size:1rem">wallpaper</span> Hintergrund ändern
+          </label>`:''}
+        </div>
+        <div class="dash-clock">
+          <div class="dash-clock-inner">
+            <div class="dash-clock-time" id="dashClock">${timeStr}</div>
+          </div>
+          <div class="dash-clock-date">${dateStr}</div>
+        </div>
+      </div>
+
+      <!-- Stat Cards -->
+      <div class="dash-stats-grid">
+        <div class="dash-stat" onclick="navigate('employees')">
+          <div class="dash-stat-icon blue"><span class="ms">person_check</span></div>
+          <div class="dash-stat-label">Active Employees</div>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span class="dash-stat-value">${activeEmps}</span>
+            <span class="dash-stat-sub green">+${Math.round(activeEmps/emps.length*100)}%</span>
           </div>
         </div>
-        ${can('editSchedules')?`<label class="dash-upload-btn" title="Hintergrundbild ändern">
-          <input type="file" accept="image/*" style="display:none" onchange="changeDashBanner(this)">📷
-        </label>`:''}
-      </div>
-
-      <div class="dash-stats-grid">
-        <div class="dash-stat" style="--stat-accent:#27ae60" onclick="navigate('employees')">
-          <div class="dash-stat-icon">👥</div>
-          <div class="dash-stat-value">${activeEmps}</div>
-          <div class="dash-stat-label">Aktive Mitarbeiter</div>
-          <div class="dash-stat-sub">von ${emps.length} gesamt</div>
+        <div class="dash-stat" onclick="navigate('vacation')">
+          ${pendingVacs>0?`<div class="dash-stat-badge" style="background:var(--warning)">${pendingVacs} Pending</div>`:''}
+          <div class="dash-stat-icon amber"><span class="ms">beach_access</span></div>
+          <div class="dash-stat-label">On Leave</div>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span class="dash-stat-value">${vacEmps}</span>
+            <span class="dash-stat-sub">${vacEmps===0?'Stable':'aktiv'}</span>
+          </div>
         </div>
-        <div class="dash-stat" style="--stat-accent:#0984e3" onclick="navigate('vacation')">
-          <div class="dash-stat-icon">🏖️</div>
-          <div class="dash-stat-value">${vacEmps}</div>
-          <div class="dash-stat-label">Im Urlaub</div>
-          <div class="dash-stat-sub">${pendingVacs} ${pendingVacs===1?'Antrag':'Anträge'} offen</div>
+        <div class="dash-stat" onclick="navigate('sick')">
+          ${activeSick>0?`<div class="dash-stat-badge" style="background:var(--danger)">${activeSick} Active</div>`:''}
+          <div class="dash-stat-icon rose"><span class="ms">medical_services</span></div>
+          <div class="dash-stat-label">Sick</div>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span class="dash-stat-value">${sickEmps}</span>
+            <span class="dash-stat-sub red">Meldungen</span>
+          </div>
         </div>
-        <div class="dash-stat" style="--stat-accent:#e74c3c" onclick="navigate('sick')">
-          <div class="dash-stat-icon">🏥</div>
-          <div class="dash-stat-value">${sickEmps}</div>
-          <div class="dash-stat-label">Krank</div>
-          <div class="dash-stat-sub">${activeSick} aktive Meldungen</div>
-        </div>
-        <div class="dash-stat" style="--stat-accent:#fdcb6e" onclick="navigate('schedule')">
-          <div class="dash-stat-icon">⏰</div>
-          <div class="dash-stat-value">${totalLate}</div>
-          <div class="dash-stat-label">Verspätungen</div>
-          <div class="dash-stat-sub">laufendes Jahr</div>
+        <div class="dash-stat" onclick="navigate('schedule')">
+          <div class="dash-stat-icon slate"><span class="ms">history</span></div>
+          <div class="dash-stat-label">Delays</div>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span class="dash-stat-value">${totalLate}</span>
+            <span class="dash-stat-sub">${totalLate<=3?'Great':'lfd. Jahr'}</span>
+          </div>
         </div>
       </div>
 
-      ${can('seeFinancials')?`<div class="dash-stats-grid">
-        <div class="dash-stat" style="--stat-accent:#667eea">
-          <div class="dash-stat-icon">💰</div>
-          <div class="dash-stat-value">${formatEuro(emps.reduce((s,e)=>s+e.bruttoGehalt,0))}</div>
-          <div class="dash-stat-label">Personalkosten / Monat</div>
-        </div>
-        <div class="dash-stat" style="--stat-accent:#00b894">
-          <div class="dash-stat-icon">⏱️</div>
-          <div class="dash-stat-value">${emps.reduce((s,e)=>s+calcPlanHours(e.id),0)}h</div>
-          <div class="dash-stat-label">Plan-Stunden</div>
-          <div class="dash-stat-sub">Soll: ${emps.reduce((s,e)=>s+e.sollStunden,0)}h</div>
-        </div>
-        <div class="dash-stat" style="--stat-accent:#a29bfe">
-          <div class="dash-stat-icon">💶</div>
-          <div class="dash-stat-value">${formatEuro(emps.filter(e=>e.sollStunden>0).length?emps.filter(e=>e.sollStunden>0).reduce((s,e)=>s+calcHourly(e),0)/emps.filter(e=>e.sollStunden>0).length:0)}</div>
-          <div class="dash-stat-label">⌀ Gehalt / Stunde</div>
-        </div>
-        <div class="dash-stat" style="--stat-accent:#fd79a8">
-          <div class="dash-stat-icon">🎓</div>
-          <div class="dash-stat-value">${emps.reduce((s,e)=>s+e.schuleTage,0)}</div>
-          <div class="dash-stat-label">Schule / Fortbildung</div>
-          <div class="dash-stat-sub">${emps.filter(e=>e.schuleTage>0).length} Mitarbeiter</div>
-        </div>
-      </div>`:``}
-
-      <div class="dash-grid">
-        <div class="dash-card">
-          <div class="dash-card-header">📍 Anwesenheit heute
-            <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
-              <div class="dash-ring">
-                <svg width="56" height="56"><circle class="dash-ring-bg" cx="28" cy="28" r="22" fill="none" stroke-width="4"/><circle class="dash-ring-fill" cx="28" cy="28" r="22" fill="none" stroke-width="4" stroke-dasharray="${circ}" stroke-dashoffset="${attOffset}" style="--ring-color:${attPct>=80?'var(--success)':attPct>=50?'var(--warning)':'var(--danger)'}"/></svg>
-                <span class="dash-ring-text">${attPct}%</span>
+      ${can('seeFinancials')?`
+      <!-- Financial + Shifts Bento -->
+      <div class="dash-bento">
+        <div class="dash-bento-main">
+          <div class="dash-card">
+            <div class="dash-card-header">
+              Monthly Personnel Costs
+              <div style="text-align:right">
+                <div style="font-size:1.6rem;font-weight:900;font-family:'Manrope',sans-serif;color:var(--accent)">${formatEuro(emps.reduce((s,e)=>s+e.bruttoGehalt,0))}</div>
+                <div style="font-size:.6rem;color:#16a34a;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Within Budget</div>
               </div>
-              <span style="font-size:.82rem;font-weight:400;color:var(--text-muted)">${checkedInCount}/${scheduledCount}</span>
+            </div>
+            <div class="dash-card-body">
+              <div style="display:flex;gap:20px;align-items:flex-end">
+                <div style="flex:1">
+                  <div class="dash-fin-bars" id="dashFinBars"></div>
+                  <div class="dash-fin-months" id="dashFinMonths"></div>
+                </div>
+                <div class="dash-fin-summary">
+                  <div class="dash-fin-box" style="background:var(--bg-input)">
+                    <div class="dash-fin-box-label">Trend</div>
+                    <div class="dash-fin-box-value">+${(emps.reduce((s,e)=>s+e.bruttoGehalt,0)/25000*14.2).toFixed(1)}%</div>
+                  </div>
+                  <div class="dash-fin-box" style="background:var(--accent);color:#fff">
+                    <div class="dash-fin-box-label" style="color:rgba(255,255,255,.65)">Summe</div>
+                    <div class="dash-fin-box-value" style="color:#fff">${formatEuro(emps.reduce((s,e)=>s+e.bruttoGehalt,0))}</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="dash-card-body" id="dashAttendance"></div>
         </div>
-        <div class="dash-card">
-          <div class="dash-card-header">🔔 Meldungen</div>
-          <div class="dash-card-body" id="dashNotifs"></div>
+        <div class="dash-bento-side">
+          <div class="dash-card" style="height:100%">
+            <div class="dash-card-header">Live Attendance<span class="dash-card-header-link" onclick="navigate('schedule')">Alle anzeigen</span></div>
+            <div class="dash-card-body">
+              <div class="dash-att-ring-wrap">
+                <div class="dash-donut-rel" style="width:160px;height:160px">
+                  <svg width="160" height="160" viewBox="0 0 160 160">
+                    <circle cx="80" cy="80" r="64" fill="transparent" stroke="var(--bg-input)" stroke-width="14"/>
+                    <circle cx="80" cy="80" r="64" fill="transparent" stroke="var(--accent)"
+                      stroke-dasharray="${2*Math.PI*64}" stroke-dashoffset="${2*Math.PI*64*(1-attPct/100)}"
+                      stroke-linecap="round" stroke-width="14"
+                      style="transform:rotate(-90deg);transform-origin:center;filter:drop-shadow(0 0 12px rgba(59,79,210,.3))"/>
+                  </svg>
+                  <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+                    <div class="dash-att-pct">${attPct}%</div>
+                    <div class="dash-att-quality">${attPct>=90?'Excellent':attPct>=70?'Good':'Fair'}</div>
+                  </div>
+                </div>
+              </div>
+              <div id="dashLocRows" style="margin-top:12px"></div>
+            </div>
+          </div>
         </div>
       </div>
 
+      <!-- Plan vs Actual + Attendance Grid -->
+      <div class="dash-grid-2">
+        <div class="dash-card">
+          <div class="dash-card-header">Plan vs. Actual Hours</div>
+          <div class="dash-card-body">
+            <div class="dash-donut-wrap">
+              <div class="dash-donut-rel" style="width:160px;height:160px">
+                <svg width="160" height="160" viewBox="0 0 160 160">
+                  <circle cx="80" cy="80" r="62" fill="transparent" stroke="var(--bg-input)" stroke-width="18"/>
+                  <circle cx="80" cy="80" r="62" fill="transparent" stroke="rgba(59,79,210,.55)"
+                    stroke-dasharray="${2*Math.PI*62}" stroke-dashoffset="${2*Math.PI*62*(1-Math.min(emps.reduce((s,e)=>s+calcPlanHours(e.id),0)/(emps.reduce((s,e)=>s+e.sollStunden,0)||1),1))}"
+                    stroke-linecap="round" stroke-width="18"/>
+                  <circle cx="80" cy="80" r="38" fill="transparent" stroke="var(--bg-input)" stroke-width="18"/>
+                  <circle cx="80" cy="80" r="38" fill="transparent" stroke="#818cf8"
+                    stroke-dasharray="${2*Math.PI*38}" stroke-dashoffset="${2*Math.PI*38*(1-Math.min(emps.reduce((s,e)=>s+calcPlanHours(e.id),0)/(emps.reduce((s,e)=>s+e.sollStunden,0)||1),1))}"
+                    stroke-linecap="round" stroke-width="18"/>
+                </svg>
+                <div class="dash-donut-center">
+                  <div class="dash-donut-center-lbl">Total Hours</div>
+                  <div class="dash-donut-center-val">${emps.reduce((s,e)=>s+calcPlanHours(e.id),0)}</div>
+                </div>
+              </div>
+              <div class="dash-donut-legend">
+                <div class="dash-donut-legend-item">
+                  <div class="dash-donut-legend-label"><span class="dash-donut-legend-dot" style="background:rgba(59,79,210,.55)"></span>Planned</div>
+                  <div class="dash-donut-legend-val">${emps.reduce((s,e)=>s+e.sollStunden,0)}h</div>
+                </div>
+                <div class="dash-donut-legend-item">
+                  <div class="dash-donut-legend-label"><span class="dash-donut-legend-dot" style="background:#818cf8"></span>Actual</div>
+                  <div class="dash-donut-legend-val">${emps.reduce((s,e)=>s+calcPlanHours(e.id),0)}h</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-header">Team Planning Overview
+            <div style="display:flex;gap:4px">
+              <button style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;border-radius:6px" class="hover-bg"><span class="ms">chevron_left</span></button>
+              <button style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;border-radius:6px" class="hover-bg"><span class="ms">chevron_right</span></button>
+            </div>
+          </div>
+          <div class="dash-card-body" id="dashShifts"></div>
+        </div>
+      </div>
+
+      <!-- GPS Attendance -->
+      <div class="dash-card" style="margin-bottom:24px">
+        <div class="dash-card-header">GPS Anwesenheit
+          <span style="margin-left:auto;font-weight:400;font-size:.78rem;color:var(--text-muted)">${checkedInCount}/${scheduledCount} eingestempelt</span>
+        </div>
+        <div class="dash-card-body" id="dashAttendance"></div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="dash-card" style="margin-bottom:24px">
+        <div class="dash-card-header">🔔 Aktivitäten</div>
+        <div class="dash-card-body" id="dashNotifs" style="padding-left:32px;position:relative"></div>
+      </div>
+      `:``}
+
+      ${!can('seeFinancials')?`
+      <div class="dash-bento">
+        <div class="dash-bento-main">
+          <div class="dash-card">
+            <div class="dash-card-header">📍 Anwesenheit heute
+              <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+                <div class="dash-ring">
+                  <svg width="56" height="56"><circle class="dash-ring-bg" cx="28" cy="28" r="22" fill="none" stroke-width="4"/><circle class="dash-ring-fill" cx="28" cy="28" r="22" fill="none" stroke-width="4" stroke-dasharray="${circ}" stroke-dashoffset="${attOffset}" style="--ring-color:${attPct>=80?'var(--success)':attPct>=50?'var(--warning)':'var(--danger)'}"/></svg>
+                  <span class="dash-ring-text">${attPct}%</span>
+                </div>
+                <span style="font-size:.82rem;font-weight:400;color:var(--text-muted)">${checkedInCount}/${scheduledCount}</span>
+              </div>
+            </div>
+            <div class="dash-card-body" id="dashAttendance"></div>
+          </div>
+        </div>
+        <div class="dash-bento-side">
+          <div class="dash-card">
+            <div class="dash-card-header">📝 Meldungen</div>
+            <div class="dash-card-body" id="dashNotifs" style="padding-left:32px;position:relative"></div>
+          </div>
+        </div>
+      </div>
       <div class="dash-card" style="margin-bottom:20px">
         <div class="dash-card-header">📋 Heutige Schichten <span style="margin-left:auto;font-weight:400;color:var(--text-muted);font-size:.78rem">${todayShifts.length} Schichten</span></div>
         <div class="dash-card-body" id="dashShifts"></div>
-      </div>`;
+      </div>
+      `:``}
+    `;
 
-    // Start live clock
+        // Start live clock
     if(window._dashClockTimer) clearInterval(window._dashClockTimer);
     window._dashClockTimer=setInterval(()=>{
       const el=document.getElementById('dashClock');
@@ -484,10 +600,61 @@ function renderDashboard(){
 
     // Populate notifications
     const notifs=getVisibleNotifs().slice(0,5);
-    document.getElementById('dashNotifs').innerHTML=notifs.map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('')||'<p style="color:var(--text-muted)">Keine Meldungen</p>';
+    const notifsHtml=notifs.map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('')||'<p style="color:var(--text-muted)">Keine Meldungen</p>';
+    const _dn=document.getElementById('dashNotifs'); if(_dn)_dn.innerHTML=notifsHtml;
+    const _dnr=document.getElementById('dashNotifsRight'); if(_dnr)_dnr.innerHTML=notifsHtml;
 
-    // Populate today shifts
-    document.getElementById('dashShifts').innerHTML=todayShifts.slice(0,8).map(s=>`<div class="emp-row"><div class="emp-avatar">${s.empName.split(' ').map(n=>n[0]).join('')}</div><div class="emp-details"><div class="emp-name-sm">${s.empName}${s.isLate?' <span class="badge badge-late">⏰+'+s.lateMin+'m</span>':''}</div><div class="emp-dept">${s.dept} · ${s.from}–${s.to}</div></div></div>`).join('')||'<p style="color:var(--text-muted)">Keine Schichten</p>';
+    // Populate financial bar chart (owner only)
+    const _fb=document.getElementById('dashFinBars');
+    const _fm=document.getElementById('dashFinMonths');
+    if(_fb&&_fm){
+      const totalBrutto=emps.reduce((s,e)=>s+e.bruttoGehalt,0);
+      const monthData=[totalBrutto*.55,totalBrutto*.7,totalBrutto*.6,totalBrutto*.85,totalBrutto*.78,totalBrutto];
+      const maxVal=Math.max(...monthData);
+      const monthNames=['Mai','Jun','Jul','Aug','Sep','Okt'];
+      _fb.innerHTML=monthData.map((v,i)=>`<div class="dash-fin-bar${i===5?' current':''}" style="height:${Math.round(v/maxVal*100)}%"><span class="dash-fin-bar-label">${Math.round(v/1000)}k</span></div>`).join('');
+      _fm.innerHTML=monthNames.map((m,i)=>`<span class="dash-fin-month${i===5?' current':''}">${m}</span>`).join('');
+    }
+
+
+    // Populate location attendance rows (admin)
+    const _dlr=document.getElementById('dashLocRows');
+    if(_dlr){
+      const locRows=LOCS.map((loc,i)=>{
+        const locShifts=todayShifts.filter(s=>s.location===loc.id);
+        const locCheckins=todayCheckins.filter(r=>locShifts.find(s=>s.empId===r.empId));
+        const pct=locShifts.length>0?Math.round(locCheckins.length/locShifts.length*100):0;
+        const dotColors=['var(--accent)','#a5b4fc','#cbd5e1'];
+        return`<div class="dash-loc-row">
+          <span class="dash-loc-dot" style="background:${dotColors[i%dotColors.length]}"></span>
+          <span class="dash-loc-name">${loc.name}</span>
+          <span class="dash-loc-pct">${pct}%</span>
+        </div>`;
+      }).join('');
+      _dlr.innerHTML=locRows||'<p style="color:var(--text-muted);font-size:.8rem">Keine Standortdaten</p>';
+    }
+
+    // Populate today shifts as premium team rows
+    const _ds=document.getElementById('dashShifts');
+    if(_ds){
+      const shiftStatusMap={pending:'pending',active:'active','active':'active',late:'sick'};
+      _ds.innerHTML=todayShifts.slice(0,5).map(s=>{
+        const isLate=s.isLate;
+        const rec=todayCheckins.find(r=>r.empId===s.empId);
+        const badgeCls=isLate?'sick':rec?'done':'active';
+        const badgeTxt=isLate?`⏰+${s.lateMin}m`:rec?'Eingest.':'Geplant';
+        return`<div class="dash-team-row">
+          <div class="dash-team-avatar">${s.empName.split(' ').map(n=>n[0]).join('').substring(0,2)}</div>
+          <div class="dash-team-info">
+            <div class="dash-team-name">${s.empName}</div>
+            <div class="dash-team-sub">${s.dept} · ${s.from}–${s.to}</div>
+          </div>
+          <span class="dash-team-badge ${badgeCls}">${badgeTxt}</span>
+          <button class="dash-team-arrow"><span class="ms">arrow_forward_ios</span></button>
+        </div>`;
+      }).join('')||'<p style="color:var(--text-muted)">Keine Schichten</p>';
+    }
+
 
     // Populate GPS attendance
     const todayShiftEmps = [...new Set(todayShifts.map(s => s.empId))];
@@ -608,35 +775,207 @@ function renderEmployees(){
   if(!can('seeAllEmployees')){pg.innerHTML=permBanner('Mitarbeiter-Ansicht ist nur für Manager und Inhaber verfügbar.');return;}
   const emps=getVisibleEmps();
   const isAdmin=can('seeFinancials');
-  pg.innerHTML=`<div class="table-wrap"><div class="table-header"><span class="table-title">Mitarbeiterliste</span><div class="table-actions">
-    <input class="form-input" style="width:200px;margin:0" placeholder="Suchen..." oninput="filterEmps(this.value)">
-    ${can('editEmployees')?'<button class="btn btn-primary" onclick="openModal(\'addEmployee\')">+ Mitarbeiter</button>':''}
-  </div></div><div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Standort</th><th>Bereich</th><th>Position</th><th>Resturlaub</th><th>Krankentage</th><th>Verspätungen</th>${isAdmin?'<th>🎓 Schule</th><th>Plan-Std.</th><th>Soll-Std.</th><th>Brutto</th><th>€/Std.</th>':''}<th>Status</th><th>Aktionen</th></tr></thead><tbody id="empTB"></tbody></table></div></div>`;
+  const todayStr=isoDate(new Date());
+  const onVac=VACS.filter(v=>v.status==='approved'&&v.from<=todayStr&&v.to>=todayStr).length;
+  const onSick=SICKS.filter(s=>s.status==='active'&&s.from<=todayStr&&s.to>=todayStr).length;
+  const lateTotal=emps.reduce((a,e)=>a+e.lateCount,0);
+  const activeCount=emps.filter(e=>e.status==='aktiv').length;
+
+  pg.innerHTML=`
+  <!-- Page Header -->
+  <div class="mit-page-hd">
+    <div>
+      <h2 class="mit-page-title">Personalverwaltung</h2>
+      <p class="mit-page-sub">Verwalten Sie Ihr Team, analysieren Sie Leistungskennzahlen und steuern Sie Personalprozesse zentral an einem Ort.</p>
+    </div>
+    ${can('editEmployees')?`<button class="mit-add-btn" onclick="openModal('addEmployee')"><span class="ms">person_add</span> Mitarbeiter hinzufügen</button>`:''}
+  </div>
+
+  <!-- Stats -->
+  <div class="mit-stats-grid">
+    <div class="mit-stat-card">
+      <div class="mit-stat-bg-circle"></div>
+      <div class="mit-stat-card-top">
+        <div class="mit-stat-icon blue"><span class="ms">groups</span></div>
+        <span class="mit-stat-badge up">+4%</span>
+      </div>
+      <div class="mit-stat-num blue">${emps.length}</div>
+      <div class="mit-stat-label">Aktive Mitarbeiter</div>
+    </div>
+    <div class="mit-stat-card">
+      <div class="mit-stat-bg-circle"></div>
+      <div class="mit-stat-card-top">
+        <div class="mit-stat-icon teal"><span class="ms">beach_access</span></div>
+        <span class="mit-stat-badge ok">Urlaub</span>
+      </div>
+      <div class="mit-stat-num teal">${onVac}</div>
+      <div class="mit-stat-label">Im Urlaub</div>
+    </div>
+    <div class="mit-stat-card">
+      <div class="mit-stat-bg-circle"></div>
+      <div class="mit-stat-card-top">
+        <div class="mit-stat-icon red"><span class="ms">medical_services</span></div>
+        <span class="mit-stat-badge danger">Krank</span>
+      </div>
+      <div class="mit-stat-num red">${onSick}</div>
+      <div class="mit-stat-label">Krankmeldungen</div>
+    </div>
+    <div class="mit-stat-card">
+      <div class="mit-stat-bg-circle"></div>
+      <div class="mit-stat-card-top">
+        <div class="mit-stat-icon orange"><span class="ms">timer_off</span></div>
+        <span class="mit-stat-badge warn">7 Tage</span>
+      </div>
+      <div class="mit-stat-num orange">${lateTotal}</div>
+      <div class="mit-stat-label">Verspätungen</div>
+    </div>
+  </div>
+
+  <!-- Control Bar -->
+  <div class="mit-control-bar">
+    <div class="mit-ctrl-left">
+      <button class="mit-filter-btn"><span class="ms">filter_alt</span> Alle Filter</button>
+      <div class="mit-dept-pills" id="mitDeptPills">
+        <button class="mit-dept-pill active" onclick="filterEmpsByDept('all',this)">Alle Bereiche</button>
+        ${[...new Set(emps.map(e=>e.dept))].sort().map(d=>`<button class="mit-dept-pill" onclick="filterEmpsByDept('${d}',this)">${d}</button>`).join('')}
+      </div>
+    </div>
+    <div class="mit-ctrl-right">
+      <div class="mit-search-wrap">
+        <span class="ms">search</span>
+        <input class="mit-search" placeholder="Suchen..." oninput="filterEmps(this.value)">
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="mit-table-card">
+    <div class="mit-table-scroll">
+      <table class="mit-table">
+        <thead><tr>
+          <th>Name & Position</th>
+          <th>Standort / Dept.</th>
+          <th>Resturlaub</th>
+          <th>Kranktage</th>
+          <th>Verspätungen</th>
+          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th>€/Std.</th>':''}
+          <th class="tc">Status</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="empTB"></tbody>
+      </table>
+    </div>
+    <div class="mit-pagination"><span class="mit-pag-info">Zeige <strong>${emps.length}</strong> Mitarbeiter</span></div>
+  </div>
+
+  <!-- Bottom Bento -->
+  <div class="mit-bottom-row">
+    <div class="mit-cert-card">
+      <div class="mit-cert-hd">
+        <span class="mit-cert-title">Anstehende Zertifizierungen</span>
+        <button class="mit-cert-see-all">Alle ansehen</button>
+      </div>
+      <div class="mit-cert-item">
+        <div class="mit-cert-icon"><span class="ms">verified_user</span></div>
+        <div class="mit-cert-info">
+          <div class="mit-cert-name">Hygiene-Schulung HACCP</div>
+          <div class="mit-cert-due">${emps.length} Mitarbeiter – demnächst fällig</div>
+        </div>
+        <button class="mit-cert-plan-btn">Planen</button>
+      </div>
+    </div>
+    <div class="mit-insight-card">
+      <div class="mit-insight-blob"></div>
+      <div>
+        <span class="ms mit-insight-icon">auto_awesome</span>
+        <div class="mit-insight-title">Effizienz-Check</div>
+        <p class="mit-insight-body">
+          ${onSick>0?`Aktuell ${onSick} Mitarbeiter krank. Prüfen Sie die Arbeitspläne für Vertretungen.`:'Alle Arbeitspläne im grünen Bereich. Keine kritischen Ausfälle.'}
+        </p>
+      </div>
+      <button class="mit-insight-cta" onclick="navigate('reports')">Bericht öffnen</button>
+    </div>
+  </div>`;
+
   renderEmpRows(emps);
 }
+
 function renderEmpRows(emps){
   const isAdmin=can('seeFinancials');
+  const _ys1=isoDate(new Date(new Date().getFullYear(),0,1));
+  const DEPT_COLORS={'Küche':'#10b981','Service':'#3b4fd2','Bar':'#f97316','Sushi':'#8b5cf6','Ausbildung':'#a29bfe','Verwaltung':'#e11d48'};
   document.getElementById('empTB').innerHTML=emps.map(e=>{
-    const vr=e.vacTotal-e.vacUsed;const pl=VACS.filter(v=>v.empId===e.id&&(v.status==='approved'||v.status==='pending')&&v.from>='2026-03-20').reduce((s,v)=>s+v.days,0);
-    const planH=calcPlanHours(e.id);
-    const hourly=calcHourly(e);
+    const vr=e.vacTotal-e.vacUsed;
+    const pl=VACS.filter(v=>v.empId===e.id&&(v.status==='approved'||v.status==='pending')&&v.from>=_ys1).reduce((s,v)=>s+v.days,0);
+    const vacRemain=vr-pl;const vacUsedPct=e.vacTotal>0?Math.round(pl/e.vacTotal*100):0;
+    const planH=calcPlanHours(e.id);const hourly=calcHourly(e);
     const sollDiff=e.sollStunden>0?planH-e.sollStunden:0;
     const sollColor=sollDiff>=0?'var(--success)':sollDiff>=-10?'var(--warning)':'var(--danger)';
-    return`<tr><td><div style="display:flex;align-items:center;gap:10px"><div class="emp-avatar">${e.avatar}</div><strong style="color:var(--text-primary)">${e.name}</strong></div></td>
-    <td>${getLocationName(e.location)}</td><td>${e.dept}</td><td>${e.position}</td>
-    <td><span class="emp-pill vac">${vr-pl}/${e.vacTotal}</span></td>
-    <td><span class="emp-pill sick">${e.sickDays}T</span></td>
-    <td>${e.lateCount?`<span class="emp-pill late">${e.lateCount}×</span>`:'—'}</td>
-    ${isAdmin?`<td>${e.schuleTage>0?`<span class="emp-pill" style="background:rgba(162,155,254,.12);color:#a29bfe">${e.schuleTage}T</span>`:'—'}</td>
-    <td><span style="font-family:'Space Mono',monospace;font-size:.8rem;color:${sollColor}">${planH}h</span></td>
-    <td><span style="font-family:'Space Mono',monospace;font-size:.8rem">${e.sollStunden}h</span></td>
-    <td><span style="font-family:'Space Mono',monospace;font-size:.8rem">${formatEuro(e.bruttoGehalt)}</span></td>
-    <td><span style="font-family:'Space Mono',monospace;font-size:.8rem">${formatEuro(hourly)}</span></td>`:''}
-    <td>${statusBadge(e.status)}</td>
-    <td><button class="btn btn-sm" onclick="viewEmp(${e.id})">Details</button>${can('markLate')?` <button class="btn btn-sm" onclick="openLateModal(${e.id})">⏰</button>`:''}</td></tr>`;
+    const initials=e.name.split(' ').map(n=>n[0]).join('').substring(0,2);
+    const deptColor=DEPT_COLORS[e.dept]||'var(--accent)';
+    const avatarBg=e.color||deptColor;
+    // Status badge
+    let statusHTML='';
+    const st=(e.status||'').toLowerCase();
+    if(st==='aktiv'||st==='active')statusHTML='<span class="mit-status-aktiv">Aktiv</span>';
+    else if(st==='urlaub'||st==='vacation')statusHTML='<span class="mit-status-urlaub">Urlaub</span>';
+    else if(st==='krank'||st==='sick')statusHTML='<span class="mit-status-krank">Krank</span>';
+    else statusHTML='<span class="mit-status-inactive">'+(e.status||'—')+'</span>';
+    // Online dot color
+    const dotColor=st==='aktiv'||st==='active'?'#22c55e':st==='urlaub'||st==='vacation'?'#f59e0b':'#94a3b8';
+    return`<tr class="mit-emp-row">
+      <td>
+        <div class="mit-emp-cell">
+          <div class="mit-emp-dot" style="background:${avatarBg}">
+            ${initials}
+            <span class="mit-emp-online-dot" style="background:${dotColor}"></span>
+          </div>
+          <div>
+            <div class="mit-emp-name">${e.name}</div>
+            <div class="mit-emp-sub">${e.position||e.dept}</div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <div class="mit-loc-main">${getLocationName(e.location)}</div>
+        <div class="mit-loc-sub">${e.dept}</div>
+      </td>
+      <td>
+        <div class="mit-vac-wrap">
+          <div class="mit-vac-nums">
+            <span class="mit-vac-remain">${vacRemain} Tage</span>
+            <span class="mit-vac-total">/ ${e.vacTotal}</span>
+          </div>
+          <div class="mit-vac-bar"><div class="mit-vac-fill" style="width:${vacUsedPct}%"></div></div>
+        </div>
+      </td>
+      <td><span class="${e.sickDays>3?'mit-pill sick':''}" style="${e.sickDays<=3?'font-size:.82rem;color:var(--text-muted)':''}">${e.sickDays}</span></td>
+      <td>${e.lateCount?`<span class="mit-pill late">${e.lateCount}×</span>`:'—'}</td>
+      ${isAdmin?`
+        <td>${e.schuleTage>0?`<span class="mit-pill schule">${e.schuleTage}T</span>`:'—'}</td>
+        <td><span class="mit-mono" style="color:${sollColor}">${planH}h</span></td>
+        <td><span class="mit-mono">${e.sollStunden}h</span></td>
+        <td><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
+        <td><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
+      `:''}
+      <td class="tc">${statusHTML}</td>
+      <td>
+        <div class="mit-actions">
+          ${can('markLate')?`<button class="mit-icon-btn" onclick="openLateModal(${e.id})" title="Verspätung"><span class="ms">alarm_on</span></button>`:''}
+          <button class="mit-detail-btn" onclick="viewEmp(${e.id})">Details</button>
+        </div>
+      </td>
+    </tr>`;
   }).join('');
 }
+
 function filterEmps(q){const emps=getVisibleEmps().filter(e=>e.name.toLowerCase().includes(q.toLowerCase())||e.dept.toLowerCase().includes(q.toLowerCase()));renderEmpRows(emps);}
+function filterEmpsByDept(dept,btn){
+  document.querySelectorAll('.emp-filter-pill').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const emps=dept==='all'?getVisibleEmps():getVisibleEmps().filter(e=>e.dept===dept);
+  renderEmpRows(emps);
+}
 function viewEmp(id){
   const e=EMPS.find(x=>x.id===id);if(!e)return;
   const ev=VACS.filter(v=>v.empId===id),es=SICKS.filter(s=>s.empId===id),ed=DOCS.filter(d=>d.empId===id);
@@ -768,7 +1107,18 @@ function renderDepts(){
   const isAdmin=can('seeFinancials');
   const today=isoDate(new Date());
 
-  let html='<div style="display:grid;gap:16px">';
+  let html=`
+  <div class="dept-page-hd">
+    <div>
+      <h2 class="dept-page-title">Abteilungsübersicht</h2>
+      <p class="dept-page-sub">Verwalten Sie Ihre Teams, verfolgen Sie die Personalkosten und optimieren Sie die Schichtplanung.</p>
+    </div>
+    ${can('editDepartments')?`<button class="dept-add-btn" onclick="openModal('addDept')"><span class="ms">add</span> Neuer Bereich</button>`:''}
+  </div>
+  <div class="dept-accordion">`;
+
+  if(!depts.length) html+=`<div class="dept-empty"><span class="ms">domain</span><p>Keine Bereiche gefunden.</p></div>`;
+
   depts.forEach(dept=>{
     const deptEmps=EMPS.filter(e=>e.dept===dept.name&&e.location===dept.location);
     const activeCount=deptEmps.filter(e=>e.status==='active').length;
@@ -780,66 +1130,133 @@ function renderDepts(){
     const totalCost=isAdmin?deptEmps.reduce((s,e)=>s+e.bruttoGehalt,0):0;
     const todayShifts=SHIFTS.filter(s=>s.dept===dept.name&&s.location===dept.location&&s.date===today&&!s.isSick&&!s.isVacation);
     const deptId='dept_'+dept.id;
+    const city=LOCS.find(l=>l.id===dept.location)?.city||LOCS.find(l=>l.id===dept.location)?.name||'';
+    const pctColor=hoursPct>=90?'#10b981':hoursPct>=70?'#f59e0b':'#ef4444';
+    const barGrad=`linear-gradient(90deg,${pctColor},${pctColor}88)`;
 
-    html+=`<div class="dash-card">
-      <div class="dash-card-header" style="cursor:pointer;user-select:none" onclick="document.getElementById('${deptId}').style.display=document.getElementById('${deptId}').style.display==='none'?'block':'none';this.querySelector('.dept-arrow').textContent=document.getElementById('${deptId}').style.display==='none'?'▸':'▾'">
-        <div style="width:4px;height:28px;border-radius:4px;background:${dept.color};margin-right:8px"></div>
-        <div style="flex:1">
-          <div style="font-size:.95rem">${dept.name} <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">· ${LOCS.find(l=>l.id===dept.location)?.city||''}</span></div>
-          <div style="font-size:.72rem;color:var(--text-muted);font-weight:400;margin-top:2px">Leitung: ${dept.head}</div>
+    html+=`
+    <div class="dept-card">
+      <div class="dept-card-header" onclick="(function(el){
+        const body=document.getElementById('${deptId}');
+        const open=body.classList.toggle('is-open');
+        el.querySelector('.dept-toggle-arrow').classList.toggle('is-open',open);
+      })(this)">
+        <div class="dept-color-bar" style="border-left-color:${dept.color||'#6366f1'}"></div>
+        <div class="dept-header-name-block">
+          <div class="dept-card-name">${dept.name}</div>
+          <div class="dept-card-location"><span class="ms">location_on</span>${city}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:16px;font-size:.78rem;font-weight:400">
-          <span title="Aktiv">👥 ${activeCount}</span>
-          ${sickCount?`<span style="color:var(--danger)" title="Krank">🏥 ${sickCount}</span>`:''}
-          ${vacCount?`<span style="color:var(--info)" title="Urlaub">🏖️ ${vacCount}</span>`:''}
-          <span title="Heute im Dienst">📋 ${todayShifts.length}</span>
-          ${isAdmin?`<span style="font-family:'Space Mono',monospace" title="Personalkosten">💰 ${formatEuro(totalCost)}</span>`:''}
+        <div class="dept-divider"></div>
+        <div class="dept-leitung-block">
+          <div class="dept-leitung-label">Leitung</div>
+          <div class="dept-leitung-name">${dept.head||'—'}</div>
         </div>
-        <span class="dept-arrow" style="margin-left:12px;font-size:1rem;color:var(--text-muted)">▸</span>
+        <div class="dept-stats">
+          <div class="dept-stat-badge is-active"><span class="dept-stat-label">👥 Aktiv</span><span class="dept-stat-val">${activeCount}</span></div>
+          <div class="dept-stat-badge is-sick"><span class="dept-stat-label">🏥 Krank</span><span class="dept-stat-val">${sickCount}</span></div>
+          <div class="dept-stat-badge is-vacation"><span class="dept-stat-label">🏖️ Urlaub</span><span class="dept-stat-val">${vacCount}</span></div>
+          <div class="dept-stat-badge is-dienst"><span class="dept-stat-label">📋 Dienst</span><span class="dept-stat-val">${todayShifts.length}</span></div>
+        </div>
+        ${isAdmin?`<div class="dept-divider"></div><div class="dept-cost-block"><div class="dept-cost-label">Personalkosten</div><div class="dept-cost-val">${formatEuro(totalCost)}</div></div>`:''}
+        <span class="ms dept-toggle-arrow">expand_more</span>
       </div>
-      <div id="${deptId}" style="display:none">
-        <div style="padding:16px 20px;border-top:1px solid var(--border)">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-            <div style="flex:1">
-              <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:4px">Plan-Stunden: ${totalHours}h / ${sollHours}h Soll (${hoursPct}%)</div>
-              <div style="background:var(--bg-input);border-radius:8px;height:8px;overflow:hidden">
-                <div style="background:${hoursPct>=90?'var(--success)':hoursPct>=70?'var(--warning)':'var(--danger)'};height:100%;width:${Math.min(hoursPct,100)}%;border-radius:8px;transition:width .5s"></div>
+
+      <div class="dept-card-body" id="${deptId}">
+        <div class="dept-body-grid">
+          <div class="dept-left-panel">
+            <div class="dept-progress-card">
+              <div class="dept-progress-hd">
+                <div>
+                  <div class="dept-progress-label">Plan-Stunden</div>
+                  <div class="dept-progress-pct">${hoursPct}% <span>erfüllt</span></div>
+                </div>
+                <span class="ms" style="color:${pctColor};font-size:1.4rem">${hoursPct>=80?'trending_up':'trending_down'}</span>
               </div>
+              <div class="dept-progress-bar-track">
+                <div class="dept-progress-bar-fill" style="width:${Math.min(hoursPct,100)}%;background:${barGrad}"></div>
+              </div>
+              <div class="dept-progress-hint">${totalHours}h / ${sollHours}h Soll · Optimaler Bereich: 80–90%</div>
             </div>
+            ${todayShifts.length?`
+            <div>
+              <div class="dept-shifts-title"><span class="ms">schedule</span> Heutige Schichten</div>
+              <div class="dept-shift-pills">
+                ${todayShifts.map(s=>{
+                  const dotColor=s.from<'14:00'?'#10b981':'#f97316';
+                  return `<span class="dept-shift-pill"><span class="dept-shift-dot" style="background:${dotColor}"></span>${s.empName.split(' ')[0]} ${s.from}–${s.to}</span>`;
+                }).join('')}
+              </div>
+            </div>`:`<div style="font-size:.8rem;color:var(--text-muted);text-align:center;padding:16px 0"><span class="ms" style="display:block;font-size:1.8rem;margin-bottom:4px">event_busy</span>Keine Schichten heute</div>`}
           </div>
-          <table style="width:100%"><thead><tr>
-            <th style="text-align:left;font-size:.72rem;padding:6px 8px">Mitarbeiter</th>
-            <th style="text-align:left;font-size:.72rem;padding:6px 8px">Position</th>
-            <th style="text-align:center;font-size:.72rem;padding:6px 8px">Status</th>
-            <th style="text-align:right;font-size:.72rem;padding:6px 8px">Plan-Std.</th>
-            ${isAdmin?'<th style="text-align:right;font-size:.72rem;padding:6px 8px">Brutto</th>':''}
-          </tr></thead><tbody>
-          ${deptEmps.map(e=>{
-            const planH=calcPlanHours(e.id);
-            const pctH=e.sollStunden>0?Math.round(planH/e.sollStunden*100):0;
-            return `<tr style="border-top:1px solid var(--border)">
-              <td style="padding:8px"><div style="display:flex;align-items:center;gap:8px"><div class="emp-avatar" style="width:28px;height:28px;font-size:.65rem">${e.avatar}</div><strong style="font-size:.82rem;color:var(--text-primary)">${e.name}</strong></div></td>
-              <td style="padding:8px;font-size:.78rem;color:var(--text-muted)">${e.position}</td>
-              <td style="padding:8px;text-align:center">${statusBadge(e.status)}</td>
-              <td style="padding:8px;text-align:right"><span style="font-family:'Space Mono',monospace;font-size:.78rem;color:${pctH>=90?'var(--success)':pctH>=70?'var(--warning)':'var(--text-muted)'}">${planH}h</span><span style="font-size:.65rem;color:var(--text-muted)">/${e.sollStunden}h</span></td>
-              ${isAdmin?`<td style="padding:8px;text-align:right;font-family:'Space Mono',monospace;font-size:.78rem">${formatEuro(e.bruttoGehalt)}</td>`:''}
-            </tr>`;
-          }).join('')}
-          </tbody></table>
-          ${todayShifts.length?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-            <div style="font-size:.75rem;color:var(--text-muted);font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">📋 Heute im Dienst</div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px">${todayShifts.map(s=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--bg-input);border-radius:8px;font-size:.78rem"><strong>${s.empName.split(' ')[0]}</strong><span style="color:var(--text-muted)">${s.from}–${s.to}</span></div>`).join('')}</div>
-          </div>`:''}
+          <div class="dept-emp-table-wrap">
+            <table class="dept-emp-table">
+              <thead><tr>
+                <th>Mitarbeiter</th><th>Position</th>
+                <th class="center">Status</th><th class="center">Plan-Std.</th>
+                ${isAdmin?'<th style="text-align:right">Brutto</th>':''}
+              </tr></thead>
+              <tbody>
+                ${deptEmps.length?deptEmps.map(e=>{
+                  const planH=calcPlanHours(e.id);
+                  const pctH=e.sollStunden>0?Math.round(planH/e.sollStunden*100):0;
+                  const hc=pctH>=90?'#059669':pctH>=70?'#d97706':'#dc2626';
+                  return `<tr>
+                    <td class="name-cell"><div style="display:flex;align-items:center;gap:10px"><div class="emp-avatar" style="width:32px;height:32px;font-size:.7rem;border-radius:10px">${e.avatar}</div>${e.name}</div></td>
+                    <td>${e.position||'—'}</td>
+                    <td class="status-cell">${statusBadge(e.status)}</td>
+                    <td class="hours-cell"><span style="font-weight:700;color:${hc}">${planH}h</span><span style="font-size:.7rem;color:var(--text-muted)">/${e.sollStunden}h</span></td>
+                    ${isAdmin?`<td class="cost-cell">${formatEuro(e.bruttoGehalt)}</td>`:''}
+                  </tr>`;
+                }).join(''):`<tr><td colspan="${isAdmin?5:4}" style="text-align:center;padding:24px;color:var(--text-muted)">Keine Mitarbeiter</td></tr>`}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>`;
   });
-  html+='</div>';
+
+  html+=`</div>`;
+
+  if(isAdmin && depts.length){
+    const allEmps=EMPS.filter(e=>depts.some(d=>d.name===e.dept&&d.location===e.location));
+    const totalCostAll=allEmps.reduce((s,e)=>s+e.bruttoGehalt,0);
+    const avgPct=depts.length>0?Math.round(depts.map(d=>{
+      const de=EMPS.filter(e=>e.dept===d.name&&e.location===d.location);
+      const th=de.reduce((s,e)=>s+calcPlanHours(e.id),0);
+      const sh=de.reduce((s,e)=>s+e.sollStunden,0);
+      return sh>0?th/sh*100:0;
+    }).reduce((a,b)=>a+b,0)/depts.length):0;
+    const totalToday=SHIFTS.filter(s=>s.date===today&&depts.some(d=>d.name===s.dept&&d.location===s.location)&&!s.isSick&&!s.isVacation).length;
+
+    html+=`
+    <div class="dept-insight-grid">
+      <div class="dept-insight-main">
+        <div class="dept-insight-title">Effizienz-Zusammenfassung</div>
+        <div class="dept-insight-stats">
+          <div><div class="dept-insight-stat-label">Durchschn. Auslastung</div><div class="dept-insight-stat-val">${avgPct}%</div></div>
+          <div><div class="dept-insight-stat-label">Gesamtkosten / Monat</div><div class="dept-insight-stat-val">${formatEuro(totalCostAll)}</div></div>
+          <div><div class="dept-insight-stat-label">Schichten heute</div><div class="dept-insight-stat-val">${totalToday}</div></div>
+        </div>
+        <div class="dept-insight-actions">
+          <button class="dept-insight-btn-ghost" onclick="exportPDF()">Bericht exportieren</button>
+          <button class="dept-insight-btn-solid" onclick="navigate('reports',null)">Details ansehen</button>
+        </div>
+      </div>
+      <div class="dept-insight-side">
+        <span class="ms dept-insight-side-icon">analytics</span>
+        <div class="dept-insight-side-title">Automatischer Dienstplan</div>
+        <div class="dept-insight-side-sub">KI-gestützte Optimierung für Ihre Personalplanung basierend auf historischen Daten.</div>
+        <button class="dept-insight-side-btn" onclick="copyWeek()">Vorschlag generieren</button>
+      </div>
+    </div>`;
+  }
+
   pg.innerHTML=html;
 }
 
 // ═══ SCHEDULE ═══
-function setView(v,btn){scheduleView=v;document.querySelectorAll('.view-toggle .btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderSchedule();}
+function setView(v,btn){scheduleView=v;renderSchedule();}
 function schedNav(dir){if(scheduleView==='day')scheduleDate.setDate(scheduleDate.getDate()+dir);else if(scheduleView==='week')scheduleDate.setDate(scheduleDate.getDate()+7*dir);else scheduleDate.setMonth(scheduleDate.getMonth()+dir);renderSchedule();}
 
 function renderSchedule(){
@@ -849,19 +1266,64 @@ function renderSchedule(){
   const me=EMPS.find(e=>e.id===currentUser.empId);
 
   let banner=isEmp?permBanner(`Du siehst den Arbeitsplan deines Bereichs (${me?.dept||''} – ${getLocationName(me?.location||'')})`).trim():'';
-  let controls=`<div class="schedule-controls">
-    <div class="view-toggle"><button class="btn${scheduleView==='day'?' active':''}" onclick="setView('day',this)">Tag</button><button class="btn${scheduleView==='week'?' active':''}" onclick="setView('week',this)">Woche</button><button class="btn${scheduleView==='month'?' active':''}" onclick="setView('month',this)">Monat</button></div>
-    <div class="calendar-nav"><button onclick="schedNav(-1)">◀</button><span class="calendar-month" id="schedLabel"></span><button onclick="schedNav(1)">▶</button></div>
-    <div style="flex:1"></div>
-    ${canEdit?`<select class="form-select" style="width:150px" id="schedDept" onchange="scheduleDept=this.value;renderSchedule()"><option value="all"${scheduleDept==='all'?' selected':''}>Alle Bereiche</option>${[...new Set(DEPTS.map(d=>d.name))].sort().map(d=>`<option value="${d}"${scheduleDept===d?' selected':''}>${d}</option>`).join('')}</select>`:''}    ${canEdit?`<select class="form-select" style="width:140px" id="schedSort" onchange="scheduleSort=this.value;renderSchedule()"><option value="name"${scheduleSort==='name'?' selected':''}>↕ Name</option><option value="dept"${scheduleSort==='dept'?' selected':''}>↕ Bereich</option><option value="hours"${scheduleSort==='hours'?' selected':''}>↕ Stunden ↓</option></select>`:''}
-    ${canEdit?'<button class="btn" onclick="openModal(\'addShift\')">+ Schicht</button><button class="btn" onclick="copyWeek()">📋 Woche kopieren</button>':''}
-    ${canEdit?`<select class="form-select" style="width:180px" id="schedTmplSel" onchange="applySavedTemplate()"><option value="">📂 Vorlage laden...</option>${SAVED_TEMPLATES.filter(t=>currentUser.location==='all'||t.location===(currentUser.location||currentLocation)).map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}</select><button class="btn" onclick="openModal('saveTemplate')" title="Aktuelle Woche als Vorlage speichern">💾 Vorlage</button>`:''}
-    ${canExp?'<button class="btn btn-primary" onclick="exportPDF()">📄 PDF Export</button>':''}
+  let shifts=getVisibleShifts();
+  if(scheduleDept!=='all')shifts=shifts.filter(s=>s.dept===scheduleDept);
+  // Conflict & efficiency bar
+  const _wkStart=getWeekStart(scheduleDate);const _wkDays=[];for(let _i=0;_i<7;_i++){const _d=new Date(_wkStart);_d.setDate(_d.getDate()+_i);_wkDays.push(isoDate(_d));}
+  const _totalWkShifts=shifts.filter(s=>_wkDays.includes(s.date)&&!s.isSick&&!s.isVacation).length;
+  const _sickWkShifts=shifts.filter(s=>_wkDays.includes(s.date)&&s.isSick).length;
+  const _effPct=_totalWkShifts>0?Math.min(100,Math.round((_totalWkShifts/(_totalWkShifts+2))*100)):0;
+
+  let controls=`
+  <div class="sc2-conflict-bar">
+    <div class="sc2-conflict-left">
+      <div class="sc2-conflict-item"><div class="sc2-conflict-icon" style="background:rgba(239,68,68,.08);color:#ef4444"><span class="ms">warning</span></div><div><div class="sc2-conflict-micro">Konflikte</div><div class="sc2-conflict-val">${_sickWkShifts} Warnungen gefunden</div></div></div>
+      <div class="sc2-conflict-divider"></div>
+      <div class="sc2-conflict-item"><div class="sc2-conflict-icon" style="background:rgba(99,102,241,.08);color:var(--accent)"><span class="ms">speed</span></div><div><div class="sc2-conflict-micro">Planungseffizienz</div><div class="sc2-conflict-val">${_effPct}% Auslastung</div></div></div>
+    </div>
+    <button class="sc2-detail-btn">Details anzeigen</button>
+  </div>
+  <div class="sc2-page-hd">
+    <div>
+      <h2 class="sc2-title">Arbeitsplan</h2>
+      <div class="sc2-hd-row">
+        <div class="sc2-view-toggle">
+          <button class="sc2-view-btn${scheduleView==='week'?' active':''}" onclick="setView('week',this)">Woche</button>
+          <button class="sc2-view-btn${scheduleView==='month'?' active':''}" onclick="setView('month',this)">Monat</button>
+          <button class="sc2-view-btn${scheduleView==='day'?' active':''}" onclick="setView('day',this)">Tag</button>
+        </div>
+        <div class="sc2-week-nav">
+          <button class="sc2-nav-btn" onclick="schedNav(-1)"><span class="ms">chevron_left</span></button>
+          <span class="sc2-kw-label" id="schedLabel"></span>
+          <button class="sc2-nav-btn" onclick="schedNav(1)"><span class="ms">chevron_right</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="sc2-page-right">
+    ${canEdit?`<button class="sc2-action-btn" onclick="copyWeek()"><span class="ms" style="font-size:1rem">content_copy</span> Woche kopieren</button>`:``}
+      ${canEdit?`<div class="sc2-tmpl-wrap"><button class="sc2-action-btn" onclick="openModal('saveTemplate')"><span class="ms" style="font-size:1rem">bookmark</span> Vorlagen</button></div>`:``}
+      ${canExp?`<button class="sc2-action-btn is-primary" onclick="exportPDF()"><span class="ms" style="font-size:1rem">picture_as_pdf</span> PDF Export</button>`:``}
+      ${canEdit?`<button class="sc2-action-btn" onclick="openModal('addShift')" style="background:var(--accent);color:#fff;border-color:var(--accent)"><span class="ms" style="font-size:1rem">add</span> Schicht</button>`:``}
+    </div>
+  </div>
+
+  <div class="sc2-filter-bar">
+    <div class="sc2-filter-left">
+      <span class="sc2-filter-label">Bereich</span>
+      <button class="sc2-dept-pill${scheduleDept==='all'?' active':''}" onclick="scheduleDept='all';renderSchedule()">Alle</button>
+      ${[...new Set(DEPTS.map(d=>d.name))].sort().map(d=>`<button class="sc2-dept-pill${scheduleDept===d?' active':''}" onclick="scheduleDept='${d}';renderSchedule()">${d}</button>`).join('')}
+    </div>
+    <div class="sc2-filter-right">
+      <span class="ms" style="font-size:1rem">sort</span> Sortieren nach:
+      <select class="sc2-sort-sel" onchange="scheduleSort=this.value;renderSchedule()">
+        <option value="name"${scheduleSort==='name'?' selected':''}>Name</option>
+        <option value="dept"${scheduleSort==='dept'?' selected':''}>Bereich</option>
+        <option value="hours"${scheduleSort==='hours'?' selected':''}>Stunden</option>
+      </select>
+    </div>
   </div>`;
 
   pg.innerHTML=banner+controls+'<div id="schedC"></div>';
-  let shifts=getVisibleShifts();
-  if(scheduleDept!=='all')shifts=shifts.filter(s=>s.dept===scheduleDept);
 
   const c=document.getElementById('schedC');
   if(scheduleView==='week'){
@@ -888,12 +1350,13 @@ function renderSchedule(){
       });
     }
     const showH=can('seeFinancials');
-    let h='<div class="table-wrap" style="overflow-x:auto"><table><thead><tr><th style="min-width:140px">Mitarbeiter</th>';
-    dayD.forEach((ds,i)=>{const d=new Date(ds);h+=`<th>${DAYS_DE[i]} ${d.getDate()}.${d.getMonth()+1}</th>`;});
+    let h='<div class="sc2-grid-wrap"><div class="table-wrap" style="overflow-x:auto"><table><thead><tr><th style="min-width:200px">Mitarbeiter</th>';
+    dayD.forEach((ds,i)=>{const d=new Date(ds);const isToday=ds===isoDate(new Date());h+=`<th${isToday?' class="is-today"':''}><div class="th-day">${DAYS_DE[i]}</div><div class="th-date">${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}</div></th>`;});
     if(showH)h+='<th style="text-align:right">Σ Std.</th>';
     h+='</tr></thead><tbody>';
     emps.forEach(emp=>{
-      h+=`<tr><td><strong style="color:var(--text-primary)">${emp}</strong></td>`;
+      const _empObj2=EMPS.find(e=>e.name===emp);const _empPos=_empObj2?.position||'';const _empInitials=emp.split(' ').map(n=>n[0]).join('').substring(0,2);
+      h+=`<tr><td><div style="display:flex;align-items:center;gap:12px"><div class="sc2-emp-avatar">${_empInitials}</div><div><div class="sc2-emp-name">${emp}</div><div class="sc2-emp-pos">${_empPos}</div></div></div></td>`;
       let weekH=0;
       dayD.forEach(ds=>{
         const dayS=shifts.filter(s=>s.date===ds&&s.empName===emp);
@@ -970,11 +1433,28 @@ function renderSchedule(){
         }
         h+='</td>';
       });
-      if(showH)h+=`<td style="text-align:right;font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700">${Math.round(weekH*10)/10}h</td>`;
+      if(showH)h+=`<td class="sc2-total-cell"><div style="font-size:1.15rem;font-weight:900">${Math.round(weekH*10)/10}</div><span class="sc2-total-label">Std.</span></td>`;
       h+='</tr>';
     });
     if(!emps.length)h+=`<tr><td colspan="${8+(showH?1:0)}" style="text-align:center;color:var(--text-muted)">Keine Schichten</td></tr>`;
-    h+='</tbody></table></div>';c.innerHTML=h;
+    h+='</tbody></table></div></div>';
+    // Add footer and stats bento
+    const _deptColors={};DEPTS.forEach(dept=>{_deptColors[dept.name]=dept.color||'var(--accent)';});
+    const _deptHours={};shifts.filter(s=>_wkDays.includes(s.date)&&!s.isSick&&!s.isVacation).forEach(s=>{const[fh,fm]=s.from.split(':').map(Number);const[th,tm]=s.to.split(':').map(Number);const h2=(th+tm/60)-(fh+fm/60);_deptHours[s.dept]=(_deptHours[s.dept]||0)+h2;});
+    const _totalH=Object.values(_deptHours).reduce((a,b)=>a+b,0);
+    const _openShifts=_wkDays.length*emps.length-_totalWkShifts;
+
+    h+=`<div class="sc2-grid-footer">
+      <div class="sc2-footer-depts">${Object.entries(_deptHours).map(([d,hh])=>`<div class="sc2-footer-dept"><div class="sc2-footer-dot" style="background:${_deptColors[d]||'var(--accent)'}"></div>${d}: ${Math.round(hh)} Std.</div>`).join('')}</div>
+      <div class="sc2-footer-total">Gesamtstunden Woche: <strong>${Math.round(_totalH*10)/10} Std.</strong></div>
+    </div>`;
+
+    h+=`<div class="sc2-bento">
+      <div class="sc2-bento-card is-blue"><div><div class="sc2-bento-label">Planungseffizienz</div><div class="sc2-bento-sub">${_effPct}% der Zielbesetzung erreicht</div></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:auto"><div class="sc2-bento-big">${_effPct}%</div></div></div>
+      <div class="sc2-bento-card"><div class="sc2-bento-icon" style="background:rgba(239,68,68,.06);color:#ef4444"><span class="ms">warning</span></div><div class="sc2-bento-big" style="font-size:2.5rem">${_sickWkShifts}</div><div class="sc2-bento-micro">Konflikte gefunden</div></div>
+      <div class="sc2-bento-card"><div class="sc2-bento-icon" style="background:rgba(99,102,241,.06);color:var(--accent)"><span class="ms">person_search</span></div><div class="sc2-bento-big" style="font-size:2.5rem">${Math.max(0,_openShifts)}</div><div class="sc2-bento-micro">Offene Schichten</div></div>
+    </div>`;
+    c.innerHTML=h;
   } else if(scheduleView==='day'){
     document.getElementById('schedLabel').textContent=scheduleDate.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     const ds=isoDate(scheduleDate);const dayS=shifts.filter(s=>s.date===ds);const seen=new Set();
@@ -1041,44 +1521,57 @@ function exportPDF(){if(!can('canExport'))return;const pc=document.getElementByI
 
 // ═══ VACATION ═══
 function renderVacation(){
-  const pg=document.getElementById('page-vacation');const isEmp=currentUser.role==='mitarbeiter';const me=EMPS.find(e=>e.id===currentUser.empId);
-  let banner=isEmp?permBanner(`Du siehst nur deinen eigenen Urlaub. Resturlaub: <strong>${me.vacTotal-me.vacUsed} Tage</strong>`):'';
-  let tabs=can('seeAllVacations')?`<div class="tabs"><div class="tab${vacationTab==='calendar'?' active':''}" onclick="vacationTab='calendar';renderVacation()">Kalender</div><div class="tab${vacationTab==='requests'?' active':''}" onclick="vacationTab='requests';renderVacation()">Anträge</div><div class="tab${vacationTab==='overview'?' active':''}" onclick="vacationTab='overview';renderVacation()">Übersicht</div></div>`:'';
-  let content='<div id="vacC"></div><button class="btn btn-primary" onclick="openModal(\'addVacation\')" style="margin-top:16px">+ Urlaubsantrag</button>';
-  pg.innerHTML=banner+tabs+content;
-
-  const vc=document.getElementById('vacC');const vacs=getVisibleVacs();
-  if(isEmp){
-    vacationTab='requests'; // force requests for employee
-    let h=`<div class="stats-row"><div class="stat-card" style="border-left:3px solid var(--info)"><div class="stat-label">Gesamtanspruch</div><div class="stat-value" style="font-size:1.4rem">${me.vacTotal}</div></div>
-    <div class="stat-card" style="border-left:3px solid var(--warning)"><div class="stat-label">Genommen</div><div class="stat-value" style="font-size:1.4rem">${me.vacUsed}</div></div>
-    <div class="stat-card" style="border-left:3px solid var(--success)"><div class="stat-label">Verbleibend</div><div class="stat-value" style="font-size:1.4rem">${me.vacTotal-me.vacUsed}</div></div></div>`;
-    h+='<div class="table-wrap"><table><thead><tr><th>Von</th><th>Bis</th><th>Tage</th><th>Bemerkung</th><th>Status</th></tr></thead><tbody>';
-    vacs.forEach(v=>{h+=`<tr><td>${formatDateDE(v.from)}</td><td>${formatDateDE(v.to)}</td><td>${v.days}</td><td>${v.note||'—'}</td><td>${v.status==='approved'?'<span class="badge badge-success">Genehmigt</span>':v.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abgelehnt</span>'}</td></tr>`;});
-    h+='</tbody></table></div>';vc.innerHTML=h;
-  } else if(vacationTab==='requests'){
-    let h='<div class="table-wrap"><table><thead><tr><th>Mitarbeiter</th><th>Von</th><th>Bis</th><th>Tage</th><th>Status</th>'+(can('approveVacations')?'<th>Aktionen</th>':'')+'</tr></thead><tbody>';
-    vacs.forEach(v=>{h+=`<tr><td><strong style="color:var(--text-primary)">${v.empName}</strong></td><td>${formatDateDE(v.from)}</td><td>${formatDateDE(v.to)}</td><td>${v.days}</td>
-    <td>${v.status==='approved'?'<span class="badge badge-success">OK</span>':v.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abg.</span>'}</td>
-    ${can('approveVacations')?`<td>${v.status==='pending'?`<button class="btn btn-sm btn-success" onclick="appVac(${v.id})">✓</button> <button class="btn btn-sm btn-danger" onclick="rejVac(${v.id})">✕</button>`:'—'}</td>`:''}</tr>`;});
-    h+='</tbody></table></div>';vc.innerHTML=h;
-  } else if(vacationTab==='overview'){
-    const emps=getVisibleEmps();
-    let h='<div class="table-wrap"><table><thead><tr><th>Mitarbeiter</th><th>Gesamt</th><th>Genommen</th><th>Geplant</th><th>Rest</th></tr></thead><tbody>';
-    emps.forEach(e=>{const pl=VACS.filter(v=>v.empId===e.id&&(v.status==='approved'||v.status==='pending')&&v.from>='2026-03-20').reduce((s,v)=>s+v.days,0);const r=e.vacTotal-e.vacUsed-pl;
-      h+=`<tr><td><strong style="color:var(--text-primary)">${e.name}</strong></td><td>${e.vacTotal}</td><td>${e.vacUsed}</td><td>${pl}</td><td><strong style="color:${r<5?'var(--warning)':'var(--success)'}">${r}</strong></td></tr>`;});
-    h+='</tbody></table></div>';vc.innerHTML=h;
-  } else { // calendar
-    const y=vacationCalendarMonth.getFullYear(),m=vacationCalendarMonth.getMonth();const fd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),so=fd===0?6:fd-1;
-    let h=`<div class="calendar-header"><div class="calendar-nav"><button onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()-1);renderVacation()">◀</button><span class="calendar-month">${MONTHS_DE[m]} ${y}</span><button onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()+1);renderVacation()">▶</button></div></div><div class="calendar-grid">`;
-    DAYS_DE.forEach(d=>h+=`<div class="cal-day-header">${d}</div>`);
-    for(let i=0;i<so;i++)h+='<div class="cal-day other-month"></div>';
-    for(let d=1;d<=dim;d++){const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const dv=vacs.filter(v=>v.from<=ds&&v.to>=ds&&v.status==='approved');const dk=getVisibleSicks().filter(s=>s.from<=ds&&s.to>=ds&&s.status==='active');
-      h+=`<div class="cal-day${ds===isoDate(new Date())?' today':''}"><div class="cal-day-num">${d}</div>`;
-      dv.forEach(v=>h+=`<div class="cal-event vacation">${v.empName.split(' ')[0]}</div>`);dk.forEach(s=>h+=`<div class="cal-event sick">${s.empName.split(' ')[0]} 🏥</div>`);
-      h+='</div>';}h+='</div>';vc.innerHTML=h;}
+  const pg=document.getElementById('page-vacation');
+  const isEmp=currentUser.role==='mitarbeiter';
+  const me=EMPS.find(e=>e.id===currentUser.empId);
+  const vacs=getVisibleVacs();
+  const pendingVacs=vacs.filter(v=>v.status==='pending');
+  const todayStr=isoDate(new Date());
+  const todayVacs=vacs.filter(v=>v.status==='approved'&&v.from<=todayStr&&v.to>=todayStr).length;
+  let empBanner='';
+  if(isEmp&&me){const remain=me.vacTotal-me.vacUsed;empBanner=`<div class="vac-emp-banner"><span class="ms" style="color:var(--info)">info</span> Du siehst nur deinen eigenen Urlaub. Resturlaub: <strong>${remain} Tage</strong></div>`;}
+  const tabDefs=can('seeAllVacations')?[['calendar','Kalender'],['requests','Antr\u00e4ge'],['overview','\u00dcbersicht'],['my','Meine Antr\u00e4ge']]:[['my','Meine Antr\u00e4ge']];
+  if(!can('seeAllVacations'))vacationTab='my';
+  const tabHtml=tabDefs.map(([k,l])=>`<button class="vac-tab${vacationTab===k?' active':''}" onclick="vacationTab='${k}';renderVacation()">${l}</button>`).join('');
+  pg.innerHTML=`${empBanner}
+    <div class="vac-topbar">
+      <div class="vac-stats-strip">
+        <div class="vac-stat-card"><div class="vac-stat-icon" style="background:rgba(59,79,210,.1);color:var(--accent)"><span class="ms">beach_access</span></div><div><div class="vac-stat-label">Heute im Urlaub</div><div class="vac-stat-num">${todayVacs}</div></div></div>
+        <div class="vac-stat-card"><div class="vac-stat-icon" style="background:rgba(16,185,129,.1);color:#10b981"><span class="ms">pending_actions</span></div><div><div class="vac-stat-label">Offene Antr\u00e4ge</div><div class="vac-stat-num">${pendingVacs.length}</div></div></div>
+      </div>
+      <button class="vac-add-btn" onclick="openModal('addVacation')"><span class="ms">add</span> Urlaubsantrag stellen</button>
+    </div>
+    <div class="vac-tabs-bar">${tabHtml}</div>
+    <div id="vacC"></div>`;
+  const vc=document.getElementById('vacC');
+  if(isEmp||(vacationTab==='my'&&me)){
+    const myVacs=VACS.filter(v=>v.empId===currentUser.empId);
+    const usedPct=me.vacTotal>0?Math.round(me.vacUsed/me.vacTotal*100):0;
+    let h=`<div class="vac-my-stats"><div class="vac-my-card" style="border-top:3px solid var(--info)"><div class="vac-my-label">Gesamtanspruch</div><div class="vac-my-num">${me.vacTotal}</div><div class="vac-my-sub">Tage / Jahr</div></div><div class="vac-my-card" style="border-top:3px solid var(--warning)"><div class="vac-my-label">Genommen</div><div class="vac-my-num">${me.vacUsed}</div><div class="vac-my-sub">${usedPct}% verbraucht</div></div><div class="vac-my-card" style="border-top:3px solid var(--success)"><div class="vac-my-label">Verbleibend</div><div class="vac-my-num" style="color:var(--success)">${me.vacTotal-me.vacUsed}</div><div class="vac-my-sub">noch verf\u00fcgbar</div></div></div><div class="vac-table-card"><table class="vac-table"><thead><tr><th>Von</th><th>Bis</th><th>Tage</th><th>Bemerkung</th><th>Status</th></tr></thead><tbody>`;
+    myVacs.forEach(v=>{h+=`<tr><td>${formatDateDE(v.from)}</td><td>${formatDateDE(v.to)}</td><td>${v.days}</td><td>${v.note||'—'}</td><td>${v.status==='approved'?'<span class="badge badge-success">Genehmigt</span>':v.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abgelehnt</span>'}</td></tr>`;});
+    h+=`</tbody></table></div>`;vc.innerHTML=h;return;
+  }
+  if(vacationTab==='requests'){
+    let h=`<div class="vac-table-card"><table class="vac-table"><thead><tr><th>Mitarbeiter</th><th>Von</th><th>Bis</th><th>Tage</th><th>Status</th>${can('approveVacations')?'<th>Aktionen</th>':''}</tr></thead><tbody>`;
+    vacs.forEach(v=>{h+=`<tr><td><strong style="color:var(--text-primary)">${v.empName}</strong></td><td>${formatDateDE(v.from)}</td><td>${formatDateDE(v.to)}</td><td>${v.days}</td><td>${v.status==='approved'?'<span class="badge badge-success">OK</span>':v.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abg.</span>'}</td>${can('approveVacations')?`<td class="vac-action-cell">${v.status==='pending'?`<button class="vac-btn-approve" onclick="appVac(${v.id})"><span class="ms">check</span></button> <button class="vac-btn-reject" onclick="rejVac(${v.id})"><span class="ms">close</span></button>`:'—'}</td>`:''}</tr>`;});
+    h+=`</tbody></table></div>`;vc.innerHTML=h;return;
+  }
+  if(vacationTab==='overview'){
+    const emps=getVisibleEmps();const _ys4=isoDate(new Date(new Date().getFullYear(),0,1));
+    let h=`<div class="vac-table-card"><div class="vac-table-header"><h3 class="vac-table-title">Team \u00dcbersicht: Urlaubsanspruch</h3></div><table class="vac-table"><thead><tr><th>Mitarbeiter</th><th>Gesamt</th><th>Genommen</th><th>Geplant</th><th>Rest</th><th>Auslastung</th></tr></thead><tbody>`;
+    emps.forEach(e=>{const pl=VACS.filter(v=>v.empId===e.id&&(v.status==='approved'||v.status==='pending')&&v.from>=_ys4).reduce((s,v)=>s+v.days,0);const r=e.vacTotal-e.vacUsed-pl;const pct=e.vacTotal>0?Math.round((e.vacUsed+pl)/e.vacTotal*100):0;const initials=e.name.split(' ').map(n=>n[0]).join('').substring(0,2);h+=`<tr><td><div class="vac-emp-cell"><div class="vac-avatar">${initials}</div><strong style="color:var(--text-primary)">${e.name}</strong></div></td><td>${e.vacTotal} T</td><td style="color:var(--accent);font-weight:700">${e.vacUsed} T</td><td style="color:#10b981;font-weight:600">${pl} T</td><td><strong style="color:${r<5?'var(--warning)':'var(--success)'}">${r} T</strong></td><td><div class="vac-progress-wrap"><div class="vac-progress-bar"><div class="vac-progress-fill" style="width:${Math.min(pct,100)}%;background:${pct>=90?'var(--danger)':pct>=70?'var(--warning)':'var(--accent)'}"></div></div><span class="vac-progress-pct">${pct}%</span></div></td></tr>`;});
+    h+=`</tbody></table></div>`;vc.innerHTML=h;return;
+  }
+  const y=vacationCalendarMonth.getFullYear(),m=vacationCalendarMonth.getMonth();
+  const fd=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate(),so=fd===0?6:fd-1;
+  const pendingList=vacs.filter(v=>v.status==='pending').slice(0,5);
+  let calCells='';
+  ['Mo','Di','Mi','Do','Fr','Sa','So'].forEach(d=>{calCells+=`<div class="vac-cal-head">${d}</div>`;});
+  for(let i=0;i<so;i++)calCells+=`<div class="vac-cal-day other-month"></div>`;
+  for(let d=1;d<=dim;d++){const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const dv=vacs.filter(v=>v.from<=ds&&v.to>=ds&&v.status==='approved');const dk=getVisibleSicks().filter(s=>s.from<=ds&&s.to>=ds&&s.status==='active');calCells+=`<div class="vac-cal-day${ds===todayStr?' today':''}"><div class="vac-cal-num">${d}</div>`;dv.slice(0,2).forEach(v=>{calCells+=`<div class="vac-cal-event vacation">${v.empName.split(' ')[0]}</div>`;});if(dv.length>2)calCells+=`<div class="vac-cal-event more">+${dv.length-2}</div>`;dk.slice(0,1).forEach(s=>{calCells+=`<div class="vac-cal-event sick">${s.empName.split(' ')[0]}</div>`;});calCells+=`</div>`;}
+  vc.innerHTML=`<div class="vac-bento"><div class="vac-cal-card"><div class="vac-cal-toolbar"><div><h3 class="vac-cal-month">${MONTHS_DE[m]} ${y}</h3><p class="vac-cal-sub">${vacs.filter(v=>v.status==='approved').length} genehmigte Abwesenheiten</p></div><div class="vac-cal-nav"><button class="vac-nav-btn" onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()-1);renderVacation()"><span class="ms">chevron_left</span></button><button class="vac-today-btn" onclick="vacationCalendarMonth=new Date();renderVacation()">Heute</button><button class="vac-nav-btn" onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()+1);renderVacation()"><span class="ms">chevron_right</span></button></div></div><div class="vac-cal-grid">${calCells}</div><div class="vac-legend"><div class="vac-legend-item"><div class="vac-legend-dot" style="background:var(--accent)"></div>Urlaub</div><div class="vac-legend-item"><div class="vac-legend-dot" style="background:var(--danger)"></div>Krankheit</div><div class="vac-legend-item"><div class="vac-legend-dot" style="background:#10b981"></div>Fortbildung</div></div></div><div class="vac-side-panel"><div class="vac-panel-card"><div class="vac-panel-header"><h4 class="vac-panel-title">Offene Antr\u00e4ge</h4><span class="vac-badge-count">${pendingVacs.length}</span></div>${pendingList.length?pendingList.map(v=>`<div class="vac-req-item"><div class="vac-req-avatar">${v.empName.split(' ').map(n=>n[0]).join('').substring(0,2)}</div><div class="vac-req-info"><div class="vac-req-name">${v.empName}</div><div class="vac-req-dates">${formatDateDE(v.from)} - ${formatDateDE(v.to)} (${v.days}T)</div></div>${can('approveVacations')?`<div class="vac-req-actions"><button class="vac-btn-approve" onclick="appVac(${v.id})"><span class="ms">check</span></button><button class="vac-btn-reject" onclick="rejVac(${v.id})"><span class="ms">close</span></button></div>`:''}</div>`).join(''):'<p class="vac-empty">Keine offenen Antr\u00e4ge</p>'}${pendingVacs.length>5?`<button class="vac-see-all" onclick="vacationTab='requests';renderVacation()">Alle Antr\u00e4ge sehen</button>`:''}</div></div></div>`;
 }
+
 function appVac(id){const v=VACS.find(x=>x.id===id);if(v){v.status='approved';syncVacationStatus(v.id,'approved');const e=EMPS.find(x=>x.id===v.empId);if(e){e.vacUsed+=v.days;syncEmployeeField(e.id,'vacUsed',e.vacUsed);}addNotif('vacation','Urlaub genehmigt',v.empName);toast('Genehmigt');renderVacation();updateBadges();}}
 function rejVac(id){const v=VACS.find(x=>x.id===id);if(v){v.status='rejected';syncVacationStatus(v.id,'rejected');addNotif('vacation','Urlaub abgelehnt',v.empName);toast('Abgelehnt','err');renderVacation();updateBadges();}}
 
@@ -1772,7 +2265,6 @@ function renderCalendar(){
   const emps=getVisibleEmps();
   const today=new Date();
 
-  // Upcoming events
   function getUpcoming(){
     const events=[];
     emps.forEach(e=>{
@@ -1782,23 +2274,22 @@ function renderCalendar(){
         if(thisYear<today)thisYear.setFullYear(thisYear.getFullYear()+1);
         const age=thisYear.getFullYear()-bd.getFullYear();
         const daysUntil=Math.ceil((thisYear-today)/864e5);
-        events.push({date:thisYear,dateStr:isoDate(thisYear),type:'birthday',icon:'🎂',label:`${e.name} wird ${age}`,daysUntil,emp:e});
+        events.push({date:thisYear,dateStr:isoDate(thisYear),type:'birthday',icon:'cake',label:`${e.name} wird ${age}`,sub:`Geburtstag (${age} Jahre)`,daysUntil,emp:e});
       }
       if(e.start){
         const sd=new Date(e.start);
-        const years=today.getFullYear()-sd.getFullYear();
         const nextAnni=new Date(today.getFullYear(),sd.getMonth(),sd.getDate());
         if(nextAnni<today)nextAnni.setFullYear(nextAnni.getFullYear()+1);
         const anniYears=nextAnni.getFullYear()-sd.getFullYear();
         if(anniYears>0){
           const daysUntil=Math.ceil((nextAnni-today)/864e5);
-          events.push({date:nextAnni,dateStr:isoDate(nextAnni),type:'anniversary',icon:'🏆',label:`${e.name} – ${anniYears}. Dienstjubiläum`,daysUntil,emp:e});
+          events.push({date:nextAnni,dateStr:isoDate(nextAnni),type:'anniversary',icon:'military_tech',label:`${e.name}`,sub:`${anniYears}-jähriges Jubiläum`,daysUntil,emp:e});
         }
       }
       if(e.probEnd&&new Date(e.probEnd)>today){
         const pe=new Date(e.probEnd);
         const daysUntil=Math.ceil((pe-today)/864e5);
-        events.push({date:pe,dateStr:e.probEnd,type:'probation',icon:'📋',label:`${e.name} – Probezeit endet`,daysUntil,emp:e});
+        events.push({date:pe,dateStr:e.probEnd,type:'probation',icon:'timer',label:`${e.name}`,sub:'Ende Probezeit',daysUntil,emp:e});
       }
     });
     return events.sort((a,b)=>a.daysUntil-b.daysUntil);
@@ -1808,28 +2299,179 @@ function renderCalendar(){
   const soon=events.filter(e=>e.daysUntil<=30);
   const later=events.filter(e=>e.daysUntil>30&&e.daysUntil<=90);
 
+  const bdCount=events.filter(e=>e.type==='birthday'&&e.daysUntil<=30).length;
+  const anniCount=events.filter(e=>e.type==='anniversary'&&e.daysUntil<=90).length;
+  const probCount=events.filter(e=>e.type==='probation').length;
+
+  const MONTHS_DE=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+  function eventCardHTML(ev){
+    const d=ev.date;
+    const monthStr=MONTHS_DE[d.getMonth()];
+    const dayStr=d.getDate();
+    const typeClass=ev.type;
+    const iconClass=ev.type;
+    return `
+    <div class="cal-event-card ${typeClass}">
+      <div class="cal-event-date-box">
+        <div class="cal-event-date-month">${monthStr}</div>
+        <div class="cal-event-date-day">${String(dayStr).padStart(2,'0')}</div>
+      </div>
+      <div class="cal-event-info">
+        <div class="cal-event-name">${ev.label}</div>
+        <div class="cal-event-type-row">
+          <span class="ms ${iconClass}">${ev.icon}</span>
+          <span class="cal-event-type-text">${ev.sub}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function laterItemHTML(ev){
+    const d=ev.date;
+    const dateStr=`${d.getDate()}. ${['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'][d.getMonth()]}`;
+    const typeLabel=ev.type==='birthday'?'Geburtstag':ev.type==='anniversary'?'Jubiläum':'Probezeit-Ende';
+    return `
+    <div class="cal-later-item">
+      <div class="cal-later-left">
+        <div class="cal-later-icon-box"><span class="ms">${ev.icon}</span></div>
+        <div>
+          <div class="cal-later-name">${ev.emp.name}</div>
+          <div class="cal-later-date">${dateStr}</div>
+        </div>
+      </div>
+      <span class="cal-later-tag">${typeLabel}</span>
+    </div>`;
+  }
+
+  function getBirthdayRows(){
+    return emps.filter(e=>e.birthday).sort((a,b)=>{
+      const am=new Date(a.birthday).getMonth()*100+new Date(a.birthday).getDate();
+      const bm=new Date(b.birthday).getMonth()*100+new Date(b.birthday).getDate();
+      return am-bm;
+    }).map(e=>{
+      const bd=new Date(e.birthday);
+      const age=today.getFullYear()-bd.getFullYear();
+      const bdStr=`${bd.getDate()}. ${MONTHS_DE[bd.getMonth()]} ${bd.getFullYear()}`;
+      const avatarCol=e.avatar?'':'#6366f1';
+      const loc=getLocationName(e.location)||e.location||'—';
+      return `<tr>
+        <td><div class="emp-name-cell">
+          <div class="cal-emp-avatar-sm" style="background:${e.color||'#6366f1'}">${e.avatar||e.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
+          ${e.name}
+        </div></td>
+        <td class="cal-bday-date">${bdStr}</td>
+        <td class="cal-bday-age">${age}</td>
+        <td><span class="cal-tag-pill location">${loc}</span></td>
+        <td><span class="cal-tag-pill dept">${e.dept||'—'}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
   pg.innerHTML=`
-    <div class="stats-row">
-      <div class="stat-card" style="border-left:3px solid #fdcb6e"><div class="stat-icon">🎂</div><div class="stat-label">Nächste Geburtstage</div><div class="stat-value" style="font-size:1.3rem">${events.filter(e=>e.type==='birthday'&&e.daysUntil<=30).length}</div><div class="stat-change">in den nächsten 30 Tagen</div></div>
-      <div class="stat-card" style="border-left:3px solid var(--accent)"><div class="stat-icon">🏆</div><div class="stat-label">Jubiläen</div><div class="stat-value" style="font-size:1.3rem">${events.filter(e=>e.type==='anniversary'&&e.daysUntil<=90).length}</div><div class="stat-change">in den nächsten 90 Tagen</div></div>
-      <div class="stat-card" style="border-left:3px solid var(--warning)"><div class="stat-icon">📋</div><div class="stat-label">Probezeit-Ende</div><div class="stat-value" style="font-size:1.3rem">${events.filter(e=>e.type==='probation').length}</div><div class="stat-change">ausstehend</div></div>
+  <div class="cal-page-hd">
+    <div>
+      <h2 class="cal-page-title">Personalkalender</h2>
+      <p class="cal-page-sub">Behalten Sie alle wichtigen Mitarbeiterereignisse im Überblick.</p>
+    </div>
+    <div class="cal-view-toggle">
+      <button class="cal-view-btn active">Events</button>
+      <button class="cal-view-btn">Liste</button>
+    </div>
+  </div>
+
+  <!-- Summary Bento Cards -->
+  <div class="cal-bento-grid">
+    <div class="cal-bento-card">
+      <span class="ms cal-bento-card-bg-icon">cake</span>
+      <div class="cal-bento-icon-row">
+        <div class="cal-bento-icon birthday"><span class="ms">cake</span></div>
+        <span class="cal-bento-card-label">Nächste Geburtstage</span>
+      </div>
+      <div>
+        <div class="cal-bento-val-row">
+          <span class="cal-bento-big">${String(bdCount).padStart(2,'0')}</span>
+          <span class="cal-bento-unit">Mitarbeiter</span>
+        </div>
+        <div class="cal-bento-hint indigo"><span class="ms">arrow_upward</span> in den nächsten 30 Tagen</div>
+      </div>
+    </div>
+    <div class="cal-bento-card">
+      <span class="ms cal-bento-card-bg-icon">military_tech</span>
+      <div class="cal-bento-icon-row">
+        <div class="cal-bento-icon jubilee"><span class="ms">military_tech</span></div>
+        <span class="cal-bento-card-label">Jubiläen</span>
+      </div>
+      <div>
+        <div class="cal-bento-val-row">
+          <span class="cal-bento-big">${String(anniCount).padStart(2,'0')}</span>
+          <span class="cal-bento-unit">Mitarbeiter</span>
+        </div>
+        <div class="cal-bento-hint teal">In den nächsten 90 Tagen</div>
+      </div>
+    </div>
+    <div class="cal-bento-card">
+      <span class="ms cal-bento-card-bg-icon">timer</span>
+      <div class="cal-bento-icon-row">
+        <div class="cal-bento-icon probation"><span class="ms">timer</span></div>
+        <span class="cal-bento-card-label">Probezeit-Ende</span>
+      </div>
+      <div>
+        <div class="cal-bento-val-row">
+          <span class="cal-bento-big">${String(probCount).padStart(2,'0')}</span>
+          <span class="cal-bento-unit">Mitarbeiter</span>
+        </div>
+        <div class="cal-bento-hint amber">Aktion erforderlich</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main: Timeline + Table -->
+  <div class="cal-main-grid">
+    <!-- Left: Timeline -->
+    <div class="cal-timeline-col">
+      <div>
+        <div class="cal-section-title">
+          Nächsten 30 Tage
+          <span class="cal-section-dot active"></span>
+        </div>
+        <div class="cal-event-cards">
+          ${soon.length?soon.map(eventCardHTML).join(''):`<div class="cal-empty"><span class="ms">event_available</span><p>Keine Ereignisse</p></div>`}
+        </div>
+      </div>
+      <div>
+        <div class="cal-section-title">
+          31–90 Tage
+          <span class="cal-section-dot muted"></span>
+        </div>
+        <div class="cal-later-list">
+          ${later.length?later.map(laterItemHTML).join(''):`<div class="cal-empty"><span class="ms">event_note</span><p>Keine Ereignisse</p></div>`}
+        </div>
+      </div>
     </div>
 
-    <div class="table-wrap"><div class="table-header"><span class="table-title">📅 Nächsten 30 Tage</span></div>
-    <table><thead><tr><th></th><th>Datum</th><th>Ereignis</th><th>In</th></tr></thead><tbody>
-    ${soon.length?soon.map(e=>`<tr><td style="font-size:1.3rem">${e.icon}</td><td>${formatDateDE(e.dateStr)}</td><td><strong style="color:var(--text-primary)">${e.label}</strong></td>
-    <td>${e.daysUntil===0?'<span class="badge badge-success">Heute!</span>':e.daysUntil===1?'<span class="badge badge-warning">Morgen</span>':`<span class="badge badge-neutral">${e.daysUntil} Tage</span>`}</td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Keine Ereignisse</td></tr>'}
-    </tbody></table></div>
-
-    <div class="table-wrap"><div class="table-header"><span class="table-title">📆 31–90 Tage</span></div>
-    <table><thead><tr><th></th><th>Datum</th><th>Ereignis</th><th>In</th></tr></thead><tbody>
-    ${later.length?later.map(e=>`<tr><td style="font-size:1.3rem">${e.icon}</td><td>${formatDateDE(e.dateStr)}</td><td><strong style="color:var(--text-primary)">${e.label}</strong></td><td><span class="badge badge-neutral">${e.daysUntil} Tage</span></td></tr>`).join(''):'<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Keine Ereignisse</td></tr>'}
-    </tbody></table></div>
-
-    <div class="table-wrap"><div class="table-header"><span class="table-title">🎂 Alle Geburtstage</span></div>
-    <table><thead><tr><th>Name</th><th>Geburtstag</th><th>Alter</th><th>Standort</th><th>Bereich</th></tr></thead><tbody>
-    ${emps.filter(e=>e.birthday).sort((a,b)=>{const am=new Date(a.birthday).getMonth()*100+new Date(a.birthday).getDate();const bm=new Date(b.birthday).getMonth()*100+new Date(b.birthday).getDate();return am-bm;}).map(e=>{const bd=new Date(e.birthday);const age=today.getFullYear()-bd.getFullYear();return`<tr><td><strong style="color:var(--text-primary)">${e.name}</strong></td><td>${bd.getDate()}.${bd.getMonth()+1}.${bd.getFullYear()}</td><td>${age}</td><td>${getLocationName(e.location)}</td><td>${e.dept}</td></tr>`;}).join('')}
-    </tbody></table></div>`;
+    <!-- Right: Birthday Table -->
+    <div class="cal-table-col">
+      <div class="cal-table-card">
+        <div class="cal-table-hd">
+          <span class="cal-table-hd-title">🎂 Alle Geburtstage</span>
+          <button class="cal-table-see-all">Alle anzeigen <span class="ms">arrow_forward</span></button>
+        </div>
+        <table class="cal-bday-table">
+          <thead><tr>
+            <th>Mitarbeiter</th>
+            <th>Geburtstag</th>
+            <th>Alter</th>
+            <th>Standort</th>
+            <th>Bereich</th>
+          </tr></thead>
+          <tbody>
+            ${emps.filter(e=>e.birthday).length?getBirthdayRows():`<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted)">Keine Geburtstagsdaten vorhanden</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
 }
 
 // ═══ REPORTS & ANALYTICS ═══
@@ -1839,75 +2481,261 @@ function renderReports(){
   const emps=getVisibleEmps();
   const isAdmin=can('seeFinancials');
 
-  // Dept distribution
+  // ─── Data calculations (unchanged logic) ───
+  const statusCount={active:0,vacation:0,sick:0};emps.forEach(e=>{statusCount[e.status]=(statusCount[e.status]||0)+1;});
   const deptCount={};emps.forEach(e=>{deptCount[e.dept]=(deptCount[e.dept]||0)+1;});
   const deptEntries=Object.entries(deptCount).sort((a,b)=>b[1]-a[1]);
   const maxDept=Math.max(...deptEntries.map(d=>d[1]),1);
+  const totalLate=emps.reduce((s,e)=>s+e.lateCount,0);
+  const totalSick=emps.reduce((s,e)=>s+e.sickDays,0);
+  const topDelays=emps.filter(e=>e.lateCount>0).sort((a,b)=>b.lateCount-a.lateCount);
 
-  // Status distribution
-  const statusCount={active:0,vacation:0,sick:0};emps.forEach(e=>{statusCount[e.status]=(statusCount[e.status]||0)+1;});
-
-  // Hours by dept (admin only)
-  let hoursSection='';
+  // Admin-only data
+  let totalBrutto=0,deptCost={},deptHours={},deptSoll={};
   if(isAdmin){
-    const deptHours={};emps.forEach(e=>{const h=calcPlanHours(e.id);deptHours[e.dept]=(deptHours[e.dept]||0)+h;});
-    const deptSoll={};emps.forEach(e=>{deptSoll[e.dept]=(deptSoll[e.dept]||0)+e.sollStunden;});
-    const deptHEntries=Object.entries(deptHours).sort((a,b)=>b[1]-a[1]);
-    const maxH=Math.max(...deptHEntries.map(d=>d[1]),1);
-    const totalBrutto=emps.reduce((s,e)=>s+e.bruttoGehalt,0);
-    const deptCost={};emps.forEach(e=>{deptCost[e.dept]=(deptCost[e.dept]||0)+e.bruttoGehalt;});
+    totalBrutto=emps.reduce((s,e)=>s+e.bruttoGehalt,0);
+    emps.forEach(e=>{deptCost[e.dept]=(deptCost[e.dept]||0)+e.bruttoGehalt;});
+    emps.forEach(e=>{const h=calcPlanHours(e.id);deptHours[e.dept]=(deptHours[e.dept]||0)+h;});
+    emps.forEach(e=>{deptSoll[e.dept]=(deptSoll[e.dept]||0)+e.sollStunden;});
+  }
+  const deptCostEntries=Object.entries(deptCost).sort((a,b)=>b[1]-a[1]);
+  const deptHEntries=Object.entries(deptHours).sort((a,b)=>b[1]-a[1]);
+  const DEPT_COLORS=['#3b4fd2','#00515c','#4857af','#d97706','#e11d48','#7c3aed'];
 
-    hoursSection=`
-    <div class="table-wrap"><div class="table-header"><span class="table-title">💰 Personalkosten nach Bereich <span class="badge badge-info" style="font-size:.6rem">Nur Inhaber</span></span>
-    ${can('canExport')?'<button class="btn btn-primary" onclick="exportReport()">📄 Report PDF</button>':''}</div>
-    <div style="padding:20px">
-    ${Object.entries(deptCost).sort((a,b)=>b[1]-a[1]).map(([dept,cost])=>{const pct=totalBrutto>0?Math.round(cost/totalBrutto*100):0;
-      return`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:600">${dept}</span><span style="font-family:'Space Mono',monospace;font-size:.82rem">${formatEuro(cost)} (${pct}%)</span></div>
-      <div style="background:var(--bg-input);border-radius:4px;height:20px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--accent);border-radius:4px;transition:width .5s ease"></div></div></div>`;
-    }).join('')}
-    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-weight:700"><span>Gesamt</span><span style="font-family:'Space Mono',monospace">${formatEuro(totalBrutto)}</span></div>
-    </div></div>
+  // SVG gauge helper (semi-circle)
+  function gaugeHTML(pct,color,label){
+    const R=42;const cx=44;const cy=48;
+    const totalArc=Math.PI*R;
+    const fill=totalArc*(Math.min(pct,100)/100);
+    const offset=totalArc-fill;
+    const clampColor=pct>=90?color:pct>=70?'#f59e0b':'#ba1a1a';
+    return `<div class="rep-gauge-item">
+      <div class="rep-gauge-wrap">
+        <svg viewBox="0 0 88 50" width="88" height="50" overflow="visible">
+          <path d="M 2 48 A ${R} ${R} 0 0 1 86 48" fill="none" stroke="var(--bg-input)" stroke-linecap="round" stroke-width="10"/>
+          <path d="M 2 48 A ${R} ${R} 0 0 1 86 48" fill="none" stroke="${clampColor}"
+            stroke-dasharray="${totalArc}" stroke-dashoffset="${offset}"
+            stroke-linecap="round" stroke-width="10" style="transition:stroke-dashoffset .8s ease"/>
+        </svg>
+        <span class="rep-gauge-pct">${pct}%</span>
+      </div>
+      <span class="rep-gauge-label">${label}</span>
+    </div>`;
+  }
 
-    <div class="table-wrap"><div class="table-header"><span class="table-title">⏱️ Plan- vs. Soll-Stunden nach Bereich</span></div>
-    <div style="padding:20px">
-    ${deptHEntries.map(([dept,hours])=>{const soll=deptSoll[dept]||0;const pct=soll>0?Math.round(hours/soll*100):0;const color=pct>=95?'var(--success)':pct>=75?'var(--warning)':'var(--danger)';
-      return`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:600">${dept}</span><span style="font-family:'Space Mono',monospace;font-size:.82rem;color:${color}">${Math.round(hours)}h / ${soll}h (${pct}%)</span></div>
-      <div style="background:var(--bg-input);border-radius:4px;height:16px;overflow:hidden;position:relative"><div style="height:100%;width:${Math.min(pct,100)}%;background:${color};border-radius:4px;transition:width .5s ease"></div></div></div>`;
-    }).join('')}
-    </div></div>`;
+  // Dept tag colors
+  function deptTagStyle(dept,i){
+    const c=DEPT_COLORS[i%DEPT_COLORS.length];
+    return `background:${c}18;color:${c}`;
+  }
+
+  // Late status
+  function lateStatus(count){
+    if(count>=8) return`<span class="rep-status-dot"><span class="dot" style="background:#ba1a1a"></span><span style="color:#ba1a1a">Action Required</span></span>`;
+    if(count>=4) return`<span class="rep-status-dot"><span class="dot" style="background:#f59e0b"></span><span style="color:#d97706">Monitoring</span></span>`;
+    return`<span class="rep-status-dot"><span class="dot" style="background:#94a3b8"></span><span style="color:var(--text-muted)">Gering</span></span>`;
+  }
+
+  // ─── Admin cost bar section ───
+  let costBarsHTML='';
+  if(isAdmin && deptCostEntries.length){
+    const BCOLS=['blue','teal','red','amber'];
+    const BCOLHEX=['#3b4fd2','#00515c','#ba1a1a','#d97706'];
+    costBarsHTML=deptCostEntries.slice(0,4).map(([dept,cost],i)=>{
+      const pct=totalBrutto>0?Math.round(cost/totalBrutto*100):0;
+      const grow=totalBrutto>0?Math.round(cost/Math.max(...deptCostEntries.map(d=>d[1]),1)*100):0;
+      return `<div>
+        <div class="rep-bar-row-label">
+          <span>${dept}</span>
+          <div class="rep-bar-row-right">
+            <span class="rep-bar-row-amt">${formatEuro(cost)}</span>
+            <span class="rep-bar-pct-badge ${BCOLS[i%BCOLS.length]}">${pct}%</span>
+          </div>
+        </div>
+        <div class="rep-bar-track">
+          <div class="rep-bar-fill" style="width:${grow}%;background:${BCOLHEX[i%BCOLHEX.length]}"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ─── Gauge grid section (hours) ───
+  let gaugesHTML='<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:.8rem">Keine Stunden-Daten</div>';
+  if(isAdmin && deptHEntries.length){
+    const items=deptHEntries.slice(0,4).map(([dept,hours])=>{
+      const soll=deptSoll[dept]||0;
+      const pct=soll>0?Math.round(hours/soll*100):0;
+      return gaugeHTML(pct,'#3b4fd2',dept);
+    });
+    gaugesHTML=`<div class="rep-gauge-grid">${items.join('')}</div>`;
+    const avgPct=deptHEntries.length>0?Math.round(deptHEntries.map(([dept,h])=>{const s=deptSoll[dept]||0;return s>0?h/s*100:0;}).reduce((a,b)=>a+b,0)/deptHEntries.length):0;
+    gaugesHTML+=`<div class="rep-gauge-info"><span class="ms">info</span><p class="rep-gauge-info-text">Die durchschnittliche Auslastung beträgt ${avgPct}%. Zielkorridor: 85–95%.</p></div>`;
+  }
+
+  // ─── Delays table rows ───
+  const delayRows=topDelays.slice(0,8).map((e,i)=>{
+    const deptIdx=deptEntries.findIndex(([d])=>d===e.dept);
+    const tagStyle=deptTagStyle(e.dept,deptIdx>=0?deptIdx:i);
+    const avgDur=e.lateCount>0?Math.round(e.lateAvgMin||12):0;
+    const durClass=e.lateCount>=8?'danger':'';
+    return `<tr>
+      <td>
+        <div class="rep-emp-cell">
+          <div class="rep-emp-avatar" style="background:${e.color||'#6366f1'}">${e.avatar||e.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
+          <div><div class="rep-emp-name">${e.name}</div><div class="rep-emp-pos">${e.position||e.dept}</div></div>
+        </div>
+      </td>
+      <td><span class="rep-dept-tag" style="${tagStyle}">${e.dept.toUpperCase()}</span></td>
+      <td class="rep-late-count">${e.lateCount}×</td>
+      <td class="rep-late-dur ${durClass}">${avgDur} Min.</td>
+      <td>${lateStatus(e.lateCount)}</td>
+      <td><button class="rep-action-btn" title="Nachricht"><span class="ms">mail</span></button></td>
+    </tr>`;
+  }).join('');
+
+  // ─── Admin extra: dept distribution + sick days ───
+  let extraSection='';
+  if(isAdmin){
+    const sickTop=emps.filter(e=>e.sickDays>0).sort((a,b)=>b.sickDays-a.sickDays).slice(0,6);
+    const maxS=Math.max(...sickTop.map(e=>e.sickDays),1);
+    const sickBars=sickTop.map(e=>`
+      <div>
+        <div class="rep-mini-bar-label"><span>${e.name}</span><span>${e.sickDays} Tage</span></div>
+        <div class="rep-mini-track"><div class="rep-mini-fill" style="width:${Math.round(e.sickDays/maxS*100)}%;background:#ba1a1a"></div></div>
+      </div>`).join('');
+    const deptBars=deptEntries.map(([dept,count],i)=>{
+      const c=DEPT_COLORS[i%DEPT_COLORS.length];
+      return `<div>
+        <div class="rep-mini-bar-label"><span>${dept}</span><span>${count}</span></div>
+        <div class="rep-mini-track"><div class="rep-mini-fill" style="width:${Math.round(count/maxDept*100)}%;background:${c}"></div></div>
+      </div>`;
+    }).join('');
+    extraSection=`
+    <div class="rep-extra-grid">
+      <div class="rep-mini-card">
+        <div class="rep-mini-title">👥 Mitarbeiter nach Bereich</div>
+        <div class="rep-mini-bar-rows">${deptBars||'<p style="color:var(--text-muted);font-size:.8rem">Keine Daten</p>'}</div>
+      </div>
+      <div class="rep-mini-card">
+        <div class="rep-mini-title">🏥 Top Krankentage</div>
+        <div class="rep-mini-bar-rows">${sickBars||'<p style="color:var(--text-muted);font-size:.8rem">Keine Krankentage</p>'}</div>
+      </div>
+    </div>`;
   }
 
   pg.innerHTML=`
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-label">Gesamt MA</div><div class="stat-value">${emps.length}</div></div>
-      <div class="stat-card" style="border-left:3px solid var(--success)"><div class="stat-label">Aktiv</div><div class="stat-value" style="color:var(--success)">${statusCount.active||0}</div></div>
-      <div class="stat-card" style="border-left:3px solid var(--info)"><div class="stat-label">Urlaub</div><div class="stat-value" style="color:var(--info)">${statusCount.vacation||0}</div></div>
-      <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="stat-label">Krank</div><div class="stat-value" style="color:var(--danger)">${statusCount.sick||0}</div></div>
-      <div class="stat-card" style="border-left:3px solid var(--late-color)"><div class="stat-label">Verspätungen Ges.</div><div class="stat-value" style="color:var(--late-color)">${emps.reduce((s,e)=>s+e.lateCount,0)}</div></div>
+  <!-- Page Header -->
+  <div class="rep-page-hd">
+    <div>
+      <p class="rep-eyebrow">Management Intelligence</p>
+      <h2 class="rep-page-title">Berichte &amp; Auswertungen</h2>
     </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-    <div class="table-wrap"><div class="table-header"><span class="table-title">👥 Mitarbeiter nach Bereich</span></div>
-    <div style="padding:20px">
-    ${deptEntries.map(([dept,count])=>`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:600">${dept}</span><span style="font-family:'Space Mono',monospace">${count}</span></div>
-    <div style="background:var(--bg-input);border-radius:4px;height:20px;overflow:hidden"><div style="height:100%;width:${Math.round(count/maxDept*100)}%;background:var(--accent);border-radius:4px;transition:width .5s ease"></div></div></div>`).join('')}
-    </div></div>
-
-    <div class="table-wrap"><div class="table-header"><span class="table-title">🏥 Top Krankentage</span></div>
-    <div style="padding:20px">
-    ${emps.filter(e=>e.sickDays>0).sort((a,b)=>b.sickDays-a.sickDays).slice(0,8).map(e=>{const maxS=Math.max(...emps.map(x=>x.sickDays),1);
-      return`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:600">${e.name}</span><span style="font-family:'Space Mono',monospace">${e.sickDays} Tage</span></div>
-      <div style="background:var(--bg-input);border-radius:4px;height:14px;overflow:hidden"><div style="height:100%;width:${Math.round(e.sickDays/maxS*100)}%;background:var(--danger);border-radius:4px"></div></div></div>`;
-    }).join('')||'<p style="color:var(--text-muted)">Keine Krankentage</p>'}
-    </div></div>
+    <div class="rep-hd-actions">
+      <button class="rep-btn-ghost"><span class="ms">filter_list</span> Zeitraum</button>
+      ${can('canExport')?`<button class="rep-btn-primary" onclick="exportReport()"><span class="ms">picture_as_pdf</span> Report PDF Export</button>`:''}
     </div>
+  </div>
 
-    ${hoursSection}
+  <!-- KPI Grid -->
+  <div class="rep-kpi-grid">
+    ${isAdmin?`
+    <div class="rep-kpi-card">
+      <span class="ms rep-kpi-bg-icon">monitoring</span>
+      <div class="rep-kpi-card-top">
+        <div class="rep-kpi-icon blue"><span class="ms">payments</span></div>
+        <span class="rep-kpi-badge up"><span class="ms">trending_up</span> Aktuell</span>
+      </div>
+      <div class="rep-kpi-label">Personalkosten / Monat</div>
+      <div class="rep-kpi-value">${formatEuro(totalBrutto)}</div>
+    </div>`:`
+    <div class="rep-kpi-card">
+      <span class="ms rep-kpi-bg-icon">group</span>
+      <div class="rep-kpi-card-top">
+        <div class="rep-kpi-icon teal"><span class="ms">badge</span></div>
+        <span class="rep-kpi-badge ok"><span class="ms">check_circle</span> Aktuell</span>
+      </div>
+      <div class="rep-kpi-label">Mitarbeiter</div>
+      <div class="rep-kpi-value">${emps.length}</div>
+    </div>`}
+    <div class="rep-kpi-card">
+      <span class="ms rep-kpi-bg-icon">badge</span>
+      <div class="rep-kpi-card-top">
+        <div class="rep-kpi-icon teal"><span class="ms">badge</span></div>
+        <span class="rep-kpi-badge ok"><span class="ms">check_circle</span> Aktuell</span>
+      </div>
+      <div class="rep-kpi-label">Aktive Mitarbeiter</div>
+      <div class="rep-kpi-value">${statusCount.active||0}</div>
+    </div>
+    <div class="rep-kpi-card">
+      <span class="ms rep-kpi-bg-icon">healing</span>
+      <div class="rep-kpi-card-top">
+        <div class="rep-kpi-icon red"><span class="ms">medical_services</span></div>
+        <span class="rep-kpi-badge down"><span class="ms">trending_down</span> Krank</span>
+      </div>
+      <div class="rep-kpi-label">Krankheitstage gesamt</div>
+      <div class="rep-kpi-value">${totalSick} Tage</div>
+    </div>
+    <div class="rep-kpi-card highlight">
+      <span class="ms rep-kpi-bg-icon">speed</span>
+      <div class="rep-kpi-card-top">
+        <div class="rep-kpi-icon white"><span class="ms" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">electric_bolt</span></div>
+        <span class="rep-kpi-badge star"><span class="ms">star</span> High</span>
+      </div>
+      <div class="rep-kpi-label">Verspätungen gesamt</div>
+      <div class="rep-kpi-value">${totalLate}×</div>
+    </div>
+  </div>
 
-    <div class="table-wrap"><div class="table-header"><span class="table-title">⏰ Top Verspätungen</span></div>
-    <table><thead><tr><th>Mitarbeiter</th><th>Standort</th><th>Bereich</th><th>Anzahl</th></tr></thead><tbody>
-    ${emps.filter(e=>e.lateCount>0).sort((a,b)=>b.lateCount-a.lateCount).map(e=>`<tr><td><strong style="color:var(--text-primary)">${e.name}</strong></td><td>${getLocationName(e.location)}</td><td>${e.dept}</td><td><span class="emp-pill late">${e.lateCount}×</span></td></tr>`).join('')||'<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">Keine Verspätungen</td></tr>'}
-    </tbody></table></div>`;
+  ${isAdmin && deptCostEntries.length?`
+  <!-- Charts Row -->
+  <div class="rep-charts-row">
+    <!-- Cost Breakdown -->
+    <div class="rep-chart-card">
+      <div class="rep-chart-card-hd">
+        <span class="rep-chart-title">Personalkosten Breakdown</span>
+        <div class="rep-chart-legend"><span class="rep-chart-legend-dot"></span> Aktueller Monat</div>
+      </div>
+      <div class="rep-bar-rows">${costBarsHTML}</div>
+    </div>
+    <!-- Hours Gauges -->
+    <div class="rep-chart-card">
+      <div class="rep-chart-card-hd">
+        <span class="rep-chart-title">Soll vs. Ist Stunden</span>
+      </div>
+      ${gaugesHTML}
+    </div>
+  </div>`:''}
+
+  ${extraSection}
+
+  <!-- Top Delays Table -->
+  <div class="rep-delays-card">
+    <div class="rep-delays-hd">
+      <div class="rep-delays-hd-left">
+        <span class="rep-delays-title">Top Verspätungen</span>
+        ${totalLate>0?'<span class="rep-kritisch-badge">Kritisch</span>':''}
+      </div>
+      <button class="rep-see-all">Gesamte Liste anzeigen</button>
+    </div>
+    ${topDelays.length?`
+    <div style="overflow-x:auto">
+      <table class="rep-delays-table">
+        <thead><tr>
+          <th>Mitarbeiter</th>
+          <th>Abteilung</th>
+          <th>Häufigkeit</th>
+          <th>∅ Dauer</th>
+          <th>Status</th>
+          <th>Aktion</th>
+        </tr></thead>
+        <tbody>${delayRows}</tbody>
+      </table>
+    </div>`:`
+    <div style="text-align:center;padding:40px;color:var(--text-muted)">
+      <span class="ms" style="font-size:2.5rem;display:block;margin-bottom:8px">verified</span>
+      Keine Verspätungen erfasst
+    </div>`}
+  </div>`;
 }
 
 function exportReport(){
@@ -1926,56 +2754,228 @@ function exportReport(){
 function renderChecklists(){
   const pg=document.getElementById('page-checklists');
   const isEmp=currentUser.role==='mitarbeiter';
-  const me=EMPS.find(e=>e.id===currentUser.empId);
   let cls=CHECKLISTS;
   if(isEmp){cls=cls.filter(c=>c.empId===currentUser.empId||c.empId===0);}
   else{const loc=currentUser.location==='all'?(currentLocation==='all'?null:currentLocation):currentUser.location;if(loc)cls=cls.filter(c=>c.location===loc);}
 
   const banner=isEmp?permBanner('Du siehst nur deine eigenen und allgemeinen Checklisten.'):'';
 
-  pg.innerHTML=`${banner}
-    <div class="stats-row">${CHECKLIST_TYPES.map(ct=>{const items=cls.filter(c=>c.type===ct.id);const total=items.reduce((s,c)=>s+c.items.length,0);const done=items.reduce((s,c)=>s+c.items.filter(i=>i.done).length,0);const pct=total>0?Math.round(done/total*100):0;
-    return`<div class="stat-card" style="border-left:3px solid ${ct.color}"><div class="stat-icon">${ct.icon}</div><div class="stat-label">${ct.name}</div><div class="stat-value" style="font-size:1.3rem">${pct}%</div><div class="stat-change">${done}/${total} erledigt</div></div>`;}).join('')}</div>
-    <div id="clContent"></div>
-    ${can('editEmployees')?'<button class="btn btn-primary" onclick="openModal(\'addChecklist\')" style="margin-top:16px">+ Checkliste erstellen</button>':''}`;
+  // ─── Category Stat Chips ───
+  const statChips=CHECKLIST_TYPES.map(ct=>{
+    const items=cls.filter(c=>c.type===ct.id);
+    const total=items.reduce((s,c)=>s+c.items.length,0);
+    const done=items.reduce((s,c)=>s+c.items.filter(i=>i.done).length,0);
+    const pct=total>0?Math.round(done/total*100):0;
+    return`<div class="cl-stat-chip" style="border-left-color:${ct.color}">
+      <div class="cl-stat-chip-icon">${ct.icon}</div>
+      <div class="cl-stat-chip-label">${ct.name}</div>
+      <div class="cl-stat-chip-pct">${pct}%</div>
+      <div class="cl-stat-chip-sub">${done}/${total} erledigt</div>
+    </div>`;
+  }).join('');
 
-  const cc=document.getElementById('clContent');
-  let h='';
-  cls.forEach(cl=>{
-    const ct=CHECKLIST_TYPES.find(t=>t.id===cl.type);
-    const done=cl.items.filter(i=>i.done).length;const total=cl.items.length;const pct=total>0?Math.round(done/total*100):0;
-    const canManage=can('editEmployees');
-    h+=`<div class="table-wrap" style="margin-bottom:16px"><div class="table-header">
-      <span class="table-title">${ct?.icon||'✅'} ${ct?.name||cl.type} – ${cl.empName}</span>
-      <span style="display:flex;align-items:center;gap:8px">
-        <span class="badge ${pct===100?'badge-success':pct>=50?'badge-warning':'badge-danger'}">${pct}%</span>
-        <span style="font-size:.75rem;color:var(--text-muted)">${done}/${total}</span>
-        ${canManage?`<button class="btn btn-sm" onclick="resetChecklist(${cl.id})" title="Zurücksetzen" style="font-size:.7rem">🔄</button>
-        <button class="btn btn-sm" style="font-size:.7rem;color:var(--danger)" onclick="deleteChecklist(${cl.id})" title="Löschen">🗑️</button>`:''}
-      </span>
-    </div>
-    <div style="padding:4px 20px 4px"><div style="background:var(--bg-input);border-radius:4px;height:6px;margin:8px 0;overflow:hidden"><div style="height:100%;width:${pct}%;background:${ct?.color||'var(--accent)'};border-radius:4px;transition:width .3s"></div></div></div>
-    <div style="padding:0 20px 16px">`;
-    cl.items.forEach((item,idx)=>{
-      h+=`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(42,42,58,.2)">
-        <div style="width:22px;height:22px;border-radius:4px;border:2px solid ${item.done?ct?.color||'var(--success)':'var(--border)'};background:${item.done?(ct?.color||'var(--success)'):'transparent'};display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#fff;flex-shrink:0;transition:all .2s;cursor:pointer" onclick="toggleCLItem(${cl.id},${idx})">
-          ${item.done?'✓':''}
+  // ─── Bento hero: pick first checklist as featured ───
+  let heroHTML='';
+  if(cls.length>0){
+    const hero=cls[0];
+    const heroType=CHECKLIST_TYPES.find(t=>t.id===hero.type)||{icon:'✅',name:hero.type,color:'#3b4fd2'};
+    const heroDone=hero.items.filter(i=>i.done).length;
+    const heroTotal=hero.items.length;
+    const heroPct=heroTotal>0?Math.round(heroDone/heroTotal*100):0;
+    const R=34;const cx=40;const cy=40;
+    const circ=2*Math.PI*R;
+    const filled=circ*(heroPct/100);
+    const offset=circ-filled;
+    heroHTML=`<div class="cl-hero-card">
+      <div class="cl-hero-blob"></div>
+      <div class="cl-hero-top">
+        <div style="position:relative;z-index:1">
+          <div class="cl-hero-prio">Prio: ${heroPct>=75?'Hoch':heroPct>=40?'Mittel':'Niedrig'}</div>
+          <h2 class="cl-hero-name">${heroType.name} – ${hero.empName}</h2>
+          <p class="cl-hero-desc">${hero.items.length} Aufgaben · ${heroDone} erledigt</p>
         </div>
-        <span style="flex:1;font-size:.88rem;${item.done?'text-decoration:line-through;color:var(--text-muted)':''}" ${canManage?`ondblclick="editCLItem(${cl.id},${idx},this)"`:''} title="${canManage?'Doppelklick zum Bearbeiten':''}">${item.text}</span>
-        ${canManage?`<button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.8rem;padding:2px 4px;opacity:.4" onclick="removeCLItem(${cl.id},${idx})" title="Entfernen">✕</button>`:''}
+        <div class="cl-circle-wrap">
+          <svg width="80" height="80" viewBox="0 0 80 80">
+            <circle cx="${cx}" cy="${cy}" r="${R}" fill="transparent" stroke="rgba(255,255,255,.15)" stroke-width="8"/>
+            <circle cx="${cx}" cy="${cy}" r="${R}" fill="transparent" stroke="#fff"
+              stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
+              stroke-linecap="round" stroke-width="8"
+              transform="rotate(-90 40 40)"/>
+          </svg>
+          <div class="cl-circle-pct">${heroPct}%</div>
+        </div>
+      </div>
+      <div class="cl-hero-bottom" style="position:relative;z-index:1">
+        <button class="cl-hero-continue-btn">Jetzt fortfahren</button>
+      </div>
+    </div>`;
+  }
+
+  // ─── Bento small cards (type chips, up to 3) ───
+  const MINI_COLORS=[
+    {bg:'rgba(245,158,11,.1)',color:'#d97706',icon:'warning'},
+    {bg:'rgba(59,79,210,.06)',color:'var(--accent)',icon:'school'},
+    {bg:'rgba(0,81,92,.07)',color:'#00515c',icon:'description'}
+  ];
+  const bentoMinis=CHECKLIST_TYPES.slice(0,3).map((ct,i)=>{
+    const items=cls.filter(c=>c.type===ct.id);
+    const total=items.reduce((s,c)=>s+c.items.length,0);
+    const done=items.reduce((s,c)=>s+c.items.filter(i=>i.done).length,0);
+    const pct=total>0?Math.round(done/total*100):0;
+    const mc=MINI_COLORS[i%MINI_COLORS.length];
+    return`<div class="cl-mini-card">
+      <div class="cl-mini-icon" style="background:${mc.bg};color:${mc.color}">
+        <span class="ms">${mc.icon}</span>
+      </div>
+      <div class="cl-mini-text">
+        <div class="cl-mini-name">${ct.name}</div>
+        <div class="cl-mini-sub">${done}/${total} Aufgaben</div>
+        <div class="cl-mini-track"><div class="cl-mini-fill" style="width:${pct}%;background:${mc.color}"></div></div>
+      </div>
+      <button class="cl-mini-arrow"><span class="ms">chevron_right</span></button>
+    </div>`;
+  }).join('');
+
+  // ─── Hygiene card: use second checklist or type ───
+  let hygieneHTML='';
+  if(cls.length>1){
+    const hy=cls[1];
+    const hyType=CHECKLIST_TYPES.find(t=>t.id===hy.type)||{icon:'restaurant',name:hy.type};
+    const hyDone=hy.items.filter(i=>i.done).length;
+    const hyTotal=hy.items.length;
+    const hyPct=hyTotal>0?Math.round(hyDone/hyTotal*100):0;
+    hygieneHTML=`<div class="cl-hygiene-card">
+      <div>
+        <div class="cl-hygiene-card-top">
+          <div class="cl-hygiene-icon"><span class="ms" style="font-variation-settings:'FILL' 1">restaurant</span></div>
+          <span class="cl-hygiene-badge">Täglich</span>
+        </div>
+        <h3 class="cl-hygiene-title">${hyType.name} – ${hy.empName}</h3>
+        <p class="cl-hygiene-desc">${hy.items.length} Kontrollpunkte</p>
+      </div>
+      <div>
+        <div class="cl-progress-label"><span>Fortschritt</span><span>${hyDone}/${hyTotal} Aufgaben</span></div>
+        <div class="cl-progress-track"><div class="cl-progress-fill" style="width:${hyPct}%;background:#22c55e"></div></div>
+      </div>
+    </div>`;
+  } else {
+    hygieneHTML=`<div class="cl-hygiene-card">
+      <div>
+        <div class="cl-hygiene-card-top">
+          <div class="cl-hygiene-icon"><span class="ms" style="font-variation-settings:'FILL' 1">checklist</span></div>
+          <span class="cl-hygiene-badge">Standard</span>
+        </div>
+        <h3 class="cl-hygiene-title">Tägliche Kontrolle</h3>
+        <p class="cl-hygiene-desc">Keine weiteren Checklisten vorhanden</p>
+      </div>
+      <div>
+        <div class="cl-progress-label"><span>Fortschritt</span><span>—</span></div>
+        <div class="cl-progress-track"><div class="cl-progress-fill" style="width:0%;background:#22c55e"></div></div>
+      </div>
+    </div>`;
+  }
+
+  // ─── Build task cards ───
+  let taskCards='';
+  if(cls.length===0){
+    taskCards=`<div class="cl-empty"><span class="ms">checklist</span>Keine Checklisten vorhanden.</div>`;
+  } else {
+    cls.forEach(cl=>{
+      const ct=CHECKLIST_TYPES.find(t=>t.id===cl.type)||{icon:'✅',name:cl.type,color:'var(--accent)'};
+      const done=cl.items.filter(i=>i.done).length;
+      const total=cl.items.length;
+      const pct=total>0?Math.round(done/total*100):0;
+      const canManage=can('editEmployees');
+      const badgeCls=pct===100?'done':pct>=50?'partial':'todo';
+      const badgeTxt=pct===100?'Abgeschlossen':pct>=50?'In Bearbeitung':'Offen';
+
+      let itemsHTML='';
+      cl.items.forEach((item,idx)=>{
+        itemsHTML+=`<div class="cl-item">
+          <div class="cl-item-check ${item.done?'done':''}" style="${item.done?'background:'+ct.color+';border-color:'+ct.color:''}" onclick="toggleCLItem(${cl.id},${idx})">
+            ${item.done?'<span class="ms" style="font-size:.75rem;font-variation-settings:\'FILL\' 1">check</span>':''}
+          </div>
+          <span class="cl-item-text ${item.done?'done':''}" ${canManage?`ondblclick="editCLItem(${cl.id},${idx},this)" title="Doppelklick zum Bearbeiten"`:''}>${item.text}</span>
+          ${canManage?`<button class="cl-item-remove" onclick="removeCLItem(${cl.id},${idx})" title="Entfernen">✕</button>`:''}
+        </div>`;
+      });
+
+      const addRowHTML=canManage?`<div class="cl-add-row">
+        <input class="cl-add-input" placeholder="Neue Aufgabe..." id="newCLItem_${cl.id}" onkeydown="if(event.key==='Enter')addCLItem(${cl.id})">
+        <button class="cl-add-btn" onclick="addCLItem(${cl.id})">+ Hinzufügen</button>
+      </div>`:'';
+
+      const actionBtns=canManage?`
+        <button class="cl-icon-btn reset" onclick="resetChecklist(${cl.id})" title="Zurücksetzen">🔄</button>
+        <button class="cl-icon-btn" onclick="deleteChecklist(${cl.id})" title="Löschen">🗑️</button>
+      `:'';
+
+      taskCards+=`<div class="cl-card">
+        <div class="cl-card-header">
+          <div class="cl-card-header-left">
+            <span class="cl-card-type-icon">${ct.icon}</span>
+            <span class="cl-card-title">${ct.name} – ${cl.empName}</span>
+          </div>
+          <div class="cl-card-header-right">
+            <span class="cl-badge ${badgeCls}">${badgeTxt}</span>
+            <span style="font-size:.75rem;color:var(--text-muted)">${done}/${total}</span>
+            ${actionBtns}
+          </div>
+        </div>
+        <div class="cl-card-progress">
+          <div class="cl-card-progress-track">
+            <div class="cl-card-progress-fill" style="width:${pct}%;background:${ct.color}"></div>
+          </div>
+        </div>
+        <div class="cl-items-wrap">${itemsHTML}</div>
+        ${addRowHTML}
       </div>`;
     });
-    // Add item input (inline)
-    if(canManage){
-      h+=`<div style="display:flex;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
-        <input class="form-input" style="flex:1;font-size:.82rem;padding:6px 10px" placeholder="Neue Aufgabe..." id="newCLItem_${cl.id}" onkeydown="if(event.key==='Enter')addCLItem(${cl.id})">
-        <button class="btn btn-sm" onclick="addCLItem(${cl.id})" style="font-size:.75rem">+ Hinzufügen</button>
-      </div>`;
-    }
-    h+='</div></div>';
-  });
-  if(!cls.length)h='<p style="color:var(--text-muted);padding:20px">Keine Checklisten vorhanden.</p>';
-  cc.innerHTML=h;
+  }
+
+  pg.innerHTML=`${banner}
+  <!-- Page Header -->
+  <div class="cl-page-hd">
+    <div>
+      <h2 class="cl-page-title">Checklisten &amp; Compliance</h2>
+      <p class="cl-page-sub">Verwalten Sie betriebliche Abläufe und Sicherheitsstandards.</p>
+    </div>
+    <div class="cl-hd-actions">
+      ${can('editEmployees')?`<button class="cl-new-btn" onclick="openModal('addChecklist')"><span class="ms">playlist_add</span> Neue Vorlage</button>`:''}
+    </div>
+  </div>
+
+  <!-- Category Stats -->
+  <div class="cl-stats-grid">${statChips}</div>
+
+  <!-- Bento Grid -->
+  ${cls.length>0?`<div class="cl-bento-grid">
+    ${heroHTML}
+    ${hygieneHTML}
+    ${bentoMinis}
+  </div>`:''}
+
+  <!-- Task Cards -->
+  <div class="cl-tasks-hd">
+    <h3 class="cl-tasks-title">Aktuelle Aufgaben</h3>
+    <div class="cl-tasks-hd-right">
+      <button class="cl-sort-btn"><span class="ms">sort</span> Sortieren</button>
+      <button class="cl-sort-btn"><span class="ms">filter_list</span> Filter</button>
+    </div>
+  </div>
+  <div id="clContent">${taskCards}</div>
+
+  <!-- FAB -->
+  <div class="cl-fab-wrap">
+    ${can('editEmployees')?`<div class="cl-fab secondary">
+        <span class="ms">file_download</span>
+        <span class="cl-fab-label">Export PDF</span>
+      </div>
+      <div class="cl-fab primary" onclick="openModal('addChecklist')">
+        <span class="ms">add</span>
+        <span class="cl-fab-label">Aufgabe hinzufügen</span>
+      </div>`:''}
+  </div>`;
 }
 
 function toggleCLItem(clId,idx){

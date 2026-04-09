@@ -101,7 +101,9 @@ async function doLogin() {
 
     buildSidebar();
     buildLocationSelect();
+    showLoading('Daten werden geladen...');
     await loadDataFromSupabase();
+    hideLoading();
     initApp();
 
     console.log('[Auth] ✓ Login successful:', currentUser.name, '(' + currentUser.role + ')');
@@ -252,7 +254,10 @@ async function doLoginDemo() {
  */
 async function doLogout() {
   try {
+    // Cleanup Realtime channels before signing out
+    if (typeof unsubscribeRealtime === 'function') unsubscribeRealtime();
     await sb.auth.signOut();
+    hideLoading();
   } catch (e) {
     // Ignore signout errors (might be demo mode)
   }
@@ -306,7 +311,9 @@ async function checkExistingSession() {
 
         buildSidebar();
         buildLocationSelect();
+        showLoading('Sitzung wird wiederhergestellt...');
         await loadDataFromSupabase();
+        hideLoading();
         initApp();
 
         console.log('[Auth] ✓ Session restored:', currentUser.name);
@@ -334,6 +341,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Check for existing session on page load
-  checkExistingSession();
+  // Show loading overlay immediately on page load
+  showLoading('Verbindung wird hergestellt...');
+
+  // Check for existing session; hide loading if no session found
+  checkExistingSession().then(hasSession => {
+    if (!hasSession) {
+      // No session → show login screen
+      hideLoading();
+    }
+    // If session exists, hideLoading() is called inside checkExistingSession()
+  }).catch(() => {
+    hideLoading();
+  });
 });

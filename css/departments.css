@@ -1,0 +1,475 @@
+/* ═══════════════════════════════════════════════════════════
+   OKYU HRM – Bereiche (Departments) Premium Styles
+   Matching Curated Workspace reference design
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Page Header ─── */
+.dept-page-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.dept-page-title {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -.03em;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+  font-family: 'Manrope', sans-serif;
+}
+.dept-page-sub {
+  font-size: .875rem;
+  color: var(--text-secondary);
+  max-width: 520px;
+  line-height: 1.5;
+}
+.dept-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-size: .875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s, opacity .15s;
+  box-shadow: 0 6px 20px rgba(59,79,210,.3);
+  white-space: nowrap;
+}
+.dept-add-btn:hover { transform: scale(1.04); }
+.dept-add-btn:active { transform: scale(.97); }
+.dept-add-btn .ms { font-size: 1.1rem; }
+
+/* ─── Accordion Cards ─── */
+.dept-accordion { display: grid; gap: 14px; }
+
+.dept-card {
+  background: var(--bg-card);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06);
+  transition: box-shadow .2s;
+}
+.dept-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,.1); }
+
+/* Left colored accent bar */
+.dept-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 20px 24px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s;
+  position: relative;
+}
+.dept-card-header:hover { background: rgba(0,0,0,.015); }
+
+.dept-color-bar {
+  width: 0;
+  border-left-width: 6px;
+  border-left-style: solid;
+  height: 48px;
+  border-radius: 3px;
+  margin-right: 20px;
+  flex-shrink: 0;
+}
+
+/* ─── Card Header Info ─── */
+.dept-header-name-block { flex: 1; min-width: 0; }
+.dept-card-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: 'Manrope', sans-serif;
+  letter-spacing: -.02em;
+}
+.dept-card-location {
+  font-size: .72rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  font-weight: 500;
+}
+.dept-card-location .ms { font-size: .75rem; }
+
+.dept-divider {
+  width: 1px;
+  height: 36px;
+  background: var(--border);
+  margin: 0 20px;
+  flex-shrink: 0;
+}
+
+.dept-leitung-block { flex-shrink: 0; min-width: 120px; }
+.dept-leitung-label {
+  font-size: .65rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.dept-leitung-name {
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ─── Stat Badges ─── */
+.dept-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 20px;
+}
+.dept-stat-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 10px;
+  min-width: 56px;
+}
+.dept-stat-badge.is-active   { background: rgba(16,185,129,.08); }
+.dept-stat-badge.is-sick     { background: rgba(239,68,68,.08); }
+.dept-stat-badge.is-vacation { background: rgba(59,130,246,.08); }
+.dept-stat-badge.is-dienst   { background: rgba(249,115,22,.08); }
+.dept-stat-label {
+  font-size: .6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  white-space: nowrap;
+}
+.dept-stat-badge.is-active   .dept-stat-label { color: #059669; }
+.dept-stat-badge.is-sick     .dept-stat-label { color: #dc2626; }
+.dept-stat-badge.is-vacation .dept-stat-label { color: #2563eb; }
+.dept-stat-badge.is-dienst   .dept-stat-label { color: #ea580c; }
+.dept-stat-val {
+  font-size: .95rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+.dept-stat-badge.is-active   .dept-stat-val { color: #065f46; }
+.dept-stat-badge.is-sick     .dept-stat-val { color: #991b1b; }
+.dept-stat-badge.is-vacation .dept-stat-val { color: #1d4ed8; }
+.dept-stat-badge.is-dienst   .dept-stat-val { color: #c2410c; }
+
+/* ─── Cost & Arrow ─── */
+.dept-cost-block { text-align: right; flex-shrink: 0; }
+.dept-cost-label {
+  font-size: .6rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.dept-cost-val {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--text-primary);
+  letter-spacing: -.02em;
+}
+.dept-toggle-arrow {
+  margin-left: 16px;
+  color: var(--text-muted);
+  transition: transform .25s;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+.dept-toggle-arrow.is-open { transform: rotate(180deg); }
+
+/* ─── Expanded Content ─── */
+.dept-card-body {
+  display: none;
+  border-top: 1px solid var(--border);
+  padding: 24px;
+}
+.dept-card-body.is-open { display: block; }
+
+.dept-body-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 24px;
+}
+@media (max-width: 900px) {
+  .dept-body-grid { grid-template-columns: 1fr; }
+}
+
+/* Left panel */
+.dept-left-panel { display: flex; flex-direction: column; gap: 20px; }
+
+/* Progress bar */
+.dept-progress-card {
+  background: var(--bg-input);
+  border-radius: 16px;
+  padding: 20px;
+}
+.dept-progress-hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+.dept-progress-label {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.dept-progress-pct {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--accent);
+  font-family: 'Manrope', sans-serif;
+  letter-spacing: -.03em;
+  line-height: 1;
+}
+.dept-progress-pct span {
+  font-size: .85rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.dept-progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.dept-progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #818cf8);
+  transition: width .6s ease;
+}
+.dept-progress-hint {
+  font-size: .65rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* Today's shifts section */
+.dept-shifts-title {
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.dept-shifts-title .ms { font-size: 1rem; color: var(--accent); }
+.dept-shift-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.dept-shift-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.dept-shift-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Right panel: employee table */
+.dept-emp-table-wrap {
+  background: var(--bg-card);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.dept-emp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.dept-emp-table thead tr {
+  background: var(--bg-input);
+}
+.dept-emp-table thead th {
+  padding: 10px 14px;
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+  text-align: left;
+}
+.dept-emp-table thead th:last-child { text-align: right; }
+.dept-emp-table thead th.center { text-align: center; }
+.dept-emp-table tbody tr {
+  border-top: 1px solid var(--border);
+  transition: background .1s;
+}
+.dept-emp-table tbody tr:hover { background: rgba(0,0,0,.015); }
+.dept-emp-table tbody td {
+  padding: 10px 14px;
+  font-size: .82rem;
+  color: var(--text-secondary);
+}
+.dept-emp-table tbody td.name-cell {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.dept-emp-table tbody td.cost-cell {
+  text-align: right;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: 'Space Mono', monospace;
+  font-size: .78rem;
+}
+.dept-emp-table tbody td.hours-cell { text-align: right; }
+.dept-emp-table tbody td.status-cell { text-align: center; }
+
+/* ─── Insight Grid (bottom) ─── */
+.dept-insight-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-top: 40px;
+}
+@media (max-width: 900px) {
+  .dept-insight-grid { grid-template-columns: 1fr; }
+}
+.dept-insight-main {
+  background: var(--accent);
+  border-radius: 24px;
+  padding: 36px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(59,79,210,.25);
+}
+.dept-insight-main::after {
+  content: '';
+  position: absolute;
+  right: -10%;
+  bottom: -20%;
+  width: 240px; height: 240px;
+  background: rgba(255,255,255,.08);
+  border-radius: 50%;
+  filter: blur(40px);
+}
+.dept-insight-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-family: 'Manrope', sans-serif;
+  margin-bottom: 20px;
+}
+.dept-insight-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.dept-insight-stat-label {
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: rgba(255,255,255,.65);
+  margin-bottom: 4px;
+}
+.dept-insight-stat-val {
+  font-size: 2.2rem;
+  font-weight: 900;
+  letter-spacing: -.04em;
+  line-height: 1;
+}
+.dept-insight-actions { display: flex; gap: 10px; position: relative; z-index: 1; }
+.dept-insight-btn-ghost {
+  padding: 9px 18px;
+  background: rgba(255,255,255,.12);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+.dept-insight-btn-ghost:hover { background: rgba(255,255,255,.2); }
+.dept-insight-btn-solid {
+  padding: 9px 18px;
+  background: #fff;
+  border: none;
+  border-radius: 10px;
+  color: var(--accent);
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s;
+}
+.dept-insight-btn-solid:hover { transform: scale(1.03); }
+
+.dept-insight-side {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 2px 12px rgba(0,0,0,.05);
+}
+.dept-insight-side-icon {
+  font-size: 3rem;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+.dept-insight-side-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-family: 'Manrope', sans-serif;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.dept-insight-side-sub {
+  font-size: .8rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.dept-insight-side-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: .875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.dept-insight-side-btn:hover { opacity: .88; }
+
+/* Empty state */
+.dept-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+.dept-empty .ms { font-size: 3rem; margin-bottom: 12px; display: block; }

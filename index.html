@@ -12,6 +12,11 @@
 
 <!-- Supabase Client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet"/>
+<style>
+  .ms { font-family:'Material Symbols Outlined'; font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 22; font-size:1.25rem; line-height:1; display:inline-flex; align-items:center; justify-content:center; user-select:none; }
+  .nav-item.active .ms, .ms.filled { font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 22; }
+</style>
 
 <!-- Stylesheets -->
 <link rel="stylesheet" href="css/variables.css">
@@ -21,10 +26,38 @@
 <link rel="stylesheet" href="css/modal.css">
 <link rel="stylesheet" href="css/notifications.css">
 <link rel="stylesheet" href="css/schedule.css">
-<link rel="stylesheet" href="css/print.css">
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/employees.css">
+<link rel="stylesheet" href="css/vacation.css">
+  <link rel="stylesheet" href="css/print.css">
+  <link rel="stylesheet" href="css/departments.css">
+  <link rel="stylesheet" href="css/calendar.css">
+  <link rel="stylesheet" href="css/reports.css">
+  <link rel="stylesheet" href="css/mitarbeiter.css">
+  <link rel="stylesheet" href="css/checklists.css">
+  <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body>
 <div class="toast-container" id="toastContainer"></div>
+
+<!-- LOADING OVERLAY -->
+<div id="loadingOverlay" style="
+  position:fixed;inset:0;z-index:9998;
+  background:var(--bg-primary);
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;
+  transition:opacity 0.4s ease;
+">
+  <div style="font-family:'Space Mono',monospace;font-size:1.8rem;font-weight:700;color:var(--accent-light);letter-spacing:4px">OKYU</div>
+  <div style="
+    width:40px;height:40px;border-radius:50%;
+    border:3px solid var(--border);
+    border-top-color:var(--accent);
+    animation:spin 0.8s linear infinite;
+  "></div>
+  <div id="loadingMsg" style="font-size:.8rem;color:var(--text-muted);letter-spacing:.5px">Laden...</div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <!-- LOGIN -->
 <div class="login-screen" id="loginScreen">
@@ -61,9 +94,9 @@
       <input type="date" id="regBirthday" />
       <label>Standort</label>
       <select id="regLocation">
-        <option value="origami">Origami Restaurant</option>
-        <option value="okyu">Okyu Restaurant</option>
-        <option value="enso">Enso Sushi & Grill</option>
+        <option value="origami">Origami Restaurant (Göppingen)</option>
+        <option value="okyu_central">Okyu Restaurant (Stuttgart)</option>
+        <option value="enso">Enso Sushi & Grill (Stuttgart)</option>
       </select>
       <label>Bereich</label>
       <select id="regDept">
@@ -104,21 +137,21 @@
     <div class="sidebar-footer">
       <div class="avatar" id="userAvatar">A</div>
       <div class="user-info"><div class="user-name" id="userName">Admin</div><div class="user-role" id="userRole">Geschäftsführung</div></div>
-      <button class="logout-btn" onclick="doLogout()" title="Abmelden">⏻</button>
+      <button class="logout-btn" onclick="doLogout()" title="Abmelden"><span class="ms">logout</span></button>
     </div>
   </aside>
 
   <div class="main">
     <header class="header">
       <div class="header-left">
-        <button class="btn" style="display:none" id="menuBtn" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+        <button class="btn" style="display:none" id="menuBtn" onclick="document.getElementById('sidebar').classList.toggle('open')"><span class="ms">menu</span></button>
         <h1 class="page-title" id="pageTitle">Dashboard</h1>
         <select class="location-select" id="locationSelect" onchange="currentLocation=this.value;renderPage(getCurrentPage())"></select>
       </div>
       <div class="header-right">
         <span style="font-size:.78rem;color:var(--text-muted)" id="dateDisplay"></span>
         <div class="theme-toggle" onclick="toggleTheme()"><div class="theme-icons"><span>🌙</span><span>☀️</span></div><div class="theme-toggle-knob"></div></div>
-        <button class="notif-btn" onclick="toggleNotifications()">🔔<span class="notif-dot" id="notifDot"></span></button>
+        <button class="notif-btn" onclick="toggleNotifications()"><span class="ms">notifications</span><span class="notif-dot" id="notifDot"></span></button>
       </div>
     </header>
     <div class="content" id="contentArea"></div>
@@ -152,6 +185,8 @@
 <script src="js/data-sync.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/app-core.js"></script>
+<script src="js/ausbildung.js"></script>
+<!-- F: Modular extraction – Ausbildung moved to ausbildung.js -->
 
 <script>
 // Login mode switcher

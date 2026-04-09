@@ -1,0 +1,290 @@
+/* ═══════════════════════════════════════════════════════════
+   OKYU HRM – Urlaubsplan v2 (Stitch Design)
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Employee info banner ─── */
+.vac-emp-banner {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(59,130,246,.08);
+  border: 1px solid rgba(59,130,246,.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: .82rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+/* ─── Top bar: stats + action button ─── */
+.vac-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.vac-stats-strip { display: flex; gap: 14px; flex-wrap: wrap; }
+.vac-stat-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 20px;
+  min-width: 180px;
+}
+.vac-stat-icon {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem;
+}
+.vac-stat-label { font-size: .72rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.vac-stat-num   { font-size: 1.7rem; font-weight: 800; color: var(--text-primary); line-height: 1.1; }
+
+.vac-add-btn {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--accent);
+  color: #fff;
+  border: none; cursor: pointer;
+  border-radius: 50px;
+  padding: 12px 22px;
+  font-size: .88rem; font-weight: 700;
+  box-shadow: 0 4px 18px rgba(99,102,241,.3);
+  transition: transform .15s, box-shadow .15s;
+}
+.vac-add-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(99,102,241,.4); }
+.vac-add-btn .ms { font-size: 1.1rem; }
+
+/* ─── Tab bar ─── */
+.vac-tabs-bar {
+  display: flex; gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 22px;
+}
+.vac-tab {
+  background: none; border: none; cursor: pointer;
+  padding: 10px 20px;
+  font-size: .88rem; font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+}
+.vac-tab:hover { color: var(--text-primary); }
+.vac-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ─── Bento: Calendar + Side panel ─── */
+.vac-bento {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1100px) { .vac-bento { grid-template-columns: 1fr; } }
+
+/* ─── Calendar card ─── */
+.vac-cal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 1px 12px rgba(0,0,0,.05);
+}
+.vac-cal-toolbar {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 20px;
+}
+.vac-cal-month { font-size: 1.35rem; font-weight: 800; color: var(--text-primary); margin: 0; }
+.vac-cal-sub   { font-size: .78rem; color: var(--text-muted); margin: 3px 0 0; }
+.vac-cal-nav   { display: flex; align-items: center; gap: 6px; }
+.vac-nav-btn {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary); transition: background .12s;
+}
+.vac-nav-btn:hover { background: var(--bg-hover); }
+.vac-today-btn {
+  padding: 5px 14px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card); cursor: pointer;
+  font-size: .8rem; font-weight: 700;
+  color: var(--text-secondary); transition: background .12s;
+}
+.vac-today-btn:hover { background: var(--bg-hover); }
+
+/* Calendar grid */
+.vac-cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  background: var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.vac-cal-head {
+  background: var(--bg-input);
+  text-align: center; padding: 8px 0;
+  font-size: .62rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-muted);
+}
+.vac-cal-day {
+  background: var(--bg-card);
+  min-height: 90px; padding: 7px;
+  position: relative;
+}
+.vac-cal-day.other-month { background: var(--bg-input); }
+.vac-cal-day.today { background: rgba(99,102,241,.06); }
+.vac-cal-day.today .vac-cal-num { color: var(--accent); font-weight: 900; }
+.vac-cal-num {
+  font-size: .8rem; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.vac-cal-event {
+  font-size: .65rem; font-weight: 700; border-radius: 5px;
+  padding: 2px 5px; margin-bottom: 2px;
+  display: flex; align-items: center; gap: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vac-cal-event.vacation { background: rgba(99,102,241,.12); color: var(--accent); }
+.vac-cal-event.sick     { background: rgba(239,68,68,.1); color: var(--danger); }
+.vac-cal-event.more     { background: rgba(148,163,184,.15); color: var(--text-muted); }
+
+/* Legend */
+.vac-legend {
+  display: flex; align-items: center; gap: 16px;
+  margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.vac-legend-item { display: flex; align-items: center; gap: 6px; font-size: .76rem; color: var(--text-muted); }
+.vac-legend-dot  { width: 12px; height: 12px; border-radius: 3px; }
+
+/* ─── Side panel ─── */
+.vac-side-panel { display: flex; flex-direction: column; gap: 16px; }
+.vac-panel-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 20px;
+}
+.vac-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.vac-panel-title { font-size: .92rem; font-weight: 800; color: var(--text-primary); margin: 0; }
+.vac-badge-count {
+  background: rgba(99,102,241,.12); color: var(--accent);
+  font-size: .7rem; font-weight: 800;
+  border-radius: 50px; padding: 2px 8px;
+}
+.vac-req-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.vac-req-item:last-of-type { border-bottom: none; }
+.vac-req-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  color: #fff; font-size: .72rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.vac-req-info   { flex: 1; min-width: 0; }
+.vac-req-name   { font-size: .8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vac-req-dates  { font-size: .7rem; color: var(--text-muted); }
+.vac-req-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.vac-btn-approve {
+  width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(16,185,129,.12); color: #10b981;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s;
+}
+.vac-btn-approve:hover { background: rgba(16,185,129,.25); }
+.vac-btn-reject {
+  width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(239,68,68,.1); color: var(--danger);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s;
+}
+.vac-btn-reject:hover { background: rgba(239,68,68,.22); }
+.vac-btn-approve .ms,.vac-btn-reject .ms { font-size: .95rem; }
+.vac-see-all {
+  width: 100%; margin-top: 12px; padding: 8px;
+  background: none; border: none; cursor: pointer;
+  color: var(--accent); font-size: .78rem; font-weight: 700;
+  border-radius: 8px; transition: background .12s;
+}
+.vac-see-all:hover { background: rgba(99,102,241,.06); }
+.vac-empty { font-size: .8rem; color: var(--text-muted); text-align: center; padding: 16px 0; }
+
+/* ─── Table card (requests / overview / my) ─── */
+.vac-table-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 1px 12px rgba(0,0,0,.05);
+}
+.vac-table-header {
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.vac-table-title { font-size: 1rem; font-weight: 800; color: var(--text-primary); margin: 0; }
+.vac-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+/* Override global th/td */
+.vac-table thead th {
+  padding: 10px 16px !important;
+  background: var(--bg-input) !important;
+  font-size: .62rem !important; font-weight: 800 !important;
+  text-transform: uppercase !important; letter-spacing: .07em !important;
+  color: var(--text-muted) !important;
+  border-bottom: 1px solid var(--border) !important;
+  white-space: nowrap !important;
+}
+.vac-table tbody tr td {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid var(--border) !important;
+  font-size: .85rem !important;
+  color: var(--text-secondary) !important;
+  background: transparent !important;
+  vertical-align: middle !important;
+}
+.vac-table tbody tr:last-child td { border-bottom: none !important; }
+.vac-table tbody tr:hover td { background: rgba(99,102,241,.025) !important; }
+.vac-action-cell { display: flex; gap: 6px; align-items: center; }
+
+/* ─── Overview: progress bars & emp cell ─── */
+.vac-emp-cell { display: flex; align-items: center; gap: 10px; }
+.vac-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  color: #fff; font-size: .68rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.vac-progress-wrap { display: flex; align-items: center; gap: 8px; }
+.vac-progress-bar {
+  width: 100px; height: 6px; background: var(--border);
+  border-radius: 99px; overflow: hidden; flex-shrink: 0;
+}
+.vac-progress-fill { height: 100%; border-radius: 99px; transition: width .3s; }
+.vac-progress-pct  { font-size: .72rem; color: var(--text-muted); font-weight: 600; width: 30px; }
+
+/* ─── My vacation stat cards ─── */
+.vac-my-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 14px; margin-bottom: 16px;
+}
+@media (max-width: 700px) { .vac-my-stats { grid-template-columns: 1fr; } }
+.vac-my-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px; padding: 18px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.04);
+}
+.vac-my-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 6px; }
+.vac-my-num   { font-size: 2rem; font-weight: 800; color: var(--text-primary); line-height: 1; }
+.vac-my-sub   { font-size: .72rem; color: var(--text-muted); margin-top: 4px; }

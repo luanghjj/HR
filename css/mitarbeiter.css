@@ -1,0 +1,406 @@
+/* ═══════════════════════════════════════════════════════════
+   OKYU HRM – Mitarbeiterverwaltung Premium Styles
+   Reference: "Okyu HR | Mitarbeiterverwaltung" design
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Page Header ─── */
+.mit-page-hd {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.mit-page-title {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: 'Manrope', sans-serif;
+  letter-spacing: -.04em;
+  line-height: 1.1;
+  margin: 0 0 6px;
+}
+.mit-page-sub {
+  font-size: .875rem;
+  color: var(--text-secondary);
+  max-width: 500px;
+  line-height: 1.5;
+  margin: 0;
+}
+.mit-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 14px 28px;
+  font-size: .875rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(59,79,210,.28);
+  transition: box-shadow .2s, transform .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mit-add-btn:hover { box-shadow: 0 8px 28px rgba(59,79,210,.38); transform: translateY(-1px); }
+.mit-add-btn .ms   { font-size: 1.2rem; transition: transform .25s; }
+.mit-add-btn:hover .ms { transform: rotate(90deg); }
+
+/* ─── Stats Grid ─── */
+.mit-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 24px;
+}
+@media (max-width: 1100px) { .mit-stats-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px)  { .mit-stats-grid { grid-template-columns: 1fr; } }
+
+.mit-stat-card {
+  background: var(--bg-card);
+  border-radius: 26px;
+  padding: 22px 22px 18px;
+  box-shadow: 0 2px 20px rgba(32,54,189,.05);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow .2s, transform .2s;
+}
+.mit-stat-card:hover { box-shadow: 0 6px 32px rgba(32,54,189,.1); transform: translateY(-2px); }
+
+.mit-stat-card-top  { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+.mit-stat-icon      { width: 46px; height: 46px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
+.mit-stat-icon .ms  { font-size: 1.3rem; }
+.mit-stat-icon.blue  { background: rgba(59,79,210,.08); color: var(--accent); }
+.mit-stat-icon.teal  { background: rgba(159,239,255,.4);  color: #00515c; }
+.mit-stat-icon.red   { background: rgba(255,218,214,.6);  color: #ba1a1a; }
+.mit-stat-icon.orange{ background: rgba(255,237,213,.6);  color: #ea580c; }
+
+.mit-stat-badge  {
+  font-size: .65rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 999px;
+  display: flex; align-items: center; gap: 3px;
+}
+.mit-stat-badge.up     { background: rgba(59,79,210,.1);   color: var(--accent); }
+.mit-stat-badge.ok     { background: rgba(0,81,92,.1);      color: #00515c; }
+.mit-stat-badge.danger { background: rgba(186,26,26,.1);   color: #ba1a1a; }
+.mit-stat-badge.warn   { background: rgba(234,88,12,.1);   color: #ea580c; }
+
+.mit-stat-num  {
+  font-size: 3.2rem;
+  font-weight: 900;
+  font-family: 'Manrope', sans-serif;
+  letter-spacing: -.06em;
+  line-height: 1;
+  color: var(--text-primary);
+}
+.mit-stat-num.blue   { color: var(--accent); }
+.mit-stat-num.teal   { color: #00515c; }
+.mit-stat-num.red    { color: #ba1a1a; }
+.mit-stat-num.orange { color: #ea580c; }
+
+.mit-stat-label { font-size: .82rem; font-weight: 600; color: var(--text-muted); margin-top: 6px; }
+
+.mit-stat-bg-circle {
+  position: absolute;
+  top: -16px; right: -16px;
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: .04;
+  transition: transform .5s;
+}
+.mit-stat-card:hover .mit-stat-bg-circle { transform: scale(2); }
+
+/* ─── Control Bar ─── */
+.mit-control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(242,244,246,.6);
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+  backdrop-filter: blur(8px);
+}
+.mit-ctrl-left  { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mit-ctrl-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.mit-filter-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px;
+  background: var(--bg-card);
+  border: none; border-radius: 10px;
+  font-size: .8rem; font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,.07);
+  transition: background .13s;
+}
+.mit-filter-btn:hover { background: var(--bg-input); }
+.mit-filter-btn .ms   { font-size: .95rem; }
+
+.mit-dept-pills {
+  display: flex;
+  background: rgba(203,213,225,.35);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+.mit-dept-pill {
+  background: none;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background .13s, color .13s, box-shadow .13s;
+}
+.mit-dept-pill.active, .mit-dept-pill:focus {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,.1);
+}
+.mit-dept-pill:hover:not(.active) { color: var(--accent); }
+
+/* Search */
+.mit-search-wrap { position: relative; }
+.mit-search-wrap .ms {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 1rem; color: var(--text-muted); pointer-events: none;
+}
+.mit-search {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px 8px 34px;
+  font-size: .8rem;
+  width: 200px;
+  color: var(--text-primary);
+  transition: border-color .13s, box-shadow .13s;
+}
+.mit-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,79,210,.1); }
+
+/* Add Button (toolbar) */
+.mit-toolbar-add {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 10px;
+  padding: 8px 16px;
+  font-size: .8rem; font-weight: 700;
+  cursor: pointer;
+  transition: background .13s, transform .1s;
+}
+.mit-toolbar-add:hover { transform: translateY(-1px); }
+.mit-toolbar-add .ms { font-size: 1rem; }
+
+/* ─── Table Card ─── */
+.mit-table-card {
+  background: var(--bg-card);
+  border-radius: 26px;
+  box-shadow: 0 2px 24px rgba(32,54,189,.05);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.mit-table-scroll { overflow-x: auto; }
+.mit-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.mit-table thead tr {
+  border-bottom: 1px solid var(--bg-input);
+}
+.mit-table thead th {
+  padding: 18px 20px;
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.mit-table thead th.tc { text-align: center; }
+
+.mit-table tbody tr {
+  border-bottom: 1px solid var(--bg-input);
+  transition: background .12s;
+}
+.mit-table tbody tr:last-child { border-bottom: none; }
+.mit-table tbody tr:hover { background: rgba(248,249,251,.8); }
+.mit-table tbody td { padding: 14px 20px; vertical-align: middle; }
+.mit-table tbody td:first-child { padding-left: 28px; }
+.mit-table tbody td:last-child  { padding-right: 28px; }
+
+/* Employee Name Cell */
+.mit-emp-cell  { display: flex; align-items: center; gap: 12px; }
+.mit-emp-dot   {
+  position: relative;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .78rem; font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.mit-emp-online-dot {
+  position: absolute; bottom: 0; right: 0;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-card);
+}
+.mit-emp-name  { font-size: .875rem; font-weight: 700; color: var(--text-primary); }
+.mit-emp-sub   { font-size: .7rem;   font-weight: 500; color: var(--text-muted); }
+
+/* Location cell */
+.mit-loc-main  { font-size: .78rem; font-weight: 600; color: var(--text-secondary); }
+.mit-loc-sub   { font-size: .68rem; color: var(--text-muted); }
+
+/* Dept pill */
+.mit-dept-pill-tag {
+  display: inline-block;
+  font-size: .65rem; font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+/* Vacation bar */
+.mit-vac-wrap    { display: flex; flex-direction: column; gap: 4px; min-width: 80px; }
+.mit-vac-nums    { display: flex; align-items: baseline; gap: 5px; }
+.mit-vac-remain  { font-size: .78rem; font-weight: 700; color: var(--accent); }
+.mit-vac-total   { font-size: .65rem; color: var(--text-muted); }
+.mit-vac-bar     { height: 4px; background: var(--bg-input); border-radius: 999px; overflow: hidden; }
+.mit-vac-fill    { height: 100%; background: var(--accent); border-radius: 999px; }
+
+/* Pills */
+.mit-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: .65rem; font-weight: 700;
+}
+.mit-pill.sick   { background: rgba(186,26,26,.1);  color: #ba1a1a; }
+.mit-pill.late   { background: rgba(234,88,12,.1);  color: #ea580c; }
+.mit-pill.schule { background: rgba(162,155,254,.12); color: #7c3aed; }
+
+/* Mono values */
+.mit-mono        { font-family: 'Space Mono', monospace; font-size: .78rem; font-weight: 600; color: var(--text-primary); }
+.mit-mono.salary { color: var(--text-primary); }
+.mit-mono.hourly { font-size: .68rem; color: #16a34a; font-weight: 700; }
+
+/* Status badges */
+.mit-status-aktiv   { display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;background:rgba(59,79,210,.08);color:var(--accent); }
+.mit-status-urlaub  { display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;background:rgba(159,239,255,.45);color:#00515c; }
+.mit-status-krank   { display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;background:rgba(255,218,214,.7);color:#ba1a1a; }
+.mit-status-inactive{ display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:.65rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;background:var(--bg-input);color:var(--text-muted); }
+
+/* Action buttons */
+.mit-actions         { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.mit-icon-btn        { width: 34px; height: 34px; display:flex;align-items:center;justify-content:center; background: none; border: none; border-radius: 8px; color: var(--text-muted); cursor: pointer; transition: background .13s, color .13s; }
+.mit-icon-btn:hover  { background: rgba(234,88,12,.08); color: #ea580c; }
+.mit-icon-btn .ms    { font-size: 1.1rem; }
+.mit-detail-btn      { padding: 6px 14px; background: none; border: none; border-radius: 8px; font-size: .78rem; font-weight: 700; color: var(--accent); cursor: pointer; transition: background .13s; }
+.mit-detail-btn:hover{ background: rgba(59,79,210,.07); }
+
+/* Pagination */
+.mit-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 28px;
+  background: rgba(242,244,246,.4);
+  border-top: 1px solid var(--bg-input);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.mit-pag-info  { font-size: .78rem; color: var(--text-muted); }
+.mit-pag-info strong { color: var(--text-primary); }
+
+/* ─── Bottom Bento Row ─── */
+.mit-bottom-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 900px) { .mit-bottom-row { grid-template-columns: 1fr; } }
+
+/* Certifications card */
+.mit-cert-card {
+  background: var(--bg-card);
+  border-radius: 26px;
+  padding: 28px;
+  box-shadow: 0 2px 20px rgba(32,54,189,.05);
+}
+.mit-cert-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.mit-cert-title { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); font-family: 'Manrope', sans-serif; }
+.mit-cert-see-all { font-size:.75rem;font-weight:700;color:var(--accent);background:none;border:none;cursor:pointer;text-decoration:underline;text-underline-offset:3px; }
+
+.mit-cert-item {
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  transition: background .13s, border-color .13s;
+}
+.mit-cert-item:hover { background: rgba(248,249,251,.9); border-color: var(--bg-input); }
+.mit-cert-icon { width: 46px; height: 46px; border-radius: 14px; background: rgba(249,115,22,.1); color: #ea580c; display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+.mit-cert-icon .ms { font-size: 1.3rem; }
+.mit-cert-info { flex: 1; }
+.mit-cert-name { font-size: .875rem; font-weight: 700; color: var(--text-primary); }
+.mit-cert-due  { font-size: .7rem; color: var(--text-muted); margin-top: 2px; }
+.mit-cert-plan-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; cursor: pointer; transition: transform .1s; white-space: nowrap; }
+.mit-cert-plan-btn:hover { transform: scale(1.03); }
+
+/* Insight card (dark) */
+.mit-insight-card {
+  background: #1e254e;
+  border-radius: 26px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(30,37,78,.25);
+  min-height: 220px;
+}
+.mit-insight-blob {
+  position: absolute;
+  bottom: -60px; right: -60px;
+  width: 200px; height: 200px;
+  background: #2533a0;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: .5;
+  pointer-events: none;
+}
+.mit-insight-icon  { font-size: 2.5rem; color: #a5b4fc; margin-bottom: 18px; display: block; position: relative; z-index: 1; }
+.mit-insight-title { font-size: 1.1rem; font-weight: 800; color: #fff; font-family: 'Manrope', sans-serif; margin-bottom: 10px; position: relative; z-index: 1; }
+.mit-insight-body  { font-size: .82rem; line-height: 1.6; color: rgba(165,180,252,.85); position: relative; z-index: 1; }
+.mit-insight-cta   {
+  margin-top: 24px;
+  width: 100%;
+  padding: 12px;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 12px;
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  cursor: pointer;
+  position: relative; z-index: 1;
+  transition: background .15s;
+}
+.mit-insight-cta:hover { background: rgba(255,255,255,.18); }

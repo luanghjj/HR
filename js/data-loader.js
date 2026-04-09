@@ -39,7 +39,16 @@ async function loadDataFromSupabase() {
     if (locsErr) throw new Error('locations: ' + locsErr.message);
     if (locs && locs.length > 0) {
       LOCS.length = 0;
-      locs.forEach(l => LOCS.push(l));
+      locs.forEach(l => {
+        // Merge GPS coords: prefer DB value, fallback to GPS_COORDS constant
+        const gps = GPS_COORDS[l.id] || {};
+        LOCS.push({
+          ...l,
+          lat:      l.lat      ?? gps.lat      ?? null,
+          lng:      l.lng      ?? gps.lng      ?? null,
+          radius_m: l.radius_m ?? gps.radius_m ?? 50
+        });
+      });
     }
 
     // Load departments
@@ -248,7 +257,37 @@ async function loadDataFromSupabase() {
       ) || null;
     }
 
-    console.log(`[Data] ✓ Loaded: ${LOCS.length} locations, ${DEPTS.length} depts, ${EMPS.length} employees, ${VACS.length} vacations, ${SICKS.length} sick leaves, ${DOCS.length} documents, ${SCHULE_SCHEDULE.length} school days, ${AUSBILDUNGSNACHWEISE.length} training logs, ${AZUBI_BEWERTUNGEN.length} evaluations, ${TIME_RECORDS.length} time records`);
+    // Load checklists (graceful – table may not exist yet)
+    const { data: chkData, error: chkErr } = await sb
+      .from('checklists').select('*').order('id');
+    if (!chkErr && chkData && chkData.length > 0) {
+      CHECKLISTS.length = 0;
+      chkData.forEach(c => CHECKLISTS.push({
+        id: c.id,
+        type: c.type,
+        empId: c.emp_id,
+        empName: c.emp_name,
+        location: c.location,
+        items: Array.isArray(c.items) ? c.items : JSON.parse(c.items || '[]')
+      }));
+    }
+    // else: keep static CHECKLISTS from data.js as fallback
+
+    // Load shift templates (graceful – table may not exist yet)
+    const { data: tplData, error: tplErr } = await sb
+      .from('shift_templates').select('*').order('id');
+    if (!tplErr && tplData && tplData.length > 0) {
+      SAVED_TEMPLATES.length = 0;
+      tplData.forEach(t => SAVED_TEMPLATES.push({
+        id: t.id,
+        location: t.location,
+        name: t.name,
+        shifts: Array.isArray(t.shifts) ? t.shifts : JSON.parse(t.shifts || '[]')
+      }));
+    }
+    // else: keep static SAVED_TEMPLATES from data.js as fallback
+
+    console.log(`[Data] ✓ Loaded: ${LOCS.length} locations, ${DEPTS.length} depts, ${EMPS.length} employees, ${VACS.length} vacations, ${SICKS.length} sick leaves, ${DOCS.length} documents, ${CHECKLISTS.length} checklists, ${SAVED_TEMPLATES.length} templates, ${SCHULE_SCHEDULE.length} school days, ${AUSBILDUNGSNACHWEISE.length} training logs, ${AZUBI_BEWERTUNGEN.length} evaluations, ${TIME_RECORDS.length} time records`);
     return true;
 
   } catch (err) {
@@ -257,3 +296,4 @@ async function loadDataFromSupabase() {
     return false;
   }
 }
+

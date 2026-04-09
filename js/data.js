@@ -3,9 +3,9 @@
 // ═══════════════════════════════════════════════════════════
 
 const LOCS = [
-  { id: 'origami', name: 'Origami Restaurant',  city: 'Stuttgart' },
-  { id: 'okyu',    name: 'Okyu Restaurant',     city: 'Stuttgart' },
-  { id: 'enso',    name: 'Enso Sushi & Grill',   city: 'Stuttgart' }
+  { id: 'origami',      name: 'Origami Restaurant',  city: 'Göppingen' },
+  { id: 'okyu_central', name: 'Okyu Restaurant',     city: 'Stuttgart' },
+  { id: 'enso',         name: 'Enso Sushi & Grill',  city: 'Stuttgart' }
 ];
 
 const DEPTS = [
@@ -15,7 +15,7 @@ const DEPTS = [
   { id: 4, name: 'Küche',      location: 'enso',         head: 'Duc Nguyen',   count: 5, color: '#fdcb6e' },
   { id: 5, name: 'Service',    location: 'enso',         head: 'Sarah Klein',  count: 4, color: '#74b9ff' },
   { id: 6, name: 'Bar',        location: 'enso',         head: 'Max Bauer',    count: 2, color: '#00b894' },
-  { id: 7, name: 'Verwaltung', location: 'okyu',         head: 'Hai My',       count: 3, color: '#a29bfe' },
+  { id: 7, name: 'Verwaltung', location: 'okyu_central', head: 'Hai My',       count: 3, color: '#a29bfe' },
   { id: 8, name: 'Ausbildung', location: 'origami',      head: 'Minh Tran',    count: 3, color: '#e17055' },
   { id: 9, name: 'Ausbildung', location: 'enso',         head: 'Duc Nguyen',   count: 2, color: '#e17055' }
 ];
