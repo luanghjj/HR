@@ -25,7 +25,8 @@ const PAGE_TITLES = {
   calendar: 'Personalkalender',
   reports: 'Berichte & Auswertungen',
   checklists: 'Checklisten',
-  ausbildung: 'Ausbildung'
+  ausbildung: 'Ausbildung',
+  qr_generator: 'QR Check-in'
 };
 
 // Shift templates

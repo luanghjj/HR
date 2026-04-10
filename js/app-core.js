@@ -45,6 +45,7 @@ function buildSidebar(){
   if(can('manageAccess')){
     html+=`<div class="nav-section">System</div>`;
     html+=`<div class="nav-item" onclick="navigate('access',this)">${mi('admin_panel_settings')} Zugangsverwaltung</div>`;
+    html+=`<div class="nav-item" onclick="navigate('qr_generator',this)">${mi('qr_code_2')} QR Check-in</div>`;
   }
   document.getElementById('sidebarNav').innerHTML=html;
 }
@@ -75,7 +76,7 @@ function navigate(page,el){
 function renderPage(p){
   const c=document.getElementById('contentArea');
   c.innerHTML='<div class="page active" id="page-'+p+'"></div>';
-  ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung})[p]?.();
+  ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung,qr_generator:renderQrGenerator})[p]?.();
 }
 
 // ═══ SHIFTS (loaded from Supabase via data-loader.js) ═══
@@ -4015,6 +4016,98 @@ function getWeekNumber(dateStr){
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+// ═══ QR GENERATOR (Admin-only) ═══
+function renderQrGenerator(){
+  const pg=document.getElementById('page-qr_generator');
+  if(!pg)return;
+
+  const domain=localStorage.getItem('qr_domain')||'';
+
+  pg.innerHTML=`
+    <div class="section-header"><h2>📱 QR Check-in Codes</h2><p>QR-Codes für Standort-Check-in generieren und drucken</p></div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px;padding:16px 20px;background:var(--bg-card);border-radius:14px;border:1px solid var(--border)">
+      <span style="font-size:.85rem;color:var(--text-muted)">🌐 Domain (HTTPS):</span>
+      <input id="qrDomainInput" type="text" value="${domain}" placeholder="https://hrm.okyu.de" style="flex:1;min-width:200px;padding:10px 14px;background:var(--bg-main);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-family:'Space Mono',monospace;font-size:.85rem;outline:none">
+      <button onclick="generateQrCodes()" class="btn-primary" style="padding:10px 20px;border-radius:8px;font-weight:600;cursor:pointer;border:none;background:var(--accent);color:#fff">QR generieren</button>
+    </div>
+    <div id="qrCardsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px"></div>
+  `;
+
+  if(domain) setTimeout(()=>generateQrCodes(),100);
+}
+
+function generateQrCodes(){
+  const domain=document.getElementById('qrDomainInput')?.value?.trim()?.replace(/\/+$/,'');
+  if(!domain||!domain.startsWith('http')){toast('Bitte gültige HTTPS-Domain eingeben','err');return;}
+  localStorage.setItem('qr_domain',domain);
+
+  // Load qrcode.js if not loaded
+  if(typeof QRCode==='undefined'){
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+    s.onload=()=>_renderQrCards(domain);
+    document.head.appendChild(s);
+  } else {
+    _renderQrCards(domain);
+  }
+}
+
+function _renderQrCards(domain){
+  const grid=document.getElementById('qrCardsGrid');
+  if(!grid)return;
+
+  const locs=[
+    {id:'okyu',name:'Okyu Restaurant',icon:'🍣',key:QR_KEYS.okyu},
+    {id:'origami',name:'Origami Restaurant',icon:'🏮',key:QR_KEYS.origami},
+    {id:'enso',name:'Enso Sushi & Grill',icon:'🔥',key:QR_KEYS.enso}
+  ];
+
+  grid.innerHTML=locs.map(l=>`
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:28px;text-align:center">
+      <div style="font-size:2.2rem;margin-bottom:8px">${l.icon}</div>
+      <div style="font-size:1.1rem;font-weight:700;margin-bottom:4px">${l.name}</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:16px">📍 Stuttgart</div>
+      <div style="background:#fff;border-radius:12px;padding:16px;display:inline-block;margin-bottom:12px"><canvas id="qrC_${l.id}"></canvas></div>
+      <div style="font-family:'Space Mono',monospace;font-size:.6rem;color:var(--text-muted);word-break:break-all;margin-bottom:8px;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px">${domain}/index.html?checkin=${l.id}&key=${l.key}</div>
+      <div style="font-size:.75rem;color:var(--warning);margin-bottom:14px">🔑 Key: <strong>${l.key}</strong></div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button onclick="downloadQrPng('${l.id}','${l.name}')" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.82rem">⬇️ PNG</button>
+        <button onclick="printQrSingle('${l.id}','${l.name}','${l.icon}')" style="padding:8px 16px;background:rgba(255,255,255,.06);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;font-weight:600;cursor:pointer;font-size:.82rem">🖨️ Drucken</button>
+      </div>
+    </div>
+  `).join('');
+
+  // Render QR codes
+  locs.forEach(l=>{
+    const url=`${domain}/index.html?checkin=${l.id}&key=${l.key}`;
+    QRCode.toCanvas(document.getElementById('qrC_'+l.id),url,{width:200,margin:2,errorCorrectionLevel:'H'});
+  });
+}
+
+function downloadQrPng(locId,locName){
+  const canvas=document.getElementById('qrC_'+locId);
+  if(!canvas)return;
+  const out=document.createElement('canvas');
+  out.width=canvas.width+80;out.height=canvas.height+120;
+  const ctx=out.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,out.width,out.height);
+  ctx.drawImage(canvas,40,40);
+  ctx.fillStyle='#000';ctx.font='bold 16px sans-serif';ctx.textAlign='center';
+  ctx.fillText(locName+' — Check-in',out.width/2,canvas.height+70);
+  ctx.font='11px sans-serif';ctx.fillStyle='#666';
+  ctx.fillText('QR scannen zum Ein-/Ausstempeln',out.width/2,canvas.height+90);
+  const a=document.createElement('a');
+  a.download='checkin-qr-'+locId+'.png';a.href=out.toDataURL('image/png');a.click();
+}
+
+function printQrSingle(locId,locName,icon){
+  const canvas=document.getElementById('qrC_'+locId);
+  if(!canvas)return;
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Arial,sans-serif;text-align:center}.c{padding:40px}h1{font-size:2rem;margin-bottom:8px}img{display:block;margin:0 auto 24px}</style></head><body><div class="c"><div style="font-size:3rem;margin-bottom:12px">${icon}</div><h1>${locName}</h1><p style="color:#666;margin-bottom:24px">📍 Stuttgart</p><img src="${canvas.toDataURL('image/png')}" width="280" height="280"><p style="font-size:1.1rem;font-weight:bold;margin-bottom:8px">📱 QR scannen zum Check-in</p><p style="color:#999;font-size:.9rem">OKYU HRM — Zeiterfassung</p></div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  w.document.close();
 }
 
 // ═══ INIT ═══
