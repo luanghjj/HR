@@ -106,39 +106,44 @@ function detectQrCheckin() {
   // Also check sessionStorage (from pending login flow)
   const pending = sessionStorage.getItem('pendingCheckin');
 
+  console.log('[QR] detectQrCheckin called. URL loc:', loc, 'key:', key, 'pending:', pending, 'user:', currentUser?.name || 'null', 'URL:', window.location.href);
+
   if (loc && key) {
     // Verify key
     if (QR_KEYS[loc] !== key) {
+      console.warn('[QR] Invalid key for', loc);
       toast('❌ Ungültiger QR-Code', 'err');
-      // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
       return;
     }
 
     if (!currentUser) {
-      // Not logged in yet → save for after login
       sessionStorage.setItem('pendingCheckin', loc);
       sessionStorage.setItem('pendingCheckinKey', key);
-      console.log('[QR] Pending check-in saved:', loc);
+      console.log('[QR] No user → saved pending:', loc);
       return;
     }
 
     // Logged in → execute check-in
+    console.log('[QR] ✓ User logged in, triggering check-in for:', loc);
     window.history.replaceState({}, '', window.location.pathname);
-    setTimeout(() => handleQrCheckin(loc), 500);
+    setTimeout(() => handleQrCheckin(loc), 800);
 
   } else if (pending && currentUser) {
     // Returning from login with pending check-in
     const savedKey = sessionStorage.getItem('pendingCheckinKey');
     sessionStorage.removeItem('pendingCheckin');
     sessionStorage.removeItem('pendingCheckinKey');
-    // Verify saved key
+    console.log('[QR] Found pending:', pending, 'savedKey:', savedKey);
     if (QR_KEYS[pending] && QR_KEYS[pending] === savedKey) {
+      console.log('[QR] ✓ Pending key valid, triggering check-in for:', pending);
       window.history.replaceState({}, '', window.location.pathname);
-      setTimeout(() => handleQrCheckin(pending), 500);
+      setTimeout(() => handleQrCheckin(pending), 800);
     } else {
-      console.warn('[QR] Invalid saved key for:', pending);
+      console.warn('[QR] Invalid saved key for:', pending, '(expected:', QR_KEYS[pending], 'got:', savedKey, ')');
     }
+  } else {
+    console.log('[QR] No QR params detected');
   }
 }
 
