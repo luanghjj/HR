@@ -4047,8 +4047,18 @@ function generateQrCodes(){
   // Load qrcode.js if not loaded
   if(typeof QRCode==='undefined'){
     const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
-    s.onload=()=>_renderQrCards(domain);
+    s.src='https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+    s.onload=()=>{
+      console.log('[QR] Library loaded, QRCode type:', typeof QRCode);
+      _renderQrCards(domain);
+    };
+    s.onerror=()=>{
+      console.warn('[QR] CDN 1 failed, trying fallback...');
+      const s2=document.createElement('script');
+      s2.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s2.onload=()=>_renderQrCards(domain);
+      document.head.appendChild(s2);
+    };
     document.head.appendChild(s);
   } else {
     _renderQrCards(domain);
@@ -4070,7 +4080,7 @@ function _renderQrCards(domain){
       <div style="font-size:2.2rem;margin-bottom:8px">${l.icon}</div>
       <div style="font-size:1.1rem;font-weight:700;margin-bottom:4px">${l.name}</div>
       <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:16px">📍 Stuttgart</div>
-      <div style="background:#fff;border-radius:12px;padding:16px;display:inline-block;margin-bottom:12px"><canvas id="qrC_${l.id}"></canvas></div>
+      <div style="background:#fff;border-radius:12px;padding:16px;display:inline-block;margin-bottom:12px"><div id="qrC_${l.id}"></div></div>
       <div style="font-family:'Space Mono',monospace;font-size:.6rem;color:var(--text-muted);word-break:break-all;margin-bottom:8px;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px">${domain}/index.html?checkin=${l.id}&key=${l.key}</div>
       <div style="font-size:.75rem;color:var(--warning);margin-bottom:14px">🔑 Key: <strong>${l.key}</strong></div>
       <div style="display:flex;gap:8px;justify-content:center">
@@ -4080,34 +4090,47 @@ function _renderQrCards(domain){
     </div>
   `).join('');
 
-  // Render QR codes
+  // Render QR codes using qrcodejs API
   locs.forEach(l=>{
     const url=`${domain}/index.html?checkin=${l.id}&key=${l.key}`;
-    QRCode.toCanvas(document.getElementById('qrC_'+l.id),url,{width:200,margin:2,errorCorrectionLevel:'H'});
+    const el=document.getElementById('qrC_'+l.id);
+    if(el){
+      try{
+        new QRCode(el,{text:url,width:200,height:200,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+        console.log('[QR] ✓ Generated:',l.id);
+      }catch(e){console.error('[QR] Error:',l.id,e);}
+    }
   });
 }
 
 function downloadQrPng(locId,locName){
-  const canvas=document.getElementById('qrC_'+locId);
-  if(!canvas)return;
+  const container=document.getElementById('qrC_'+locId);
+  if(!container)return;
+  // qrcodejs puts an <img> or <canvas> inside the div
+  const img=container.querySelector('img')||container.querySelector('canvas');
+  if(!img)return;
   const out=document.createElement('canvas');
-  out.width=canvas.width+80;out.height=canvas.height+120;
+  const size=200;
+  out.width=size+80;out.height=size+120;
   const ctx=out.getContext('2d');
   ctx.fillStyle='#fff';ctx.fillRect(0,0,out.width,out.height);
-  ctx.drawImage(canvas,40,40);
+  ctx.drawImage(img,40,40,size,size);
   ctx.fillStyle='#000';ctx.font='bold 16px sans-serif';ctx.textAlign='center';
-  ctx.fillText(locName+' — Check-in',out.width/2,canvas.height+70);
+  ctx.fillText(locName+' — Check-in',out.width/2,size+70);
   ctx.font='11px sans-serif';ctx.fillStyle='#666';
-  ctx.fillText('QR scannen zum Ein-/Ausstempeln',out.width/2,canvas.height+90);
+  ctx.fillText('QR scannen zum Ein-/Ausstempeln',out.width/2,size+90);
   const a=document.createElement('a');
   a.download='checkin-qr-'+locId+'.png';a.href=out.toDataURL('image/png');a.click();
 }
 
 function printQrSingle(locId,locName,icon){
-  const canvas=document.getElementById('qrC_'+locId);
-  if(!canvas)return;
+  const container=document.getElementById('qrC_'+locId);
+  if(!container)return;
+  const img=container.querySelector('img')||container.querySelector('canvas');
+  if(!img)return;
+  const src=img.tagName==='IMG'?img.src:img.toDataURL('image/png');
   const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Arial,sans-serif;text-align:center}.c{padding:40px}h1{font-size:2rem;margin-bottom:8px}img{display:block;margin:0 auto 24px}</style></head><body><div class="c"><div style="font-size:3rem;margin-bottom:12px">${icon}</div><h1>${locName}</h1><p style="color:#666;margin-bottom:24px">📍 Stuttgart</p><img src="${canvas.toDataURL('image/png')}" width="280" height="280"><p style="font-size:1.1rem;font-weight:bold;margin-bottom:8px">📱 QR scannen zum Check-in</p><p style="color:#999;font-size:.9rem">OKYU HRM — Zeiterfassung</p></div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  w.document.write(`<!DOCTYPE html><html><head><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Arial,sans-serif;text-align:center}.c{padding:40px}h1{font-size:2rem;margin-bottom:8px}img{display:block;margin:0 auto 24px}</style></head><body><div class="c"><div style="font-size:3rem;margin-bottom:12px">${icon}</div><h1>${locName}</h1><p style="color:#666;margin-bottom:24px">📍 Stuttgart</p><img src="${src}" width="280" height="280"><p style="font-size:1.1rem;font-weight:bold;margin-bottom:8px">📱 QR scannen zum Check-in</p><p style="color:#999;font-size:.9rem">OKYU HRM — Zeiterfassung</p></div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`);
   w.document.close();
 }
 
