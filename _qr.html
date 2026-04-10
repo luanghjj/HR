@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OKYU HRM — QR Check-in Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#0a0a0f;--bg-card:#12121a;--border:#1e1e2e;
+  --text:#e8e8f0;--text-muted:#6b6b80;
+  --accent:#667eea;--success:#2ecc71;--danger:#e74c3c;--warning:#f39c12;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:40px 20px}
+
+/* Login */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:80vh}
+.login-box{background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:40px;width:340px;text-align:center}
+.login-box h2{font-size:1.2rem;margin-bottom:24px;color:var(--accent)}
+.login-box input{width:100%;padding:12px 16px;background:#1a1a2e;border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.95rem;margin-bottom:12px;outline:none}
+.login-box input:focus{border-color:var(--accent)}
+.login-box button{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-weight:700;font-size:1rem;cursor:pointer}
+.login-box .err{color:var(--danger);font-size:.8rem;margin-top:8px;display:none}
+
+/* Main */
+#app{display:none}
+.header{text-align:center;margin-bottom:40px}
+.header h1{font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,var(--accent),#9b59b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header p{color:var(--text-muted);margin-top:8px;font-size:.9rem}
+
+/* Domain config */
+.domain-bar{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:32px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.domain-bar label{font-size:.85rem;color:var(--text-muted);white-space:nowrap}
+.domain-bar input{flex:1;min-width:200px;padding:10px 14px;background:#1a1a2e;border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Space Mono',monospace;font-size:.9rem;outline:none}
+.domain-bar input:focus{border-color:var(--accent)}
+.domain-bar button{padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer}
+
+/* QR Cards */
+.qr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px}
+.qr-card{background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:32px;text-align:center;transition:transform .2s,border-color .2s}
+.qr-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.qr-card .loc-icon{font-size:2.5rem;margin-bottom:12px}
+.qr-card h3{font-size:1.2rem;font-weight:700;margin-bottom:4px}
+.qr-card .loc-addr{font-size:.8rem;color:var(--text-muted);margin-bottom:20px}
+.qr-canvas{background:#fff;border-radius:12px;padding:16px;display:inline-block;margin-bottom:16px}
+.qr-canvas canvas{display:block}
+.qr-url{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--text-muted);word-break:break-all;margin-bottom:16px;padding:8px 12px;background:rgba(255,255,255,.03);border-radius:8px}
+.qr-key{font-size:.75rem;color:var(--warning);margin-bottom:16px}
+.qr-actions{display:flex;gap:8px;justify-content:center}
+.qr-actions button{padding:10px 18px;border:none;border-radius:8px;font-weight:600;font-size:.85rem;cursor:pointer}
+.btn-download{background:var(--accent);color:#fff}
+.btn-print{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border)!important}
+
+/* Print styles */
+@media print{
+  body{background:#fff!important;color:#000!important;padding:0!important}
+  #loginScreen,.domain-bar,.header,.qr-actions,.qr-key,.qr-url{display:none!important}
+  .qr-grid{display:block!important}
+  .qr-card{border:2px solid #000!important;background:#fff!important;page-break-inside:avoid;margin-bottom:40px;padding:40px}
+  .qr-card h3{color:#000!important;font-size:1.5rem}
+  .qr-card .loc-addr{color:#666!important}
+  .qr-canvas{padding:20px}
+}
+
+/* Print single card */
+.print-single .qr-card{display:none!important}
+.print-single .qr-card.printing{display:block!important}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div style="font-size:2.5rem;margin-bottom:12px">🔐</div>
+    <h2>QR Check-in Generator</h2>
+    <p style="color:var(--text-muted);font-size:.8rem;margin-bottom:20px">Nur für Admin-Zugriff</p>
+    <input type="password" id="loginPass" placeholder="Admin-Passwort" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">Zugriff</button>
+    <div class="err" id="loginErr">Falsches Passwort</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="header">
+    <h1>📱 QR Check-in Generator</h1>
+    <p>QR-Codes für Standort-Check-in erstellen und drucken</p>
+  </div>
+
+  <div class="domain-bar">
+    <label>🌐 Domain (HTTPS):</label>
+    <input type="text" id="domainInput" placeholder="https://hrm.okyu.de" value="">
+    <button onclick="generateAll()">QR-Codes generieren</button>
+  </div>
+
+  <div class="qr-grid" id="qrGrid"></div>
+</div>
+
+<script>
+const PASS = 'Okyu@SuperAdmin2026';
+
+const LOCATIONS = [
+  { id: 'okyu', name: 'Okyu Restaurant', addr: 'Stuttgart', key: 'oK4xY9', icon: '🍣', color: '#667eea' },
+  { id: 'origami', name: 'Origami Restaurant', addr: 'Stuttgart', key: 'rG3mI7', icon: '🏮', color: '#e74c3c' },
+  { id: 'enso', name: 'Enso Sushi & Grill', addr: 'Stuttgart', key: 'eN5oS2', icon: '🔥', color: '#2ecc71' }
+];
+
+function doLogin() {
+  const pass = document.getElementById('loginPass').value;
+  if (pass === PASS) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    // Try to load saved domain
+    const saved = localStorage.getItem('qr_domain');
+    if (saved) {
+      document.getElementById('domainInput').value = saved;
+      generateAll();
+    }
+  } else {
+    const err = document.getElementById('loginErr');
+    err.style.display = 'block';
+    setTimeout(() => err.style.display = 'none', 2000);
+  }
+}
+
+function generateAll() {
+  const domain = document.getElementById('domainInput').value.trim().replace(/\/+$/, '');
+  if (!domain || !domain.startsWith('http')) {
+    alert('Bitte gültige Domain eingeben (z.B. https://hrm.okyu.de)');
+    return;
+  }
+  localStorage.setItem('qr_domain', domain);
+
+  const grid = document.getElementById('qrGrid');
+  grid.innerHTML = '';
+
+  LOCATIONS.forEach(loc => {
+    const url = `${domain}/index.html?checkin=${loc.id}&key=${loc.key}`;
+
+    const card = document.createElement('div');
+    card.className = 'qr-card';
+    card.id = 'card-' + loc.id;
+    card.innerHTML = `
+      <div class="loc-icon">${loc.icon}</div>
+      <h3>${loc.name}</h3>
+      <div class="loc-addr">📍 ${loc.addr}</div>
+      <div class="qr-canvas"><canvas id="qr-${loc.id}"></canvas></div>
+      <div class="qr-url">${url}</div>
+      <div class="qr-key">🔑 Key: <strong>${loc.key}</strong></div>
+      <div class="qr-actions">
+        <button class="btn-download" onclick="downloadQR('${loc.id}','${loc.name}')">⬇️ PNG</button>
+        <button class="btn-print" onclick="printSingle('${loc.id}')">🖨️ Drucken</button>
+      </div>
+    `;
+    grid.appendChild(card);
+
+    // Generate QR
+    QRCode.toCanvas(document.getElementById('qr-' + loc.id), url, {
+      width: 240,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' },
+      errorCorrectionLevel: 'H'
+    });
+  });
+}
+
+function downloadQR(locId, locName) {
+  const canvas = document.getElementById('qr-' + locId);
+  if (!canvas) return;
+
+  // Create a larger canvas with label
+  const out = document.createElement('canvas');
+  const padding = 40;
+  const labelH = 60;
+  out.width = canvas.width + padding * 2;
+  out.height = canvas.height + padding * 2 + labelH;
+  const ctx = out.getContext('2d');
+
+  // White background
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, out.width, out.height);
+
+  // QR code
+  ctx.drawImage(canvas, padding, padding);
+
+  // Label
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 18px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(locName + ' — Check-in', out.width / 2, canvas.height + padding + 30);
+  ctx.font = '12px Inter, sans-serif';
+  ctx.fillStyle = '#666';
+  ctx.fillText('QR scannen zum Ein-/Ausstempeln', out.width / 2, canvas.height + padding + 50);
+
+  // Download
+  const link = document.createElement('a');
+  link.download = `checkin-qr-${locId}.png`;
+  link.href = out.toDataURL('image/png');
+  link.click();
+}
+
+function printSingle(locId) {
+  const card = document.getElementById('card-' + locId);
+  if (!card) return;
+
+  // Create print window
+  const canvas = document.getElementById('qr-' + locId);
+  const loc = LOCATIONS.find(l => l.id === locId);
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><style>
+    body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Arial,sans-serif;text-align:center}
+    .card{padding:40px}
+    h1{font-size:2rem;margin-bottom:8px}
+    .addr{color:#666;margin-bottom:24px;font-size:1rem}
+    img{display:block;margin:0 auto 24px}
+    .sub{color:#999;font-size:.9rem}
+  </style></head><body>
+    <div class="card">
+      <div style="font-size:3rem;margin-bottom:12px">${loc.icon}</div>
+      <h1>${loc.name}</h1>
+      <div class="addr">📍 ${loc.addr}</div>
+      <img src="${canvas.toDataURL('image/png')}" width="280" height="280">
+      <p style="font-size:1.1rem;font-weight:bold;margin-bottom:8px">📱 QR scannen zum Check-in</p>
+      <p class="sub">OKYU HRM — Zeiterfassung</p>
+    </div>
+    <script>setTimeout(()=>{window.print();},300)<\/script>
+  </body></html>`);
+  win.document.close();
+}
+</script>
+</body>
+</html>
