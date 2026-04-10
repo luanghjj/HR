@@ -118,6 +118,7 @@ function detectQrCheckin() {
     if (!currentUser) {
       // Not logged in yet → save for after login
       sessionStorage.setItem('pendingCheckin', loc);
+      sessionStorage.setItem('pendingCheckinKey', key);
       console.log('[QR] Pending check-in saved:', loc);
       return;
     }
