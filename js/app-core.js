@@ -164,7 +164,8 @@ async function handleQrCheckin(locationId) {
 
   if (openRecord) {
     // Smart toggle → CHECK-OUT
-    console.log('[QR] Already checked in → triggering check-out');
+    console.log('[QR] Already checked in → triggering check-out. Record:', openRecord.id, 'checkIn:', openRecord.checkIn);
+    toast('🔴 Ausstempeln...', 'info');
     activeCheckIn = openRecord;
     await doCheckOut();
     return;
@@ -4147,4 +4148,23 @@ function initApp(){
   window.addEventListener('resize',()=>{document.getElementById('menuBtn').style.display=window.innerWidth<=900?'':'none';});
   // QR Check-in: detect URL params after app is ready
   detectQrCheckin();
+
+  // Re-detect QR when page is shown again (mobile: scan QR → brings back same tab)
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) {
+      console.log('[QR] pageshow (from bfcache) → re-checking');
+      detectQrCheckin();
+    }
+  });
+
+  // Also check when tab becomes visible (user switches back)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('checkin')) {
+        console.log('[QR] Tab visible with checkin params → re-checking');
+        detectQrCheckin();
+      }
+    }
+  });
 }
