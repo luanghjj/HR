@@ -124,9 +124,10 @@ td input:focus,td select:focus{border-color:var(--accent);outline:none}
       <div class="nav-item" onclick="navTo('vacations',this)"><span class="ms">beach_access</span> Urlaub</div>
       <div class="nav-item" onclick="navTo('sick',this)"><span class="ms">local_hospital</span> Krank</div>
       <div class="nav-section">Zeiterfassung</div>
-      <div class="nav-item" onclick="navTo('ze_daily',this)"><span class="ms">schedule</span> Tageserfassung</div>
+      <div class="nav-item" onclick="navTo('checkinout',this)"><span class="ms">fingerprint</span> Check-in / out</div>
       <div class="nav-item" onclick="navTo('ze_monthly',this)"><span class="ms">bar_chart</span> Monatsübersicht</div>
-      <div class="nav-item" onclick="navTo('time_records',this)"><span class="ms">location_on</span> GPS Records</div>
+      <div class="nav-section">Archiv</div>
+      <div class="nav-item" onclick="navTo('ze_daily',this)"><span class="ms">history</span> ZE Daily (extern)</div>
       <div class="nav-section">System</div>
       <div class="nav-item" onclick="navTo('documents',this)"><span class="ms">folder</span> Dokumente</div>
       <div class="nav-item" onclick="navTo('checklists',this)"><span class="ms">checklist</span> Checklisten</div>
@@ -232,9 +233,9 @@ function renderPage(page){
     shifts:renderShifts,
     vacations:renderVacations,
     sick:renderSick,
+    checkinout:renderCheckinOut,
     ze_daily:renderZeDaily,
     ze_monthly:renderZeMonthly,
-    time_records:renderTimeRecords,
     documents:renderDocuments,
     checklists:renderChecklists
   };
@@ -292,10 +293,10 @@ function renderDashboard(m){
       <div class="stat-card"><div class="stat-label">Urlaub (${MONTHS[curMonth-1]})</div><div class="stat-value info">${totalUrlaub}</div></div>
     </div>
     <div class="stats-row">
-      <div class="stat-card"><div class="stat-label">Zeiterfassung Daily</div><div class="stat-value">${DATA.ze_daily.length}</div></div>
-      <div class="stat-card"><div class="stat-label">Zeiterfassung Monthly</div><div class="stat-value">${DATA.ze_monthly.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Check-in Records</div><div class="stat-value accent">${DATA.time_records.length}</div></div>
       <div class="stat-card"><div class="stat-label">Schichten</div><div class="stat-value">${DATA.shifts.length}</div></div>
-      <div class="stat-card"><div class="stat-label">GPS Records</div><div class="stat-value">${DATA.time_records.length}</div></div>
+      <div class="stat-card"><div class="stat-label">ZE Daily (extern)</div><div class="stat-value" style="color:var(--text-muted)">${DATA.ze_daily.length}</div></div>
+      <div class="stat-card"><div class="stat-label">ZE Monthly (extern)</div><div class="stat-value" style="color:var(--text-muted)">${DATA.ze_monthly.length}</div></div>
     </div>
 
     <div class="page-title" style="font-size:1rem;margin-top:24px">Monatsübersicht je Mitarbeiter — ${MONTHS[curMonth-1]} 2026</div>
@@ -535,31 +536,66 @@ function renderSick(m){
   `;
 }
 
-// ═══ TIME RECORDS ═══
-function renderTimeRecords(m){
+// ═══ CHECK-IN / CHECK-OUT (time_records — echte Daten) ═══
+function renderCheckinOut(m){
   const d=DATA.time_records;
+  const empMap={}; DATA.employees.forEach(e=>empMap[e.id]=e.name);
+  const locs=[...new Set(d.map(r=>r.location))].filter(Boolean).sort();
+  const empIds=[...new Set(d.map(r=>r.emp_id))].sort();
+
   m.innerHTML=`
-    <div class="page-title">GPS Records <span class="record-count">${d.length} Records</span></div>
-    <div class="page-sub">time_records — Check-in/out mit GPS</div>
+    <div class="page-title">Check-in / Check-out <span class="record-count">${d.length} Records</span></div>
+    <div class="page-sub">time_records — Echte GPS-Stempelungen aus dem HRM-System</div>
     <div class="toolbar">
-      <button class="btn btn-accent" onclick="exportCSV(DATA.time_records,'gps_records.csv')"><span class="ms">download</span> CSV</button>
+      <select id="fCiLoc" onchange="filterCheckins()"><option value="">Alle Standorte</option>${locs.map(l=>`<option value="${l}">${STANDORTE[l]||l}</option>`).join('')}</select>
+      <select id="fCiEmp" onchange="filterCheckins()"><option value="">Alle Mitarbeiter</option>${empIds.map(id=>`<option value="${id}">${empMap[id]||'ID '+id}</option>`).join('')}</select>
+      <span class="spacer"></span>
+      <button class="btn btn-accent" onclick="exportCheckins()"><span class="ms">download</span> CSV</button>
+      <button class="btn" onclick="loadAllData().then(()=>renderPage('checkinout'))"><span class="ms">refresh</span></button>
     </div>
-    <div class="table-wrap"><table>
-      <thead><tr><th>ID</th><th>Emp ID</th><th>Standort</th><th>Check-in</th><th>Check-out</th><th>Total h</th><th>Distanz</th><th>Verspätet</th><th>Akt.</th></tr></thead>
-      <tbody>${d.length?d.map(r=>`<tr>
-        <td>${r.id}</td>
-        <td>${r.emp_id}</td>
-        <td>${r.location||''}</td>
-        <td>${r.check_in?new Date(r.check_in).toLocaleString('de-DE'):''}</td>
-        <td>${r.check_out?new Date(r.check_out).toLocaleString('de-DE'):''}</td>
-        <td>${r.total_hours?fmtNum(r.total_hours):''}</td>
-        <td>${r.distance_m?r.distance_m+'m':''}</td>
-        <td>${r.is_late?`<span class="badge badge-warning">${r.late_min}m</span>`:''}</td>
-        <td class="row-actions"><button class="del" onclick="deleteRow('time_records',${r.id})">🗑️</button></td>
-      </tr>`).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">Keine GPS Records</td></tr>'}</tbody>
-    </table></div>
+    <div class="table-wrap" id="checkinTable"></div>
   `;
+  filterCheckins();
 }
+
+function filterCheckins(){
+  const loc=document.getElementById('fCiLoc')?.value||'';
+  const emp=document.getElementById('fCiEmp')?.value||'';
+  let d=DATA.time_records;
+  if(loc)d=d.filter(r=>r.location===loc);
+  if(emp)d=d.filter(r=>String(r.emp_id)===emp);
+  window._filteredCheckins=d;
+  const empMap={}; DATA.employees.forEach(e=>empMap[e.id]=e.name);
+
+  document.getElementById('checkinTable').innerHTML=`<table>
+    <thead><tr><th>ID</th><th>Mitarbeiter</th><th>Standort</th><th>Check-in</th><th>Check-out</th><th>Dauer (Std)</th><th>Distanz</th><th>Verspätet</th><th>GPS In</th><th>GPS Out</th><th>Akt.</th></tr></thead>
+    <tbody>${d.length?d.map(r=>{
+      const name=empMap[r.emp_id]||'ID '+r.emp_id;
+      const ciDate=r.check_in?new Date(r.check_in):null;
+      const coDate=r.check_out?new Date(r.check_out):null;
+      const ciStr=ciDate?ciDate.toLocaleString('de-DE'):'—';
+      const coStr=coDate?coDate.toLocaleString('de-DE'):'<span class="badge badge-warning">Offen</span>';
+      const dur=r.total_hours?fmtNum(r.total_hours,2):(ciDate&&coDate?fmtNum((coDate-ciDate)/3600000,2):'—');
+      const gpsIn=r.check_in_lat?`${Number(r.check_in_lat).toFixed(4)}, ${Number(r.check_in_lng).toFixed(4)}`:'';
+      const gpsOut=r.check_out_lat?`${Number(r.check_out_lat).toFixed(4)}, ${Number(r.check_out_lng).toFixed(4)}`:'';
+      return `<tr>
+        <td>${r.id}</td>
+        <td><strong>${name}</strong></td>
+        <td>${STANDORTE[r.location]||r.location||''}</td>
+        <td>${ciStr}</td>
+        <td>${coStr}</td>
+        <td style="font-weight:700">${dur}</td>
+        <td>${r.distance_m?r.distance_m+'m':''}</td>
+        <td>${r.is_late?`<span class="badge badge-warning">+${r.late_min}m</span>`:''}</td>
+        <td style="font-size:.7rem;color:var(--text-muted)">${gpsIn}</td>
+        <td style="font-size:.7rem;color:var(--text-muted)">${gpsOut}</td>
+        <td class="row-actions"><button class="del" onclick="deleteRow('time_records',${r.id})">🗑️</button></td>
+      </tr>`;
+    }).join(''):'<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:40px">Noch keine Check-in Records.<br>Mitarbeiter stempeln über die HRM-App ein.</td></tr>'}</tbody>
+  </table>`;
+}
+
+function exportCheckins(){exportCSV(window._filteredCheckins||DATA.time_records,'checkin_checkout.csv');}
 
 // ═══ DOCUMENTS ═══
 function renderDocuments(m){
