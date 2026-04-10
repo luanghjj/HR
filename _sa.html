@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>System Console</title>
+<link rel="icon" href="data:,">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Symbols+Rounded" rel="stylesheet">
+<style>
+:root{--bg-primary:#0a0a0f;--bg-secondary:#12121a;--bg-card:#16161f;--bg-hover:#1e1e2a;--border:#2a2a3a;--text-primary:#f0f0f5;--text-secondary:#a0a0b5;--text-muted:#666680;--accent:#6366f1;--accent-glow:rgba(99,102,241,.15);--danger:#ef4444;--success:#22c55e;--warning:#f59e0b;--info:#3b82f6;--radius:10px;--shadow:0 4px 24px rgba(0,0,0,.4)}
+[data-theme="light"]{--bg-primary:#f5f5f7;--bg-secondary:#fff;--bg-card:#fff;--bg-hover:#f0f0f5;--border:#e0e0e8;--text-primary:#1a1a2e;--text-secondary:#555;--text-muted:#999;--shadow:0 2px 12px rgba(0,0,0,.08)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg-primary);color:var(--text-primary);overflow:hidden;height:100vh}
+.ms{font-family:'Material Symbols Rounded';font-size:20px;vertical-align:middle}
+
+/* LOGIN */
+#loginScreen{position:fixed;inset:0;background:var(--bg-primary);display:flex;align-items:center;justify-content:center;z-index:9999}
+.login-box{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:40px;width:360px;text-align:center;box-shadow:var(--shadow)}
+.login-box h1{font-size:1.1rem;color:var(--text-muted);margin-bottom:24px;letter-spacing:2px;text-transform:uppercase}
+.login-box input{width:100%;padding:12px 16px;background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-size:.95rem;margin-bottom:16px;outline:none}
+.login-box input:focus{border-color:var(--accent)}
+.login-box button{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.95rem}
+.login-box button:hover{opacity:.9}
+.login-err{color:var(--danger);font-size:.8rem;margin-top:8px;min-height:20px}
+
+/* LAYOUT */
+#app{display:none;height:100vh;overflow:hidden}
+.layout{display:flex;height:100%}
+.sidebar{width:220px;background:var(--bg-secondary);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 0;flex-shrink:0;overflow-y:auto}
+.sidebar-brand{padding:0 20px 20px;font-weight:800;font-size:1rem;color:var(--accent);letter-spacing:1px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.nav-item{padding:10px 20px;cursor:pointer;font-size:.85rem;color:var(--text-secondary);display:flex;align-items:center;gap:10px;transition:all .15s}
+.nav-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.nav-item.active{background:var(--accent-glow);color:var(--accent);font-weight:600;border-right:3px solid var(--accent)}
+.nav-section{padding:16px 20px 6px;font-size:.65rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);font-weight:700}
+.sidebar-footer{margin-top:auto;padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px}
+.sidebar-footer button{flex:1;padding:6px;background:var(--bg-hover);border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);cursor:pointer;font-size:.75rem}
+.sidebar-footer button:hover{color:var(--text-primary);border-color:var(--accent)}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;padding:24px 32px}
+.page{display:none}
+.page.active{display:block}
+.page-title{font-size:1.4rem;font-weight:800;margin-bottom:4px}
+.page-sub{font-size:.82rem;color:var(--text-muted);margin-bottom:20px}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px}
+.stat-label{font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:4px}
+.stat-value{font-size:1.8rem;font-weight:900;font-family:'Space Mono',monospace}
+.stat-value.accent{color:var(--accent)}
+.stat-value.danger{color:var(--danger)}
+.stat-value.success{color:var(--success)}
+
+/* TOOLBAR */
+.toolbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.toolbar select,.toolbar input{padding:8px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:.82rem;outline:none}
+.toolbar select:focus,.toolbar input:focus{border-color:var(--accent)}
+.toolbar .spacer{flex:1}
+.btn{padding:8px 16px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);cursor:pointer;font-size:.82rem;font-weight:500;display:inline-flex;align-items:center;gap:6px;transition:all .15s}
+.btn:hover{border-color:var(--accent);background:var(--accent-glow)}
+.btn-accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-accent:hover{opacity:.9;background:var(--accent)}
+.btn-danger{color:var(--danger);border-color:var(--danger)}
+.btn-danger:hover{background:rgba(239,68,68,.1)}
+.btn-sm{padding:4px 10px;font-size:.75rem}
+
+/* TABLE */
+.table-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+thead th{background:var(--bg-secondary);padding:10px 14px;text-align:left;font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);position:sticky;top:0;border-bottom:1px solid var(--border)}
+tbody td{padding:8px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:hover{background:var(--bg-hover)}
+tbody tr:last-child td{border-bottom:none}
+td input,td select{padding:4px 8px;background:var(--bg-primary);border:1px solid transparent;border-radius:4px;color:var(--text-primary);font-size:.82rem;width:100%;min-width:60px}
+td input:focus,td select:focus{border-color:var(--accent);outline:none}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:600}
+.badge-success{background:rgba(34,197,94,.12);color:var(--success)}
+.badge-danger{background:rgba(239,68,68,.12);color:var(--danger)}
+.badge-warning{background:rgba(245,158,11,.12);color:var(--warning)}
+.badge-info{background:rgba(59,130,246,.12);color:var(--info)}
+.badge-muted{background:var(--bg-hover);color:var(--text-muted)}
+.row-actions{display:flex;gap:4px}
+.row-actions button{padding:4px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-size:.75rem;color:var(--text-secondary)}
+.row-actions button:hover{border-color:var(--accent);color:var(--accent)}
+.row-actions button.del:hover{border-color:var(--danger);color:var(--danger)}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 20px;font-size:.85rem;z-index:9999;box-shadow:var(--shadow);animation:slideIn .3s}
+.toast.err{border-color:var(--danger);color:var(--danger)}
+@keyframes slideIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+/* RECORD COUNT */
+.record-count{font-size:.75rem;color:var(--text-muted);margin-left:8px}
+
+/* LOADING */
+.loading{text-align:center;padding:40px;color:var(--text-muted)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>🔒 System Console</h1>
+    <input type="password" id="pwInput" placeholder="Passwort eingeben" autofocus onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">Zugang</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="layout">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-brand">⚡ DATA CONSOLE</div>
+      <div class="nav-section">Übersicht</div>
+      <div class="nav-item active" onclick="navTo('dashboard',this)"><span class="ms">dashboard</span> Dashboard</div>
+      <div class="nav-section">Stammdaten</div>
+      <div class="nav-item" onclick="navTo('employees',this)"><span class="ms">people</span> Mitarbeiter</div>
+      <div class="nav-item" onclick="navTo('shifts',this)"><span class="ms">calendar_month</span> Schichten</div>
+      <div class="nav-item" onclick="navTo('vacations',this)"><span class="ms">beach_access</span> Urlaub</div>
+      <div class="nav-item" onclick="navTo('sick',this)"><span class="ms">local_hospital</span> Krank</div>
+      <div class="nav-section">Zeiterfassung</div>
+      <div class="nav-item" onclick="navTo('ze_daily',this)"><span class="ms">schedule</span> Tageserfassung</div>
+      <div class="nav-item" onclick="navTo('ze_monthly',this)"><span class="ms">bar_chart</span> Monatsübersicht</div>
+      <div class="nav-item" onclick="navTo('time_records',this)"><span class="ms">location_on</span> GPS Records</div>
+      <div class="nav-section">System</div>
+      <div class="nav-item" onclick="navTo('documents',this)"><span class="ms">folder</span> Dokumente</div>
+      <div class="nav-item" onclick="navTo('checklists',this)"><span class="ms">checklist</span> Checklisten</div>
+      <div class="sidebar-footer">
+        <button onclick="toggleTheme()">🌓 Theme</button>
+        <button onclick="location.reload()">🔄 Reload</button>
+      </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main" id="mainContent">
+      <!-- Pages rendered by JS -->
+    </div>
+  </div>
+</div>
+
+<div id="toastEl" class="toast" style="display:none"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ═══ CONFIG ═══
+const SB_URL='https://zkxsyipyjqikqxswpbks.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpreHN5aXB5anFpa3F4c3dwYmtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MzgxOTMsImV4cCI6MjA5MTIxNDE5M30.oodwUnavIkmHS6W08OwpAoxxFoBPcJ6ZOizOQkaE5PY';
+const PW_HASH='a3d2f8c1e9b7'; // Simple hash of password
+const PASS='Okyu@SuperAdmin2026';
+
+let sb;
+let DATA={};
+let currentPage='dashboard';
+
+// ═══ AUTH ═══
+function doLogin(){
+  const pw=document.getElementById('pwInput').value;
+  if(pw===PASS){
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('app').style.display='block';
+    sessionStorage.setItem('_sa_auth','1');
+    initApp();
+  } else {
+    document.getElementById('loginErr').textContent='Falsches Passwort';
+    document.getElementById('pwInput').value='';
+  }
+}
+if(sessionStorage.getItem('_sa_auth')==='1'){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.addEventListener('DOMContentLoaded',initApp);
+}
+
+// ═══ THEME ═══
+function toggleTheme(){
+  const t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('_sa_theme',t);
+}
+(function(){const t=localStorage.getItem('_sa_theme');if(t)document.documentElement.setAttribute('data-theme',t);})();
+
+// ═══ INIT ═══
+async function initApp(){
+  sb=window.supabase.createClient(SB_URL,SB_KEY);
+  toast('Daten werden geladen...');
+  await loadAllData();
+  renderPage('dashboard');
+  toast('✓ Daten geladen');
+}
+
+async function loadAllData(){
+  const [emps,shifts,vacs,sicks,daily,monthly,timeRec,docs,checks]=await Promise.all([
+    sb.from('employees').select('*').order('id'),
+    sb.from('shifts').select('*').order('shift_date',{ascending:false}),
+    sb.from('vacations').select('*').order('id',{ascending:false}),
+    sb.from('sick_leaves').select('*').order('id',{ascending:false}),
+    sb.from('zeiterfassung_daily').select('*').order('datum',{ascending:false}).limit(500),
+    sb.from('zeiterfassung_monthly').select('*').order('employee_nr,monat'),
+    sb.from('time_records').select('*').order('id',{ascending:false}),
+    sb.from('documents').select('*').order('id',{ascending:false}),
+    sb.from('checklists').select('*').order('id',{ascending:false})
+  ]);
+  DATA.employees=emps.data||[];
+  DATA.shifts=shifts.data||[];
+  DATA.vacations=vacs.data||[];
+  DATA.sick_leaves=sicks.data||[];
+  DATA.ze_daily=daily.data||[];
+  DATA.ze_monthly=monthly.data||[];
+  DATA.time_records=timeRec.data||[];
+  DATA.documents=docs.data||[];
+  DATA.checklists=checks.data||[];
+}
+
+// ═══ NAVIGATION ═══
+function navTo(page,el){
+  currentPage=page;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(el)el.classList.add('active');
+  renderPage(page);
+}
+
+function renderPage(page){
+  const m=document.getElementById('mainContent');
+  const fn={
+    dashboard:renderDashboard,
+    employees:renderEmployees,
+    shifts:renderShifts,
+    vacations:renderVacations,
+    sick:renderSick,
+    ze_daily:renderZeDaily,
+    ze_monthly:renderZeMonthly,
+    time_records:renderTimeRecords,
+    documents:renderDocuments,
+    checklists:renderChecklists
+  };
+  if(fn[page])fn[page](m);
+}
+
+// ═══ HELPERS ═══
+function toast(msg,type){
+  const t=document.getElementById('toastEl');
+  t.textContent=msg;t.className='toast'+(type==='err'?' err':'');
+  t.style.display='block';
+  clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',2500);
+}
+
+function exportCSV(data,filename){
+  if(!data.length){toast('Keine Daten','err');return;}
+  const keys=Object.keys(data[0]);
+  let csv=keys.join(';')+'\n';
+  data.forEach(r=>{csv+=keys.map(k=>{let v=r[k];if(v===null||v===undefined)v='';return String(v).replace(/;/g,',');}).join(';')+'\n';});
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV exportiert ✓');
+}
+
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function fmtNum(n,dec=1){return n!=null?Number(n).toFixed(dec):'—';}
+
+const MONTHS=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const STANDORTE={okyu:'Okyu Restaurant',origami:'Origami',enso:'Enso'};
+
+// ═══ DASHBOARD ═══
+function renderDashboard(m){
+  const emps=DATA.employees;
+  const active=emps.filter(e=>e.status==='active').length;
+  const monthly=DATA.ze_monthly;
+  const curMonth=new Date().getMonth()+1;
+  const curMonthly=monthly.filter(r=>r.monat===curMonth);
+  const totalIst=curMonthly.reduce((s,r)=>s+(r.ist_stunden||0),0);
+  const totalSoll=curMonthly.reduce((s,r)=>s+(r.soll_stunden||0),0);
+  const totalKrank=curMonthly.reduce((s,r)=>s+(r.krank_tage||0),0);
+  const totalUrlaub=curMonthly.reduce((s,r)=>s+(r.urlaub_tage||0),0);
+  const saldo=totalIst-totalSoll;
+
+  m.innerHTML=`
+    <div class="page-title">Dashboard</div>
+    <div class="page-sub">Echtzeitdaten aus Supabase · Stand: ${new Date().toLocaleString('de-DE')}</div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Mitarbeiter (aktiv)</div><div class="stat-value accent">${active}</div></div>
+      <div class="stat-card"><div class="stat-label">Ist-Stunden ${MONTHS[curMonth-1]}</div><div class="stat-value">${fmtNum(totalIst)}</div></div>
+      <div class="stat-card"><div class="stat-label">Soll-Stunden ${MONTHS[curMonth-1]}</div><div class="stat-value">${fmtNum(totalSoll)}</div></div>
+      <div class="stat-card"><div class="stat-label">Saldo ${MONTHS[curMonth-1]}</div><div class="stat-value ${saldo>=0?'success':'danger'}">${saldo>=0?'+':''}${fmtNum(saldo)}</div></div>
+      <div class="stat-card"><div class="stat-label">Krank (${MONTHS[curMonth-1]})</div><div class="stat-value danger">${totalKrank}</div></div>
+      <div class="stat-card"><div class="stat-label">Urlaub (${MONTHS[curMonth-1]})</div><div class="stat-value info">${totalUrlaub}</div></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Zeiterfassung Daily</div><div class="stat-value">${DATA.ze_daily.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Zeiterfassung Monthly</div><div class="stat-value">${DATA.ze_monthly.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Schichten</div><div class="stat-value">${DATA.shifts.length}</div></div>
+      <div class="stat-card"><div class="stat-label">GPS Records</div><div class="stat-value">${DATA.time_records.length}</div></div>
+    </div>
+
+    <div class="page-title" style="font-size:1rem;margin-top:24px">Monatsübersicht je Mitarbeiter — ${MONTHS[curMonth-1]} 2026</div>
+    <div class="table-wrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th>PNr</th><th>Name</th><th>Standort</th><th>Ist</th><th>Soll</th><th>Saldo</th><th>Kum.Saldo</th><th>Krank</th><th>Urlaub</th></tr></thead>
+        <tbody>${curMonthly.map(r=>`<tr>
+          <td style="font-family:'Space Mono',monospace">${r.employee_nr}</td>
+          <td><strong>${r.employee_name}</strong></td>
+          <td>${STANDORTE[r.standort_id]||r.standort_id}</td>
+          <td>${fmtNum(r.ist_stunden)}</td>
+          <td>${fmtNum(r.soll_stunden)}</td>
+          <td style="color:${(r.saldo||0)>=0?'var(--success)':'var(--danger)'}">${fmtNum(r.saldo)}</td>
+          <td style="color:${(r.kum_saldo||0)>=0?'var(--success)':'var(--danger)'}"><strong>${fmtNum(r.kum_saldo)}</strong></td>
+          <td>${r.krank_tage||0}</td>
+          <td>${r.urlaub_tage||0}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ═══ EMPLOYEES ═══
+function renderEmployees(m){
+  const d=DATA.employees;
+  m.innerHTML=`
+    <div class="page-title">Mitarbeiter <span class="record-count">${d.length} Records</span></div>
+    <div class="page-sub">Alle Mitarbeiterdaten aus Supabase</div>
+    <div class="toolbar">
+      <button class="btn btn-accent" onclick="exportCSV(DATA.employees,'mitarbeiter.csv')"><span class="ms">download</span> CSV Export</button>
+      <span class="spacer"></span>
+      <button class="btn" onclick="loadAllData().then(()=>renderPage('employees'))"><span class="ms">refresh</span> Aktualisieren</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>Name</th><th>Standort</th><th>Bereich</th><th>Position</th><th>Status</th><th>Soll-Std</th><th>Brutto</th><th>Urlaub</th><th>Krank</th><th>Start</th><th>Aktionen</th></tr></thead>
+      <tbody>${d.map(e=>`<tr data-id="${e.id}">
+        <td>${e.id}</td>
+        <td><input value="${e.name||''}" onchange="updateField('employees',${e.id},'name',this.value)"></td>
+        <td>${e.location||''}</td>
+        <td>${e.dept||''}</td>
+        <td><input value="${e.position||''}" onchange="updateField('employees',${e.id},'position',this.value)" style="min-width:100px"></td>
+        <td><select onchange="updateField('employees',${e.id},'status',this.value)">
+          <option${e.status==='active'?' selected':''}>active</option>
+          <option${e.status==='inactive'?' selected':''}>inactive</option>
+          <option${e.status==='sick'?' selected':''}>sick</option>
+          <option${e.status==='vacation'?' selected':''}>vacation</option>
+        </select></td>
+        <td><input type="number" value="${e.soll_stunden||0}" style="width:60px" onchange="updateField('employees',${e.id},'soll_stunden',Number(this.value))"></td>
+        <td><input type="number" step="0.01" value="${e.brutto_gehalt||0}" style="width:80px" onchange="updateField('employees',${e.id},'brutto_gehalt',Number(this.value))"></td>
+        <td>${e.vac_total||0}/${e.vac_used||0}</td>
+        <td>${e.sick_days||0}</td>
+        <td>${fmtDate(e.start_date)}</td>
+        <td class="row-actions"><button class="del" onclick="deleteRow('employees',${e.id})">🗑️</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+}
+
+// ═══ ZE DAILY ═══
+function renderZeDaily(m){
+  const standorte=[...new Set(DATA.ze_daily.map(r=>r.standort_id))].sort();
+  const emps=[...new Set(DATA.ze_daily.map(r=>r.employee_name))].sort();
+  const monate=[...new Set(DATA.ze_daily.map(r=>r.monat))].sort((a,b)=>a-b);
+
+  m.innerHTML=`
+    <div class="page-title">Tageserfassung <span class="record-count">${DATA.ze_daily.length} Records</span></div>
+    <div class="page-sub">zeiterfassung_daily — Tägliche Arbeitszeiten</div>
+    <div class="toolbar">
+      <select id="fZeStandort" onchange="filterZeDaily()"><option value="">Alle Standorte</option>${standorte.map(s=>`<option value="${s}">${STANDORTE[s]||s}</option>`).join('')}</select>
+      <select id="fZeEmp" onchange="filterZeDaily()"><option value="">Alle Mitarbeiter</option>${emps.map(e=>`<option value="${e}">${e}</option>`).join('')}</select>
+      <select id="fZeMonat" onchange="filterZeDaily()"><option value="">Alle Monate</option>${monate.map(m=>`<option value="${m}">${MONTHS[m-1]}</option>`).join('')}</select>
+      <span class="spacer"></span>
+      <button class="btn btn-accent" onclick="exportFilteredDaily()"><span class="ms">download</span> CSV</button>
+      <button class="btn" onclick="loadAllData().then(()=>renderPage('ze_daily'))"><span class="ms">refresh</span></button>
+    </div>
+    <div class="table-wrap" id="zeDailyTable"></div>
+  `;
+  filterZeDaily();
+}
+
+function filterZeDaily(){
+  const st=document.getElementById('fZeStandort')?.value||'';
+  const emp=document.getElementById('fZeEmp')?.value||'';
+  const mon=document.getElementById('fZeMonat')?.value||'';
+  let d=DATA.ze_daily;
+  if(st)d=d.filter(r=>r.standort_id===st);
+  if(emp)d=d.filter(r=>r.employee_name===emp);
+  if(mon)d=d.filter(r=>r.monat===Number(mon));
+  window._filteredDaily=d;
+
+  document.getElementById('zeDailyTable').innerHTML=`<table>
+    <thead><tr><th>Datum</th><th>PNr</th><th>Name</th><th>Standort</th><th>Tag</th><th>Beginn</th><th>Ende</th><th>Pause</th><th>Dauer</th><th>Ist-Std</th><th>Code</th><th>Akt.</th></tr></thead>
+    <tbody>${d.slice(0,200).map(r=>`<tr>
+      <td>${fmtDate(r.datum)}</td>
+      <td style="font-family:'Space Mono',monospace">${r.employee_nr}</td>
+      <td><strong>${r.employee_name}</strong></td>
+      <td>${STANDORTE[r.standort_id]||r.standort_id}</td>
+      <td>${r.wochentag||''}</td>
+      <td><input value="${r.beginn||''}" style="width:55px" onchange="updateField('zeiterfassung_daily',${r.id},'beginn',this.value)"></td>
+      <td><input value="${r.ende||''}" style="width:55px" onchange="updateField('zeiterfassung_daily',${r.id},'ende',this.value)"></td>
+      <td>${r.pause||''}</td>
+      <td>${r.dauer||''}</td>
+      <td>${fmtNum(r.ist_stunden)}</td>
+      <td>${r.code?`<span class="badge ${r.code==='K'?'badge-danger':r.code==='U'?'badge-info':'badge-warning'}">${r.code}</span>`:''}</td>
+      <td class="row-actions"><button class="del" onclick="deleteRow('zeiterfassung_daily',${r.id})">🗑️</button></td>
+    </tr>`).join('')}${d.length>200?`<tr><td colspan="12" style="text-align:center;color:var(--text-muted)">... und ${d.length-200} weitere</td></tr>`:''}</tbody>
+  </table>`;
+}
+
+function exportFilteredDaily(){exportCSV(window._filteredDaily||DATA.ze_daily,'zeiterfassung_daily.csv');}
+
+// ═══ ZE MONTHLY ═══
+function renderZeMonthly(m){
+  const standorte=[...new Set(DATA.ze_monthly.map(r=>r.standort_id))].sort();
+  const d=DATA.ze_monthly;
+
+  m.innerHTML=`
+    <div class="page-title">Monatsübersicht <span class="record-count">${d.length} Records</span></div>
+    <div class="page-sub">zeiterfassung_monthly — Monatliche Zusammenfassung</div>
+    <div class="toolbar">
+      <select id="fZmStandort" onchange="filterZeMonthly()"><option value="">Alle Standorte</option>${standorte.map(s=>`<option value="${s}">${STANDORTE[s]||s}</option>`).join('')}</select>
+      <span class="spacer"></span>
+      <button class="btn btn-accent" onclick="exportCSV(DATA.ze_monthly,'zeiterfassung_monthly.csv')"><span class="ms">download</span> CSV</button>
+    </div>
+    <div class="table-wrap" id="zeMonthlyTable"></div>
+  `;
+  filterZeMonthly();
+}
+
+function filterZeMonthly(){
+  const st=document.getElementById('fZmStandort')?.value||'';
+  let d=DATA.ze_monthly;
+  if(st)d=d.filter(r=>r.standort_id===st);
+
+  document.getElementById('zeMonthlyTable').innerHTML=`<table>
+    <thead><tr><th>PNr</th><th>Name</th><th>Standort</th><th>Monat</th><th>Ist-Std</th><th>Soll-Std</th><th>Saldo</th><th>Kum.Saldo</th><th>Arbeitstage</th><th>Krank</th><th>Urlaub</th><th>UU</th><th>FB</th><th>Akt.</th></tr></thead>
+    <tbody>${d.map(r=>`<tr>
+      <td style="font-family:'Space Mono',monospace">${r.employee_nr}</td>
+      <td><strong>${r.employee_name}</strong></td>
+      <td>${STANDORTE[r.standort_id]||r.standort_id}</td>
+      <td>${MONTHS[r.monat-1]} ${r.jahr}</td>
+      <td><input type="number" step="0.01" value="${r.ist_stunden||0}" style="width:70px" onchange="updateField('zeiterfassung_monthly',${r.id},'ist_stunden',Number(this.value))"></td>
+      <td>${fmtNum(r.soll_stunden)}</td>
+      <td style="color:${(r.saldo||0)>=0?'var(--success)':'var(--danger)'}">${fmtNum(r.saldo)}</td>
+      <td style="color:${(r.kum_saldo||0)>=0?'var(--success)':'var(--danger)'}"><strong>${fmtNum(r.kum_saldo)}</strong></td>
+      <td>${r.arbeitstage||''}</td>
+      <td>${r.krank_tage||0}</td>
+      <td>${r.urlaub_tage||0}</td>
+      <td>${r.uu_tage||0}</td>
+      <td>${r.fb_tage||0}</td>
+      <td class="row-actions"><button class="del" onclick="deleteRow('zeiterfassung_monthly',${r.id})">🗑️</button></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+// ═══ SHIFTS ═══
+function renderShifts(m){
+  const d=DATA.shifts;
+  m.innerHTML=`
+    <div class="page-title">Schichten <span class="record-count">${d.length} Records</span></div>
+    <div class="page-sub">shifts — Arbeitsplan-Einträge</div>
+    <div class="toolbar">
+      <button class="btn btn-accent" onclick="exportCSV(DATA.shifts,'shifts.csv')"><span class="ms">download</span> CSV</button>
+      <span class="spacer"></span>
+      <button class="btn" onclick="loadAllData().then(()=>renderPage('shifts'))"><span class="ms">refresh</span></button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>Mitarbeiter</th><th>Bereich</th><th>Standort</th><th>Datum</th><th>Von</th><th>Bis</th><th>Label</th><th>Krank</th><th>Urlaub</th><th>Akt.</th></tr></thead>
+      <tbody>${d.length?d.map(s=>`<tr>
+        <td>${s.id}</td>
+        <td><strong>${s.emp_name}</strong></td>
+        <td>${s.dept||''}</td>
+        <td>${s.location||''}</td>
+        <td>${fmtDate(s.shift_date)}</td>
+        <td>${s.shift_from?.substring(0,5)||''}</td>
+        <td>${s.shift_to?.substring(0,5)||''}</td>
+        <td>${s.label||''}</td>
+        <td>${s.is_sick?'<span class="badge badge-danger">Ja</span>':''}</td>
+        <td>${s.is_vacation?'<span class="badge badge-info">Ja</span>':''}</td>
+        <td class="row-actions"><button class="del" onclick="deleteRow('shifts',${s.id})">🗑️</button></td>
+      </tr>`).join(''):'<tr><td colspan="11" style="text-align:center;color:var(--text-muted)">Keine Schichten vorhanden</td></tr>'}</tbody>
+    </table></div>
+  `;
+}
+
+// ═══ VACATIONS ═══
+function renderVacations(m){
+  const d=DATA.vacations;
+  m.innerHTML=`
+    <div class="page-title">Urlaub <span class="record-count">${d.length} Records</span></div>
+    <div class="toolbar">
+      <button class="btn btn-accent" onclick="exportCSV(DATA.vacations,'urlaub.csv')"><span class="ms">download</span> CSV</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>Mitarbeiter</th><th>Standort</th><th>Von</th><th>Bis</th><th>Tage</th><th>Status</th><th>Notiz</th><th>Akt.</th></tr></thead>
+      <tbody>${d.map(v=>`<tr>
+        <td>${v.id}</td>
+        <td><strong>${v.emp_name}</strong></td>
+        <td>${v.location||''}</td>
+        <td>${fmtDate(v.from_date)}</td>
+        <td>${fmtDate(v.to_date)}</td>
+        <td>${v.days||0}</td>
+        <td><select onchange="updateField('vacations',${v.id},'status',this.value)">
+          <option${v.status==='pending'?' selected':''}>pending</option>
+          <option${v.status==='approved'?' selected':''}>approved</option>
+          <option${v.status==='rejected'?' selected':''}>rejected</option>
+        </select></td>
+        <td>${v.note||''}</td>
+        <td class="row-actions"><button class="del" onclick="deleteRow('vacations',${v.id})">🗑️</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+}
+
+// ═══ SICK ═══
+function renderSick(m){
+  const d=DATA.sick_leaves;
+  m.innerHTML=`
+    <div class="page-title">Krankmeldungen <span class="record-count">${d.length} Records</span></div>
+    <div class="toolbar">
+      <button class="btn btn-accent" onclick="exportCSV(DATA.sick_leaves,'krank.csv')"><span class="ms">download</span> CSV</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>Mitarbeiter</th><th>Von</th><th>Bis</th><th>Tage</th><th>Status</th><th>AU</th><th>Notiz</th><th>Akt.</th></tr></thead>
+      <tbody>${d.length?d.map(s=>`<tr>
+        <td>${s.id}</td>
+        <td><strong>${s.emp_name}</strong></td>
+        <td>${fmtDate(s.from_date)}</td>
+        <td>${fmtDate(s.to_date)}</td>
+        <td>${s.days||0}</td>
+        <td><span class="badge badge-${s.status==='active'?'danger':'muted'}">${s.status}</span></td>
+        <td>${s.has_au?'✅':'—'}</td>
+        <td>${s.note||''}</td>
+        <td class="row-actions"><button class="del" onclick="deleteRow('sick_leaves',${s.id})">🗑️</button></td>
+      </tr>`).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">Keine Einträge</td></tr>'}</tbody>
+    </table></div>
+  `;
+}
+
+// ═══ TIME RECORDS ═══
+function renderTimeRecords(m){
+  const d=DATA.time_records;
+  m.innerHTML=`
+    <div class="page-title">GPS Records <span class="record-count">${d.length} Records</span></div>
+    <div class="page-sub">time_records — Check-in/out mit GPS</div>
+    <div class="toolbar">
+      <button class="btn btn-accent" onclick="exportCSV(DATA.time_records,'gps_records.csv')"><span class="ms">download</span> CSV</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>Emp ID</th><th>Standort</th><th>Check-in</th><th>Check-out</th><th>Total h</th><th>Distanz</th><th>Verspätet</th><th>Akt.</th></tr></thead>
+      <tbody>${d.length?d.map(r=>`<tr>
+        <td>${r.id}</td>
+        <td>${r.emp_id}</td>
+        <td>${r.location||''}</td>
+        <td>${r.check_in?new Date(r.check_in).toLocaleString('de-DE'):''}</td>
+        <td>${r.check_out?new Date(r.check_out).toLocaleString('de-DE'):''}</td>
+        <td>${r.total_hours?fmtNum(r.total_hours):''}</td>
+        <td>${r.distance_m?r.distance_m+'m':''}</td>
+        <td>${r.is_late?`<span class="badge badge-warning">${r.late_min}m</span>`:''}</td>
+        <td class="row-actions"><button class="del" onclick="deleteRow('time_records',${r.id})">🗑️</button></td>
+      </tr>`).join(''):'<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">Keine GPS Records</td></tr>'}</tbody>
+    </table></div>
+  `;
+}
+
+// ═══ DOCUMENTS ═══
+function renderDocuments(m){
+  const d=DATA.documents;
+  m.innerHTML=`
+    <div class="page-title">Dokumente <span class="record-count">${d.length} Records</span></div>
+    <div class="toolbar">
+      <button class="btn btn-accent" onclick="exportCSV(DATA.documents,'dokumente.csv')"><span class="ms">download</span> CSV</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>Mitarbeiter</th><th>Name</th><th>Typ</th><th>Datum</th><th>File</th><th>Akt.</th></tr></thead>
+      <tbody>${d.map(dc=>`<tr>
+        <td>${dc.id}</td>
+        <td>${dc.emp_name||''}</td>
+        <td>${dc.name||''}</td>
+        <td>${dc.type||''}</td>
+        <td>${fmtDate(dc.doc_date)}</td>
+        <td>${dc.file_url?`<a href="${dc.file_url}" target="_blank" style="color:var(--accent)">📎 Öffnen</a>`:''}</td>
+        <td class="row-actions"><button class="del" onclick="deleteRow('documents',${dc.id})">🗑️</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+}
+
+// ═══ CHECKLISTS ═══
+function renderChecklists(m){
+  const d=DATA.checklists;
+  m.innerHTML=`
+    <div class="page-title">Checklisten <span class="record-count">${d.length} Records</span></div>
+    <div class="toolbar">
+      <button class="btn btn-accent" onclick="exportCSV(DATA.checklists,'checklisten.csv')"><span class="ms">download</span> CSV</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>Typ</th><th>Mitarbeiter</th><th>Standort</th><th>Items</th><th>Akt.</th></tr></thead>
+      <tbody>${d.map(c=>`<tr>
+        <td>${c.id}</td>
+        <td>${c.type||''}</td>
+        <td>${c.emp_name||''}</td>
+        <td>${c.location||''}</td>
+        <td>${Array.isArray(c.items)?c.items.length+' items':''}</td>
+        <td class="row-actions"><button class="del" onclick="deleteRow('checklists',${c.id})">🗑️</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+}
+
+// ═══ CRUD ═══
+async function updateField(table,id,field,value){
+  try{
+    const{error}=await sb.from(table).update({[field]:value}).eq('id',id);
+    if(error)throw error;
+    toast(`✓ ${field} aktualisiert`);
+    // Update local cache
+    const dataKey=table==='zeiterfassung_daily'?'ze_daily':table==='zeiterfassung_monthly'?'ze_monthly':table;
+    const row=(DATA[dataKey]||[]).find(r=>r.id===id);
+    if(row)row[field]=value;
+  }catch(e){
+    toast('Fehler: '+e.message,'err');
+  }
+}
+
+async function deleteRow(table,id){
+  if(!confirm('Diesen Eintrag wirklich löschen?'))return;
+  try{
+    const{error}=await sb.from(table).delete().eq('id',id);
+    if(error)throw error;
+    toast('✓ Gelöscht');
+    const dataKey=table==='zeiterfassung_daily'?'ze_daily':table==='zeiterfassung_monthly'?'ze_monthly':table;
+    DATA[dataKey]=(DATA[dataKey]||[]).filter(r=>r.id!==id);
+    renderPage(currentPage);
+  }catch(e){
+    toast('Fehler: '+e.message,'err');
+  }
+}
+</script>
+</body>
+</html>
