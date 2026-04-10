@@ -110,12 +110,17 @@ function detectQrCheckin() {
 
   if (loc && key) {
     // Verify key
-    if (QR_KEYS[loc] !== key) {
-      console.warn('[QR] Invalid key for', loc);
+    console.log('[QR] Checking key: QR_KEYS['+loc+'] =', QR_KEYS[loc], 'vs key =', key, 'match:', QR_KEYS[loc] === key);
+    if (!QR_KEYS[loc] || QR_KEYS[loc] !== key) {
+      console.warn('[QR] Invalid key for', loc, '- expected:', QR_KEYS[loc], 'got:', key);
       toast('❌ Ungültiger QR-Code', 'err');
       window.history.replaceState({}, '', window.location.pathname);
       return;
     }
+
+    // Clear any stale sessionStorage from previous scans
+    sessionStorage.removeItem('pendingCheckin');
+    sessionStorage.removeItem('pendingCheckinKey');
 
     if (!currentUser) {
       sessionStorage.setItem('pendingCheckin', loc);
@@ -124,8 +129,8 @@ function detectQrCheckin() {
       return;
     }
 
-    // Logged in → execute check-in
-    console.log('[QR] ✓ User logged in, triggering check-in for:', loc);
+    // Logged in → execute check-in/out
+    console.log('[QR] ✓ User logged in, triggering handleQrCheckin for:', loc);
     window.history.replaceState({}, '', window.location.pathname);
     setTimeout(() => handleQrCheckin(loc), 800);
 
