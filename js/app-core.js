@@ -79,7 +79,6 @@ function renderPage(p){
 }
 
 // ═══ SHIFTS (loaded from Supabase via data-loader.js) ═══
-var dragData = null;
 function genShifts(){
   // Shifts are loaded from Supabase — no random generation
   console.log('[Shifts]', SHIFTS.length, 'shifts from Supabase');
