@@ -1369,6 +1369,63 @@ async function zeRenderTag(area, empNr, standort) {
 
 
 
+// ═══ ZEITERFASSUNG – Build today entry from real time_records ═══
+function buildTodayEntry(todayRecords, todayISO) {
+  if (!todayRecords || !todayRecords.length) return null;
+
+  // Beginn = earliest check_in
+  const firstIn = new Date(todayRecords[0].check_in);
+  const beginn = firstIn.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Berlin'});
+
+  // Ende = latest check_out (if any)
+  const checkouts = todayRecords.filter(r => r.check_out).map(r => new Date(r.check_out));
+  let ende = null;
+  let endeStr = '—';
+  if (checkouts.length) {
+    ende = new Date(Math.max(...checkouts));
+    endeStr = ende.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Berlin'});
+  }
+
+  // Pause = total gap between consecutive check_out[i] → check_in[i+1]
+  let pauseMin = 0;
+  for (let i = 0; i < todayRecords.length - 1; i++) {
+    if (todayRecords[i].check_out && todayRecords[i+1].check_in) {
+      const gapMs = new Date(todayRecords[i+1].check_in) - new Date(todayRecords[i].check_out);
+      if (gapMs > 0) pauseMin += Math.round(gapMs / 60000);
+    }
+  }
+  const pauseH = Math.floor(pauseMin / 60);
+  const pauseM = pauseMin % 60;
+  const pauseStr = pauseH + ':' + String(pauseM).padStart(2, '0');
+
+  // Dauer = Ende - Beginn - Pause
+  let dauerStr = '—';
+  let istStunden = 0;
+  if (ende) {
+    const totalMin = Math.round((ende - firstIn) / 60000) - pauseMin;
+    const dH = Math.floor(totalMin / 60);
+    const dM = totalMin % 60;
+    dauerStr = dH + ':' + String(dM).padStart(2, '0');
+    istStunden = totalMin / 60;
+  }
+
+  // Wochentag from date
+  const WOCHENTAGE_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const wt = WOCHENTAGE_SHORT[new Date(todayISO).getDay()];
+
+  return {
+    datum: todayISO,
+    wochentag: wt,
+    beginn: beginn,
+    ende: endeStr,
+    pause: pauseStr,
+    dauer: dauerStr,
+    ist_stunden: istStunden,
+    code: '',
+    bemerkung: ''
+  };
+}
+
 // ═══ ZEITERFASSUNG PDF EXPORTS ═══
 
 // Helper: save jsPDF doc — opens in new tab (file:// blocks download attr)
@@ -1411,17 +1468,50 @@ async function zeDownloadTagPDF(empId) {
   const empNr = getEmployeeNr(empId);
   const monat = parseInt(document.getElementById('zeMonatSel')?.value || (new Date().getMonth()+1));
   const jahr = new Date().getFullYear();
+  const now = new Date();
+  const todayISO = isoDate(now);
+  const todayMonth = now.getMonth() + 1;
+  const todayYear = now.getFullYear();
+  const isCurrentMonth = (monat === todayMonth && jahr === todayYear);
+  console.log('[ZE PDF Tag] empId:', empId, 'empNr:', empNr, 'monat:', monat, 'jahr:', jahr, 'todayISO:', todayISO, 'isCurrentMonth:', isCurrentMonth);
 
-  // Fetch daily data for this month
-  const {data: daily, error} = await sb.from('zeiterfassung_daily')
+  // --- Step 1: Fetch fake data (all days, or up to yesterday if current month) ---
+  let fakeQuery = sb.from('zeiterfassung_daily')
     .select('*')
     .eq('employee_nr', empNr)
     .eq('standort_id', e.location)
     .eq('jahr', jahr)
-    .eq('monat', monat)
-    .order('datum');
+    .eq('monat', monat);
 
-  if(error || !daily?.length) {
+  if (isCurrentMonth) {
+    // Only fetch up to yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    fakeQuery = fakeQuery.lte('datum', isoDate(yesterday));
+  }
+
+  const {data: fakeDaily, error} = await fakeQuery.order('datum');
+  if(error) { console.error('[ZE PDF Tag] fetch fake:', error); }
+
+  // --- Step 2: Fetch real data for today from time_records (only if current month) ---
+  let todayEntry = null;
+  if (isCurrentMonth) {
+    const {data: todayRecords, error: trErr} = await sb.from('time_records')
+      .select('check_in, check_out')
+      .eq('emp_id', empId)
+      .gte('check_in', todayISO + 'T00:00:00')
+      .lt('check_in', todayISO + 'T23:59:59')
+      .order('check_in');
+    if(trErr) console.warn('[ZE PDF Tag] fetch time_records:', trErr);
+    todayEntry = buildTodayEntry(todayRecords, todayISO);
+  }
+
+  // --- Step 3: Merge fake + real ---
+  const allDaily = [...(fakeDaily || [])];
+  if (todayEntry) allDaily.push(todayEntry);
+  console.log('[ZE PDF Tag] fakeDaily:', fakeDaily?.length, 'todayEntry:', todayEntry, 'allDaily:', allDaily.length);
+
+  if(!allDaily.length) {
     toast('Keine Daten für diesen Monat','warn');
     return;
   }
@@ -1475,7 +1565,6 @@ async function zeDownloadTagPDF(empId) {
     // Table header
     doc.setFontSize(7);
     doc.setFont(undefined,'bold');
-    // Draw header box
     doc.setLineWidth(0.3);
     doc.rect(colX[0], y-1, 170, rowH*2);
     for(let i=0; i<colX.length; i++) {
@@ -1485,17 +1574,23 @@ async function zeDownloadTagPDF(empId) {
     }
     y += rowH*2;
 
-    // Get total days in month
+    // Determine how many days to render:
+    // Current month → up to today; past months → full month
     const daysInMonth = new Date(jahr, monat, 0).getDate();
+    const lastDay = isCurrentMonth ? now.getDate() : daysInMonth;
+
     const dayMap = {};
-    daily.forEach(d => { dayMap[parseInt(d.datum.split('-')[2])] = d; });
+    allDaily.forEach(d => {
+      const dayNum = parseInt(String(d.datum).split('-')[2]);
+      dayMap[dayNum] = d;
+    });
 
     const WOCHENTAGE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
     doc.setFont(undefined,'normal');
     let totalMinutes = 0;
 
-    for(let day=1; day<=daysInMonth; day++) {
+    for(let day=1; day<=lastDay; day++) {
       if(y > 270) { doc.addPage(); y = 20; }
 
       const dateObj = new Date(jahr, monat-1, day);
@@ -1521,7 +1616,7 @@ async function zeDownloadTagPDF(empId) {
         doc.text(codeLabels[d.code] || d.code, colX[7]+1, y+3.5);
         if(d.ist_stunden) totalMinutes += Math.round(d.ist_stunden * 60);
       } else if(d && d.beginn) {
-        // Normal work day
+        // Normal work day (fake or real)
         doc.text(d.beginn || '', colX[1]+1, y+3.5);
         doc.text(d.pause || '', colX[2]+1, y+3.5);
         doc.text(d.ende || '', colX[3]+1, y+3.5);
