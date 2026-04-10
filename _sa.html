@@ -125,9 +125,7 @@ td input:focus,td select:focus{border-color:var(--accent);outline:none}
       <div class="nav-item" onclick="navTo('sick',this)"><span class="ms">local_hospital</span> Krank</div>
       <div class="nav-section">Zeiterfassung</div>
       <div class="nav-item" onclick="navTo('checkinout',this)"><span class="ms">fingerprint</span> Check-in / out</div>
-      <div class="nav-item" onclick="navTo('ze_monthly',this)"><span class="ms">bar_chart</span> Monatsübersicht</div>
-      <div class="nav-section">Archiv</div>
-      <div class="nav-item" onclick="navTo('ze_daily',this)"><span class="ms">history</span> ZE Daily (extern)</div>
+      <div class="nav-item" onclick="navTo('monthly_real',this)"><span class="ms">bar_chart</span> Monatsübersicht</div>
       <div class="nav-section">System</div>
       <div class="nav-item" onclick="navTo('documents',this)"><span class="ms">folder</span> Dokumente</div>
       <div class="nav-item" onclick="navTo('checklists',this)"><span class="ms">checklist</span> Checklisten</div>
@@ -195,13 +193,11 @@ async function initApp(){
 }
 
 async function loadAllData(){
-  const [emps,shifts,vacs,sicks,daily,monthly,timeRec,docs,checks]=await Promise.all([
+  const [emps,shifts,vacs,sicks,timeRec,docs,checks]=await Promise.all([
     sb.from('employees').select('*').order('id'),
     sb.from('shifts').select('*').order('shift_date',{ascending:false}),
     sb.from('vacations').select('*').order('id',{ascending:false}),
     sb.from('sick_leaves').select('*').order('id',{ascending:false}),
-    sb.from('zeiterfassung_daily').select('*').order('datum',{ascending:false}).limit(500),
-    sb.from('zeiterfassung_monthly').select('*').order('employee_nr,monat'),
     sb.from('time_records').select('*').order('id',{ascending:false}),
     sb.from('documents').select('*').order('id',{ascending:false}),
     sb.from('checklists').select('*').order('id',{ascending:false})
@@ -210,8 +206,6 @@ async function loadAllData(){
   DATA.shifts=shifts.data||[];
   DATA.vacations=vacs.data||[];
   DATA.sick_leaves=sicks.data||[];
-  DATA.ze_daily=daily.data||[];
-  DATA.ze_monthly=monthly.data||[];
   DATA.time_records=timeRec.data||[];
   DATA.documents=docs.data||[];
   DATA.checklists=checks.data||[];
@@ -234,8 +228,7 @@ function renderPage(page){
     vacations:renderVacations,
     sick:renderSick,
     checkinout:renderCheckinOut,
-    ze_daily:renderZeDaily,
-    ze_monthly:renderZeMonthly,
+    monthly_real:renderMonthlyReal,
     documents:renderDocuments,
     checklists:renderChecklists
   };
@@ -268,52 +261,78 @@ function fmtNum(n,dec=1){return n!=null?Number(n).toFixed(dec):'—';}
 const MONTHS=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const STANDORTE={okyu:'Okyu Restaurant',origami:'Origami',enso:'Enso'};
 
-// ═══ DASHBOARD ═══
+// ═══ HELPERS: real hours from check-in/out ═══
+function calcHours(r){
+  if(r.total_hours)return Number(r.total_hours);
+  if(!r.check_in||!r.check_out)return 0;
+  return (new Date(r.check_out)-new Date(r.check_in))/3600000;
+}
+
+// ═══ DASHBOARD (berechnet aus time_records) ═══
 function renderDashboard(m){
   const emps=DATA.employees;
   const active=emps.filter(e=>e.status==='active').length;
-  const monthly=DATA.ze_monthly;
-  const curMonth=new Date().getMonth()+1;
-  const curMonthly=monthly.filter(r=>r.monat===curMonth);
-  const totalIst=curMonthly.reduce((s,r)=>s+(r.ist_stunden||0),0);
-  const totalSoll=curMonthly.reduce((s,r)=>s+(r.soll_stunden||0),0);
-  const totalKrank=curMonthly.reduce((s,r)=>s+(r.krank_tage||0),0);
-  const totalUrlaub=curMonthly.reduce((s,r)=>s+(r.urlaub_tage||0),0);
+  const now=new Date();
+  const curMonth=now.getMonth();
+  const curYear=now.getFullYear();
+  const monthLabel=MONTHS[curMonth];
+
+  // Filter time_records for current month
+  const monthRecords=DATA.time_records.filter(r=>{
+    if(!r.check_in)return false;
+    const d=new Date(r.check_in);
+    return d.getMonth()===curMonth && d.getFullYear()===curYear;
+  });
+  const totalIst=monthRecords.reduce((s,r)=>s+calcHours(r),0);
+
+  // Soll from employees
+  const totalSoll=emps.filter(e=>e.status==='active').reduce((s,e)=>s+(e.soll_stunden||0),0);
   const saldo=totalIst-totalSoll;
+
+  // Krank + Urlaub from actual tables
+  const monthStart=`${curYear}-${String(curMonth+1).padStart(2,'0')}-01`;
+  const monthEnd=`${curYear}-${String(curMonth+1).padStart(2,'0')}-31`;
+  const sickCount=DATA.sick_leaves.filter(s=>s.from_date<=monthEnd&&s.to_date>=monthStart).reduce((s,r)=>s+(r.days||0),0);
+  const vacCount=DATA.vacations.filter(v=>v.status==='approved'&&v.from_date<=monthEnd&&v.to_date>=monthStart).reduce((s,r)=>s+(r.days||0),0);
+
+  // Per-employee summary
+  const empSummary=emps.filter(e=>e.status==='active').map(e=>{
+    const recs=monthRecords.filter(r=>r.emp_id===e.id);
+    const ist=recs.reduce((s,r)=>s+calcHours(r),0);
+    const soll=e.soll_stunden||0;
+    return {id:e.id,name:e.name,location:e.location,ist,soll,saldo:ist-soll,checkins:recs.length};
+  });
 
   m.innerHTML=`
     <div class="page-title">Dashboard</div>
-    <div class="page-sub">Echtzeitdaten aus Supabase · Stand: ${new Date().toLocaleString('de-DE')}</div>
+    <div class="page-sub">Echtzeitdaten berechnet aus Check-in/out · Stand: ${now.toLocaleString('de-DE')}</div>
     <div class="stats-row">
       <div class="stat-card"><div class="stat-label">Mitarbeiter (aktiv)</div><div class="stat-value accent">${active}</div></div>
-      <div class="stat-card"><div class="stat-label">Ist-Stunden ${MONTHS[curMonth-1]}</div><div class="stat-value">${fmtNum(totalIst)}</div></div>
-      <div class="stat-card"><div class="stat-label">Soll-Stunden ${MONTHS[curMonth-1]}</div><div class="stat-value">${fmtNum(totalSoll)}</div></div>
-      <div class="stat-card"><div class="stat-label">Saldo ${MONTHS[curMonth-1]}</div><div class="stat-value ${saldo>=0?'success':'danger'}">${saldo>=0?'+':''}${fmtNum(saldo)}</div></div>
-      <div class="stat-card"><div class="stat-label">Krank (${MONTHS[curMonth-1]})</div><div class="stat-value danger">${totalKrank}</div></div>
-      <div class="stat-card"><div class="stat-label">Urlaub (${MONTHS[curMonth-1]})</div><div class="stat-value info">${totalUrlaub}</div></div>
+      <div class="stat-card"><div class="stat-label">Ist-Stunden ${monthLabel}</div><div class="stat-value">${fmtNum(totalIst,2)}</div></div>
+      <div class="stat-card"><div class="stat-label">Soll-Stunden ${monthLabel}</div><div class="stat-value">${fmtNum(totalSoll,1)}</div></div>
+      <div class="stat-card"><div class="stat-label">Saldo ${monthLabel}</div><div class="stat-value ${saldo>=0?'success':'danger'}">${saldo>=0?'+':''}${fmtNum(saldo,2)}</div></div>
+      <div class="stat-card"><div class="stat-label">Krank-Tage (${monthLabel})</div><div class="stat-value danger">${sickCount}</div></div>
+      <div class="stat-card"><div class="stat-label">Urlaub-Tage (${monthLabel})</div><div class="stat-value info">${vacCount}</div></div>
     </div>
     <div class="stats-row">
-      <div class="stat-card"><div class="stat-label">Check-in Records</div><div class="stat-value accent">${DATA.time_records.length}</div></div>
-      <div class="stat-card"><div class="stat-label">Schichten</div><div class="stat-value">${DATA.shifts.length}</div></div>
-      <div class="stat-card"><div class="stat-label">ZE Daily (extern)</div><div class="stat-value" style="color:var(--text-muted)">${DATA.ze_daily.length}</div></div>
-      <div class="stat-card"><div class="stat-label">ZE Monthly (extern)</div><div class="stat-value" style="color:var(--text-muted)">${DATA.ze_monthly.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Check-in Records (gesamt)</div><div class="stat-value accent">${DATA.time_records.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Check-ins ${monthLabel}</div><div class="stat-value">${monthRecords.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Schichten geplant</div><div class="stat-value">${DATA.shifts.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Offene Check-ins</div><div class="stat-value ${DATA.time_records.filter(r=>r.check_in&&!r.check_out).length?'warning':'success'}">${DATA.time_records.filter(r=>r.check_in&&!r.check_out).length}</div></div>
     </div>
 
-    <div class="page-title" style="font-size:1rem;margin-top:24px">Monatsübersicht je Mitarbeiter — ${MONTHS[curMonth-1]} 2026</div>
+    <div class="page-title" style="font-size:1rem;margin-top:24px">Übersicht je Mitarbeiter — ${monthLabel} ${curYear}</div>
     <div class="table-wrap" style="margin-top:12px">
       <table>
-        <thead><tr><th>PNr</th><th>Name</th><th>Standort</th><th>Ist</th><th>Soll</th><th>Saldo</th><th>Kum.Saldo</th><th>Krank</th><th>Urlaub</th></tr></thead>
-        <tbody>${curMonthly.map(r=>`<tr>
-          <td style="font-family:'Space Mono',monospace">${r.employee_nr}</td>
-          <td><strong>${r.employee_name}</strong></td>
-          <td>${STANDORTE[r.standort_id]||r.standort_id}</td>
-          <td>${fmtNum(r.ist_stunden)}</td>
-          <td>${fmtNum(r.soll_stunden)}</td>
-          <td style="color:${(r.saldo||0)>=0?'var(--success)':'var(--danger)'}">${fmtNum(r.saldo)}</td>
-          <td style="color:${(r.kum_saldo||0)>=0?'var(--success)':'var(--danger)'}"><strong>${fmtNum(r.kum_saldo)}</strong></td>
-          <td>${r.krank_tage||0}</td>
-          <td>${r.urlaub_tage||0}</td>
-        </tr>`).join('')}</tbody>
+        <thead><tr><th>Name</th><th>Standort</th><th>Check-ins</th><th>Ist (Std)</th><th>Soll (Std)</th><th>Saldo</th></tr></thead>
+        <tbody>${empSummary.length?empSummary.map(e=>`<tr>
+          <td><strong>${e.name}</strong></td>
+          <td>${STANDORTE[e.location]||e.location||''}</td>
+          <td>${e.checkins}</td>
+          <td style="font-weight:700">${fmtNum(e.ist,2)}</td>
+          <td>${fmtNum(e.soll,1)}</td>
+          <td style="color:${e.saldo>=0?'var(--success)':'var(--danger)'}">${e.saldo>=0?'+':''}${fmtNum(e.saldo,2)}</td>
+        </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">Noch keine Daten</td></tr>'}</tbody>
       </table>
     </div>
   `;
@@ -355,102 +374,60 @@ function renderEmployees(m){
   `;
 }
 
-// ═══ ZE DAILY ═══
-function renderZeDaily(m){
-  const standorte=[...new Set(DATA.ze_daily.map(r=>r.standort_id))].sort();
-  const emps=[...new Set(DATA.ze_daily.map(r=>r.employee_name))].sort();
-  const monate=[...new Set(DATA.ze_daily.map(r=>r.monat))].sort((a,b)=>a-b);
-
+// ═══ MONATSÜBERSICHT (berechnet aus time_records) ═══
+function renderMonthlyReal(m){
+  const locs=[...new Set(DATA.employees.map(e=>e.location))].filter(Boolean).sort();
   m.innerHTML=`
-    <div class="page-title">Tageserfassung <span class="record-count">${DATA.ze_daily.length} Records</span></div>
-    <div class="page-sub">zeiterfassung_daily — Tägliche Arbeitszeiten</div>
+    <div class="page-title">Monatsübersicht <span class="record-count">Berechnet aus ${DATA.time_records.length} Check-in Records</span></div>
+    <div class="page-sub">Aggregierte Arbeitszeiten aus echten GPS-Stempelungen</div>
     <div class="toolbar">
-      <select id="fZeStandort" onchange="filterZeDaily()"><option value="">Alle Standorte</option>${standorte.map(s=>`<option value="${s}">${STANDORTE[s]||s}</option>`).join('')}</select>
-      <select id="fZeEmp" onchange="filterZeDaily()"><option value="">Alle Mitarbeiter</option>${emps.map(e=>`<option value="${e}">${e}</option>`).join('')}</select>
-      <select id="fZeMonat" onchange="filterZeDaily()"><option value="">Alle Monate</option>${monate.map(m=>`<option value="${m}">${MONTHS[m-1]}</option>`).join('')}</select>
+      <select id="fMrLoc" onchange="filterMonthlyReal()"><option value="">Alle Standorte</option>${locs.map(l=>`<option value="${l}">${STANDORTE[l]||l}</option>`).join('')}</select>
+      <select id="fMrMonth" onchange="filterMonthlyReal()">${[...Array(12)].map((_,i)=>`<option value="${i}"${i===new Date().getMonth()?' selected':''}>${MONTHS[i]}</option>`).join('')}</select>
+      <select id="fMrYear" onchange="filterMonthlyReal()"><option value="2026" selected>2026</option><option value="2025">2025</option></select>
       <span class="spacer"></span>
-      <button class="btn btn-accent" onclick="exportFilteredDaily()"><span class="ms">download</span> CSV</button>
-      <button class="btn" onclick="loadAllData().then(()=>renderPage('ze_daily'))"><span class="ms">refresh</span></button>
+      <button class="btn btn-accent" onclick="exportMonthlyReal()"><span class="ms">download</span> CSV</button>
+      <button class="btn" onclick="loadAllData().then(()=>renderPage('monthly_real'))"><span class="ms">refresh</span></button>
     </div>
-    <div class="table-wrap" id="zeDailyTable"></div>
+    <div class="table-wrap" id="monthlyRealTable"></div>
   `;
-  filterZeDaily();
+  filterMonthlyReal();
 }
-
-function filterZeDaily(){
-  const st=document.getElementById('fZeStandort')?.value||'';
-  const emp=document.getElementById('fZeEmp')?.value||'';
-  const mon=document.getElementById('fZeMonat')?.value||'';
-  let d=DATA.ze_daily;
-  if(st)d=d.filter(r=>r.standort_id===st);
-  if(emp)d=d.filter(r=>r.employee_name===emp);
-  if(mon)d=d.filter(r=>r.monat===Number(mon));
-  window._filteredDaily=d;
-
-  document.getElementById('zeDailyTable').innerHTML=`<table>
-    <thead><tr><th>Datum</th><th>PNr</th><th>Name</th><th>Standort</th><th>Tag</th><th>Beginn</th><th>Ende</th><th>Pause</th><th>Dauer</th><th>Ist-Std</th><th>Code</th><th>Akt.</th></tr></thead>
-    <tbody>${d.slice(0,200).map(r=>`<tr>
-      <td>${fmtDate(r.datum)}</td>
-      <td style="font-family:'Space Mono',monospace">${r.employee_nr}</td>
-      <td><strong>${r.employee_name}</strong></td>
-      <td>${STANDORTE[r.standort_id]||r.standort_id}</td>
-      <td>${r.wochentag||''}</td>
-      <td><input value="${r.beginn||''}" style="width:55px" onchange="updateField('zeiterfassung_daily',${r.id},'beginn',this.value)"></td>
-      <td><input value="${r.ende||''}" style="width:55px" onchange="updateField('zeiterfassung_daily',${r.id},'ende',this.value)"></td>
-      <td>${r.pause||''}</td>
-      <td>${r.dauer||''}</td>
-      <td>${fmtNum(r.ist_stunden)}</td>
-      <td>${r.code?`<span class="badge ${r.code==='K'?'badge-danger':r.code==='U'?'badge-info':'badge-warning'}">${r.code}</span>`:''}</td>
-      <td class="row-actions"><button class="del" onclick="deleteRow('zeiterfassung_daily',${r.id})">🗑️</button></td>
-    </tr>`).join('')}${d.length>200?`<tr><td colspan="12" style="text-align:center;color:var(--text-muted)">... und ${d.length-200} weitere</td></tr>`:''}</tbody>
-  </table>`;
+function filterMonthlyReal(){
+  const loc=document.getElementById('fMrLoc')?.value||'';
+  const month=parseInt(document.getElementById('fMrMonth')?.value||new Date().getMonth());
+  const year=parseInt(document.getElementById('fMrYear')?.value||2026);
+  let emps=DATA.employees.filter(e=>e.status==='active');
+  if(loc)emps=emps.filter(e=>e.location===loc);
+  const monthRecords=DATA.time_records.filter(r=>{if(!r.check_in)return false;const d=new Date(r.check_in);return d.getMonth()===month&&d.getFullYear()===year;});
+  const rows=emps.map(e=>{
+    const recs=monthRecords.filter(r=>r.emp_id===e.id);
+    const completed=recs.filter(r=>r.check_out).length;
+    const ist=recs.reduce((s,r)=>s+calcHours(r),0);
+    const soll=e.soll_stunden||0;
+    const lateCount=recs.filter(r=>r.is_late).length;
+    const lateMins=recs.filter(r=>r.is_late).reduce((s,r)=>s+(r.late_min||0),0);
+    return {name:e.name,location:e.location,checkins:recs.length,completed,ist,soll,saldo:ist-soll,lateCount,lateMins};
+  });
+  window._monthlyRealData=rows;
+  const totIst=rows.reduce((s,r)=>s+r.ist,0);const totSoll=rows.reduce((s,r)=>s+r.soll,0);
+  document.getElementById('monthlyRealTable').innerHTML=`<table>
+    <thead><tr><th>Mitarbeiter</th><th>Standort</th><th>Check-ins</th><th>Fertig</th><th>Ist (Std)</th><th>Soll (Std)</th><th>Saldo</th><th>Verspätungen</th></tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td><strong>${r.name}</strong></td>
+      <td>${STANDORTE[r.location]||r.location||''}</td>
+      <td>${r.checkins}</td><td>${r.completed}</td>
+      <td style="font-weight:700;font-family:'Space Mono',monospace">${fmtNum(r.ist,2)}</td>
+      <td>${fmtNum(r.soll,1)}</td>
+      <td style="color:${r.saldo>=0?'var(--success)':'var(--danger)'}"><strong>${r.saldo>=0?'+':''}${fmtNum(r.saldo,2)}</strong></td>
+      <td>${r.lateCount?`<span class="badge badge-warning">${r.lateCount}x (${r.lateMins}m)</span>`:''}</td>
+    </tr>`).join('')}
+    <tr style="font-weight:700;border-top:2px solid var(--border)"><td>GESAMT</td><td></td>
+      <td>${rows.reduce((s,r)=>s+r.checkins,0)}</td><td>${rows.reduce((s,r)=>s+r.completed,0)}</td>
+      <td style="font-family:'Space Mono',monospace">${fmtNum(totIst,2)}</td><td>${fmtNum(totSoll,1)}</td>
+      <td style="color:${(totIst-totSoll)>=0?'var(--success)':'var(--danger)'}">${(totIst-totSoll)>=0?'+':''}${fmtNum(totIst-totSoll,2)}</td><td></td>
+    </tr></tbody></table>`;
 }
-
-function exportFilteredDaily(){exportCSV(window._filteredDaily||DATA.ze_daily,'zeiterfassung_daily.csv');}
-
-// ═══ ZE MONTHLY ═══
-function renderZeMonthly(m){
-  const standorte=[...new Set(DATA.ze_monthly.map(r=>r.standort_id))].sort();
-  const d=DATA.ze_monthly;
-
-  m.innerHTML=`
-    <div class="page-title">Monatsübersicht <span class="record-count">${d.length} Records</span></div>
-    <div class="page-sub">zeiterfassung_monthly — Monatliche Zusammenfassung</div>
-    <div class="toolbar">
-      <select id="fZmStandort" onchange="filterZeMonthly()"><option value="">Alle Standorte</option>${standorte.map(s=>`<option value="${s}">${STANDORTE[s]||s}</option>`).join('')}</select>
-      <span class="spacer"></span>
-      <button class="btn btn-accent" onclick="exportCSV(DATA.ze_monthly,'zeiterfassung_monthly.csv')"><span class="ms">download</span> CSV</button>
-    </div>
-    <div class="table-wrap" id="zeMonthlyTable"></div>
-  `;
-  filterZeMonthly();
-}
-
-function filterZeMonthly(){
-  const st=document.getElementById('fZmStandort')?.value||'';
-  let d=DATA.ze_monthly;
-  if(st)d=d.filter(r=>r.standort_id===st);
-
-  document.getElementById('zeMonthlyTable').innerHTML=`<table>
-    <thead><tr><th>PNr</th><th>Name</th><th>Standort</th><th>Monat</th><th>Ist-Std</th><th>Soll-Std</th><th>Saldo</th><th>Kum.Saldo</th><th>Arbeitstage</th><th>Krank</th><th>Urlaub</th><th>UU</th><th>FB</th><th>Akt.</th></tr></thead>
-    <tbody>${d.map(r=>`<tr>
-      <td style="font-family:'Space Mono',monospace">${r.employee_nr}</td>
-      <td><strong>${r.employee_name}</strong></td>
-      <td>${STANDORTE[r.standort_id]||r.standort_id}</td>
-      <td>${MONTHS[r.monat-1]} ${r.jahr}</td>
-      <td><input type="number" step="0.01" value="${r.ist_stunden||0}" style="width:70px" onchange="updateField('zeiterfassung_monthly',${r.id},'ist_stunden',Number(this.value))"></td>
-      <td>${fmtNum(r.soll_stunden)}</td>
-      <td style="color:${(r.saldo||0)>=0?'var(--success)':'var(--danger)'}">${fmtNum(r.saldo)}</td>
-      <td style="color:${(r.kum_saldo||0)>=0?'var(--success)':'var(--danger)'}"><strong>${fmtNum(r.kum_saldo)}</strong></td>
-      <td>${r.arbeitstage||''}</td>
-      <td>${r.krank_tage||0}</td>
-      <td>${r.urlaub_tage||0}</td>
-      <td>${r.uu_tage||0}</td>
-      <td>${r.fb_tage||0}</td>
-      <td class="row-actions"><button class="del" onclick="deleteRow('zeiterfassung_monthly',${r.id})">🗑️</button></td>
-    </tr>`).join('')}</tbody>
-  </table>`;
-}
+function exportMonthlyReal(){exportCSV(window._monthlyRealData||[],'monatsuebersicht.csv');}
 
 // ═══ SHIFTS ═══
 function renderShifts(m){
@@ -649,7 +626,7 @@ async function updateField(table,id,field,value){
     if(error)throw error;
     toast(`✓ ${field} aktualisiert`);
     // Update local cache
-    const dataKey=table==='zeiterfassung_daily'?'ze_daily':table==='zeiterfassung_monthly'?'ze_monthly':table;
+    const dataKey=table;
     const row=(DATA[dataKey]||[]).find(r=>r.id===id);
     if(row)row[field]=value;
   }catch(e){
@@ -663,7 +640,7 @@ async function deleteRow(table,id){
     const{error}=await sb.from(table).delete().eq('id',id);
     if(error)throw error;
     toast('✓ Gelöscht');
-    const dataKey=table==='zeiterfassung_daily'?'ze_daily':table==='zeiterfassung_monthly'?'ze_monthly':table;
+    const dataKey=table;
     DATA[dataKey]=(DATA[dataKey]||[]).filter(r=>r.id!==id);
     renderPage(currentPage);
   }catch(e){
