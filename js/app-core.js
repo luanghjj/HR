@@ -1041,8 +1041,512 @@ function viewEmp(id){
     ${es.map(s=>`<div class="emp-row"><div class="emp-details"><div class="emp-name-sm">${formatDateDE(s.from)}–${formatDateDE(s.to)} (${s.days}T)</div><div class="emp-dept">${s.note||''}</div></div>${s.hasAU?'<span class="badge badge-success">AU</span>':'<span class="badge badge-neutral">—</span>'}</div>`).join('')||'<p style="color:var(--text-muted);font-size:.82rem">—</p>'}
     <h4 style="margin:16px 0 8px">Dokumente (${ed.length})</h4>
     ${ed.map(d=>`<div class="emp-row"><div style="font-size:1.3rem">${d.icon}</div><div class="emp-details"><div class="emp-name-sm">${d.name}</div><div class="emp-dept">${formatDateDE(d.date)}</div></div></div>`).join('')||'<p style="color:var(--text-muted);font-size:.82rem">—</p>'}
+
+    <div class="ze-section">
+      <div class="ze-section-hd">
+        <h4 style="margin:0">⏱️ Zeiterfassung</h4>
+        <span class="ze-badge-ro">Nur lesen</span>
+      </div>
+      <div class="ze-controls">
+        <div class="ze-view-tabs">
+          <button class="ze-view-tab active" onclick="zeSetView('monat',${e.id},this)">Monat</button>
+          <button class="ze-view-tab" onclick="zeSetView('tag',${e.id},this)">Tag</button>
+        </div>
+        <select class="ze-select" id="zeMonatSel" onchange="zeLoadView(${e.id})">
+          ${Array.from({length:12},(_,i)=>`<option value="${i+1}" ${i+1===new Date().getMonth()+1?'selected':''}>${MONTHS_DE[i]}</option>`).join('')}
+        </select>
+        <input type="date" class="ze-date-input" id="zeTagInput" value="${isoDate(new Date())}" onchange="zeLoadView(${e.id})" style="display:none">
+      </div>
+      <div id="zeViewArea"><div class="ze-loading">Daten werden geladen</div></div>
+      <div class="ze-pdf-buttons" style="margin-top:12px">
+        <button class="ze-pdf-btn" onclick="zeDownloadMonatPDF(${e.id})"><span class="ms">picture_as_pdf</span> PDF Monat</button>
+        <button class="ze-pdf-btn" onclick="zeDownloadTagPDF(${e.id})"><span class="ms">today</span> PDF Tag</button>
+        <button class="ze-pdf-btn" onclick="zeDownloadGesamtPDF(${e.id})"><span class="ms">summarize</span> PDF Gesamt</button>
+      </div>
+    </div>
   `);
+
+  // Auto-load Zeiterfassung data
+  setTimeout(()=>zeLoadView(e.id),100);
 }
+
+// ═══ ZEITERFASSUNG HELPERS ═══
+let _zeCurrentView = 'monat';
+
+function getEmployeeNr(empId) {
+  return String(empId).padStart(5, '0');
+}
+
+function zeSetView(view, empId, btn) {
+  _zeCurrentView = view;
+  // Toggle tabs
+  document.querySelectorAll('.ze-view-tab').forEach(t=>t.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  // Toggle controls
+  const monatSel = document.getElementById('zeMonatSel');
+  const tagInput = document.getElementById('zeTagInput');
+  if(monatSel) monatSel.style.display = view==='monat' ? '' : 'none';
+  if(tagInput) tagInput.style.display = view==='tag' ? '' : 'none';
+  zeLoadView(empId);
+}
+
+async function zeLoadView(empId) {
+  const area = document.getElementById('zeViewArea');
+  if(!area) return;
+  area.innerHTML = '<div class="ze-loading">Daten werden geladen</div>';
+
+  const e = EMPS.find(x=>x.id===empId);
+  if(!e) { area.innerHTML = '<div class="ze-empty"><span class="ms">error</span>Mitarbeiter nicht gefunden</div>'; return; }
+
+  const empNr = getEmployeeNr(empId);
+  const standort = e.location;
+  const jahr = new Date().getFullYear();
+
+  try {
+    if(_zeCurrentView === 'monat') {
+      await zeRenderMonat(area, empNr, standort, jahr);
+    } else if(_zeCurrentView === 'tag') {
+      await zeRenderTag(area, empNr, standort);
+    }
+  } catch(err) {
+    console.warn('[ZE] Error:', err);
+    area.innerHTML = '<div class="ze-empty"><span class="ms">cloud_off</span>Fehler beim Laden der Zeiterfassung</div>';
+  }
+}
+
+function zeCodeBadge(code) {
+  if(!code) return '';
+  const cls = 'code-' + code.toLowerCase();
+  const labels = {K:'Krank', U:'Urlaub', UU:'Unbez. Urlaub', F:'Feiertag', FB:'Fortbildung'};
+  return `<span class="ze-code ${cls}">${labels[code]||code}</span>`;
+}
+
+async function zeRenderMonat(area, empNr, standort, jahr) {
+  const monat = parseInt(document.getElementById('zeMonatSel')?.value || (new Date().getMonth()+1));
+
+  // Fetch daily data for this month
+  const {data: daily, error: dErr} = await sb.from('zeiterfassung_daily')
+    .select('*')
+    .eq('employee_nr', empNr)
+    .eq('standort_id', standort)
+    .eq('jahr', jahr)
+    .eq('monat', monat)
+    .order('datum');
+  if(dErr) throw dErr;
+
+  // Fetch monthly summary
+  const {data: monthly, error: mErr} = await sb.from('zeiterfassung_monthly')
+    .select('*')
+    .eq('employee_nr', empNr)
+    .eq('standort_id', standort)
+    .eq('jahr', jahr)
+    .eq('monat', monat)
+    .single();
+
+  if(!daily?.length && !monthly) {
+    area.innerHTML = `<div class="ze-empty"><span class="ms">event_busy</span>Keine Zeiterfassung-Daten für ${MONTHS_DE[monat-1]} ${jahr}</div>`;
+    return;
+  }
+
+  let h = '';
+
+  // Daily table
+  if(daily && daily.length) {
+    h += `<div class="ze-table-wrap"><table class="ze-table">
+      <thead><tr><th>Datum</th><th>Tag</th><th>Beginn</th><th>Ende</th><th>Pause</th><th>Dauer</th><th>Code</th></tr></thead>
+      <tbody>`;
+    daily.forEach(d => {
+      const dateStr = d.datum ? new Date(d.datum).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) : '—';
+      h += `<tr>
+        <td>${dateStr}</td>
+        <td class="ze-td-day">${d.wochentag||''}</td>
+        <td>${d.beginn||'—'}</td>
+        <td>${d.ende||'—'}</td>
+        <td>${d.pause||'—'}</td>
+        <td>${d.dauer||'—'}</td>
+        <td>${zeCodeBadge(d.code)}</td>
+      </tr>`;
+    });
+    h += '</tbody></table></div>';
+  }
+
+  area.innerHTML = h;
+}
+
+async function zeRenderTag(area, empNr, standort) {
+  const datum = document.getElementById('zeTagInput')?.value;
+  if(!datum) { area.innerHTML = '<div class="ze-empty"><span class="ms">today</span>Bitte Datum auswählen</div>'; return; }
+
+  const {data, error} = await sb.from('zeiterfassung_daily')
+    .select('*')
+    .eq('employee_nr', empNr)
+    .eq('standort_id', standort)
+    .eq('datum', datum)
+    .single();
+
+  if(error || !data) {
+    const dateDE = new Date(datum).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+    area.innerHTML = `<div class="ze-empty"><span class="ms">event_busy</span>Keine Daten für ${dateDE}</div>`;
+    return;
+  }
+
+  const d = data;
+  const dateDE = new Date(d.datum).toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+
+  let h = `<div class="ze-day-card">
+    <div class="ze-day-card-title">${dateDE} ${zeCodeBadge(d.code)}</div>
+    <div class="ze-day-grid">
+      <div><div class="ze-day-field-label">Beginn</div><div class="ze-day-field-val">${d.beginn||'—'}</div></div>
+      <div><div class="ze-day-field-label">Ende</div><div class="ze-day-field-val">${d.ende||'—'}</div></div>
+      <div><div class="ze-day-field-label">Pause</div><div class="ze-day-field-val">${d.pause||'—'}</div></div>
+      <div><div class="ze-day-field-label">Dauer</div><div class="ze-day-field-val">${d.dauer||'—'}</div></div>
+    </div>
+    ${d.bemerkung?`<div style="margin-top:10px;font-size:.75rem;color:var(--text-muted)">📝 ${d.bemerkung}</div>`:''}
+  </div>`;
+
+  // Also show the Ist-Stunden
+  if(d.ist_stunden) {
+    h += `<div style="font-size:.8rem;color:var(--text-secondary)">Ist-Stunden: <strong style="font-family:'Space Mono',monospace">${d.ist_stunden.toFixed(1)}h</strong></div>`;
+  }
+
+  area.innerHTML = h;
+}
+
+
+
+// ═══ ZEITERFASSUNG PDF EXPORTS ═══
+
+// Helper: save jsPDF doc — opens in new tab (file:// blocks download attr)
+function zeSavePDF(doc, filename) {
+  const blob = new Blob([doc.output('arraybuffer')], {type:'application/pdf'});
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
+  if(!win) toast('Bitte Pop-ups erlauben','warn');
+  // Revoke after tab loads
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+  toast('PDF geöffnet — Cmd+S zum Speichern');
+}
+
+async function zeDownloadMonatPDF(empId) {
+  const e = EMPS.find(x=>x.id===empId); if(!e) return;
+  const empNr = getEmployeeNr(empId);
+  const monat = parseInt(document.getElementById('zeMonatSel')?.value || (new Date().getMonth()+1));
+  const jahr = new Date().getFullYear();
+  const mm = String(monat).padStart(2,'0');
+  // File format: 00001_Nguyen_2026_01.pdf (only Nachname)
+  const parts = e.name.split(' ');
+  const nachname = parts.length>=2 ? parts[parts.length-1] : e.name;
+  const path = `${jahr}/${e.location}/${empNr}_${nachname}_${jahr}_${mm}.pdf`;
+  console.log('[ZE PDF Monat] path:', path);
+  toast('PDF wird geöffnet...');
+  try {
+    const {data} = sb.storage.from('zeiterfassung-pdfs').getPublicUrl(path);
+    if(!data?.publicUrl) throw new Error('URL nicht verfügbar');
+    console.log('[ZE PDF Monat] url:', data.publicUrl);
+    window.open(data.publicUrl, '_blank');
+    toast('PDF geöffnet ✓');
+  } catch(err) {
+    console.warn('[ZE PDF] path tried:', path, err);
+    toast('PDF nicht verfügbar – Datei fehlt','warn');
+  }
+}
+
+async function zeDownloadTagPDF(empId) {
+  const e = EMPS.find(x=>x.id===empId); if(!e) return;
+  const empNr = getEmployeeNr(empId);
+  const monat = parseInt(document.getElementById('zeMonatSel')?.value || (new Date().getMonth()+1));
+  const jahr = new Date().getFullYear();
+
+  // Fetch daily data for this month
+  const {data: daily, error} = await sb.from('zeiterfassung_daily')
+    .select('*')
+    .eq('employee_nr', empNr)
+    .eq('standort_id', e.location)
+    .eq('jahr', jahr)
+    .eq('monat', monat)
+    .order('datum');
+
+  if(error || !daily?.length) {
+    toast('Keine Daten für diesen Monat','warn');
+    return;
+  }
+
+  toast('PDF wird erstellt...');
+  try {
+    if(!window.jspdf) { toast('jsPDF-Bibliothek nicht geladen.','err'); return; }
+    const {jsPDF} = window.jspdf;
+    const doc = new jsPDF({unit:'mm', format:'a4'});
+    const locName = LOCS.find(l=>l.id===e.location)?.name || e.location;
+    const parts = e.name.split(' ');
+    const zeName = parts.length>=2 ? parts[parts.length-1]+', '+parts.slice(0,-1).join(' ') : e.name;
+
+    // === HEADER (matching reference format) ===
+    doc.setFontSize(12);
+    doc.setFont(undefined,'bold');
+    doc.text('Dokumentation der täglichen Arbeitszeit', 20, 20);
+    doc.setLineWidth(0.5);
+    doc.line(20, 21.5, 148, 21.5);
+
+    doc.setFontSize(10);
+    doc.setFont(undefined,'bold');
+    doc.text('Firma:', 20, 32);
+    doc.setFont(undefined,'normal');
+    doc.text(locName, 65, 32);
+
+    doc.setFont(undefined,'bold');
+    doc.text('Name des Mitarbeiters:', 20, 40);
+    doc.setFont(undefined,'normal');
+    doc.text(zeName, 65, 40);
+    doc.line(65, 41, 140, 41);
+
+    doc.setFont(undefined,'bold');
+    doc.text('Pers.-Nr.:', 20, 48);
+    doc.setFont(undefined,'normal');
+    doc.text(empNr, 45, 48);
+
+    doc.setFont(undefined,'bold');
+    doc.text('Monat/Jahr:', 100, 48);
+    doc.setFont(undefined,'normal');
+    doc.text(MONTHS_DE[monat-1] + ' ' + jahr, 130, 48);
+
+    // === TABLE ===
+    const colX = [20, 38, 58, 78, 98, 118, 130, 160];
+    const colW = [18, 20, 20, 20, 20, 12, 30, 30];
+    const headers1 = ['Kalen-', 'Beginn', 'Pause', 'Ende', 'Dauer', '*', 'aufgezeichnet', 'Bemerkungen'];
+    const headers2 = ['dertag', '(Uhrzeit)', '(Dauer)', '(Uhrzeit)', '(Summe)', '', 'am:', ''];
+    let y = 56;
+    const rowH = 6.5;
+
+    // Table header
+    doc.setFontSize(7);
+    doc.setFont(undefined,'bold');
+    // Draw header box
+    doc.setLineWidth(0.3);
+    doc.rect(colX[0], y-1, 170, rowH*2);
+    for(let i=0; i<colX.length; i++) {
+      if(i>0) doc.line(colX[i], y-1, colX[i], y-1+rowH*2);
+      doc.text(headers1[i], colX[i]+1, y+3);
+      doc.text(headers2[i], colX[i]+1, y+3+rowH);
+    }
+    y += rowH*2;
+
+    // Get total days in month
+    const daysInMonth = new Date(jahr, monat, 0).getDate();
+    const dayMap = {};
+    daily.forEach(d => { dayMap[parseInt(d.datum.split('-')[2])] = d; });
+
+    const WOCHENTAGE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+    doc.setFont(undefined,'normal');
+    let totalMinutes = 0;
+
+    for(let day=1; day<=daysInMonth; day++) {
+      if(y > 270) { doc.addPage(); y = 20; }
+
+      const dateObj = new Date(jahr, monat-1, day);
+      const wt = WOCHENTAGE[dateObj.getDay()];
+      const d = dayMap[day];
+
+      // Draw row borders
+      doc.setLineWidth(0.15);
+      doc.rect(colX[0], y-1, 170, rowH);
+
+      // Vertical lines
+      for(let i=1; i<colX.length; i++) {
+        doc.line(colX[i], y-1, colX[i], y-1+rowH);
+      }
+
+      doc.text(String(day), colX[0]+2, y+3.5);
+
+      if(d && d.code && d.code !== '') {
+        // Special day (Krank, Urlaub, etc.)
+        const codeLabels = {K:'Krank',U:'Urlaub',UU:'unbez.Urlaub',F:'Feiertag',FB:'Fortbildung'};
+        if(d.dauer) doc.text(d.dauer, colX[4]+1, y+3.5);
+        doc.text(d.code, colX[5]+1, y+3.5);
+        doc.text(codeLabels[d.code] || d.code, colX[7]+1, y+3.5);
+        if(d.ist_stunden) totalMinutes += Math.round(d.ist_stunden * 60);
+      } else if(d && d.beginn) {
+        // Normal work day
+        doc.text(d.beginn || '', colX[1]+1, y+3.5);
+        doc.text(d.pause || '', colX[2]+1, y+3.5);
+        doc.text(d.ende || '', colX[3]+1, y+3.5);
+        doc.text(d.dauer || '', colX[4]+1, y+3.5);
+        doc.text(wt, colX[7]+1, y+3.5);
+        if(d.ist_stunden) totalMinutes += Math.round(d.ist_stunden * 60);
+      } else if(dateObj.getDay() === 0) {
+        // Sunday
+        doc.text('So Ruhetag', colX[7]+1, y+3.5);
+      } else {
+        // No data
+        doc.text(wt, colX[7]+1, y+3.5);
+      }
+
+      y += rowH;
+    }
+
+    // === SUMME ===
+    y += 4;
+    const totalH = Math.floor(totalMinutes / 60);
+    const totalM = totalMinutes % 60;
+    const sumStr = totalH + ':' + String(totalM).padStart(2,'0');
+    doc.setFont(undefined,'bold');
+    doc.setFontSize(9);
+    doc.text('Summe:', 98, y);
+    doc.text(sumStr, 118, y);
+    doc.setLineWidth(0.5);
+    doc.line(118, y+1, 138, y+1);
+
+    // === UNTERSCHRIFT ===
+    y += 20;
+    doc.setFontSize(7);
+    doc.setFont(undefined,'normal');
+    doc.setLineWidth(0.3);
+    doc.line(20, y, 70, y);
+    doc.line(120, y, 170, y);
+    y += 4;
+    doc.text('Datum', 20, y);
+    doc.text('Unterschrift des Arbeitnehmers', 35, y);
+    doc.text('Datum', 120, y);
+    doc.text('Unterschrift des Arbeitgebers', 135, y);
+
+    // === KÜRZEL ===
+    y += 10;
+    doc.setFontSize(6);
+    doc.setFont(undefined,'bold');
+    doc.text('* Kürzel: K=Krank, U=Urlaub, UU=unbez.Urlaub, F=Feiertag, FB=Fortbildung', 20, y);
+
+    zeSavePDF(doc, `${empNr}_${parts[parts.length-1]}_${jahr}_${String(monat).padStart(2,'0')}.pdf`);
+    toast('PDF erstellt ✓');
+  } catch(err) {
+    console.error('[ZE PDF Tag]', err);
+    toast('PDF-Fehler: '+err.message,'err');
+  }
+}
+
+async function zeDownloadGesamtPDF(empId) {
+  const e = EMPS.find(x=>x.id===empId); if(!e) return;
+  const empNr = getEmployeeNr(empId);
+  const jahr = new Date().getFullYear();
+
+  toast('PDF Gesamt wird erstellt...');
+
+  // Fetch monthly summaries
+  const {data: monthly, error: mErr} = await sb.from('zeiterfassung_monthly')
+    .select('*')
+    .eq('employee_nr', empNr)
+    .eq('standort_id', e.location)
+    .eq('jahr', jahr)
+    .order('monat');
+
+  if(!monthly?.length) {
+    toast('Keine Daten für '+jahr,'warn');
+    return;
+  }
+
+  try {
+    if(!window.jspdf) { toast('jsPDF-Bibliothek nicht geladen.','err'); return; }
+    const {jsPDF} = window.jspdf;
+    const doc = new jsPDF({unit:'mm', format:'a4'});
+    const locName = LOCS.find(l=>l.id===e.location)?.name || e.location;
+    const parts = e.name.split(' ');
+    const zeName = parts.length>=2 ? parts[parts.length-1]+', '+parts.slice(0,-1).join(' ') : e.name;
+    const sollMonat = e.spiSoll || 160;
+
+    // === HEADER ===
+    doc.setFontSize(14);
+    doc.setFont(undefined,'bold');
+    doc.text(`Jahresübersicht ${jahr} — ${locName}`, 20, 20);
+
+    doc.setFontSize(9);
+    doc.setFont(undefined,'normal');
+    doc.text(`${locName}  |  ${zeName}  |  Pers.-Nr.: ${empNr}  |  Std/Mon: ${sollMonat.toFixed(1)}h`, 20, 28);
+
+    // === TABLE ===
+    const colX  = [20, 50, 75, 100, 125, 150, 165, 177, 190];
+    const headers = ['Monat', 'Ist-Std', 'Soll-Std', 'Saldo', 'Kum.Saldo', 'Krank', 'Urlaub', 'UU', 'Fortb.'];
+    const colEnd = 197;
+    let y = 36;
+    const rowH = 8;
+
+    // Header row
+    doc.setFontSize(8);
+    doc.setFont(undefined,'bold');
+    doc.setLineWidth(0.3);
+    doc.rect(colX[0], y-2, colEnd-colX[0], rowH);
+    for(let i=0; i<colX.length; i++) {
+      if(i>0) doc.line(colX[i], y-2, colX[i], y-2+rowH);
+      doc.text(headers[i], colX[i]+2, y+3);
+    }
+    y += rowH;
+
+    // Data rows
+    doc.setFont(undefined,'normal');
+    const MONAT_NAMEN = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+    function fmtHM(hours) {
+      const neg = hours < 0;
+      const abs = Math.abs(hours);
+      const h = Math.floor(abs);
+      const m = Math.round((abs - h) * 60);
+      return (neg?'-':'') + h + ':' + String(m).padStart(2,'0');
+    }
+
+    let totalIst = 0, totalSoll = 0, totalKrank = 0, totalUrlaub = 0, totalUU = 0, totalFB = 0;
+
+    monthly.forEach(m => {
+      doc.setLineWidth(0.15);
+      doc.rect(colX[0], y-2, colEnd-colX[0], rowH);
+      for(let i=1; i<colX.length; i++) {
+        doc.line(colX[i], y-2, colX[i], y-2+rowH);
+      }
+
+      doc.text(MONAT_NAMEN[m.monat-1] || '', colX[0]+2, y+3);
+      doc.text(fmtHM(m.ist_stunden||0), colX[1]+2, y+3);
+      doc.text(fmtHM(m.soll_stunden||0), colX[2]+2, y+3);
+      doc.text(fmtHM(m.saldo||0), colX[3]+2, y+3);
+      doc.text(fmtHM(m.kum_saldo||0), colX[4]+2, y+3);
+      doc.text(String(m.krank_tage||0), colX[5]+2, y+3);
+      doc.text(String(m.urlaub_tage||0), colX[6]+2, y+3);
+      doc.text(String(m.uu_tage||0), colX[7]+2, y+3);
+      doc.text(String(m.fb_tage||0), colX[8]+2, y+3);
+
+      totalIst += (m.ist_stunden||0);
+      totalSoll += (m.soll_stunden||0);
+      totalKrank += (m.krank_tage||0);
+      totalUrlaub += (m.urlaub_tage||0);
+      totalUU += (m.uu_tage||0);
+      totalFB += (m.fb_tage||0);
+
+      y += rowH;
+    });
+
+    // GESAMT row
+    const lastKum = monthly[monthly.length-1].kum_saldo || 0;
+    const pct = totalSoll > 0 ? ((totalIst - totalSoll) / totalSoll * 100).toFixed(1) : '0.0';
+    doc.setFont(undefined,'bold');
+    doc.setLineWidth(0.5);
+    doc.rect(colX[0], y-2, colEnd-colX[0], rowH);
+    for(let i=1; i<colX.length; i++) {
+      doc.line(colX[i], y-2, colX[i], y-2+rowH);
+    }
+    doc.text('GESAMT', colX[0]+2, y+3);
+    doc.text(fmtHM(totalIst), colX[1]+2, y+3);
+    doc.text(fmtHM(totalSoll), colX[2]+2, y+3);
+    doc.text(fmtHM(totalIst-totalSoll), colX[3]+2, y+3);
+    doc.text(fmtHM(lastKum) + ' (' + pct + '%)', colX[4]+2, y+3);
+    doc.text(String(totalKrank), colX[5]+2, y+3);
+    doc.text(String(totalUrlaub), colX[6]+2, y+3);
+    doc.text(String(totalUU), colX[7]+2, y+3);
+    doc.text(String(totalFB), colX[8]+2, y+3);
+
+    zeSavePDF(doc, `${empNr}_${parts[parts.length-1]}_${jahr}_Jahresuebersicht.pdf`);
+    toast('PDF Gesamt erstellt ✓');
+  } catch(err) {
+    console.error('[ZE PDF Gesamt]', err);
+    toast('PDF-Fehler: '+err.message,'err');
+  }
+}
+
 
 // Recalculate salary fields
 function recalcSalary(empId, changed){

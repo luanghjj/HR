@@ -404,3 +404,351 @@
   transition: background .15s;
 }
 .mit-insight-cta:hover { background: rgba(255,255,255,.18); }
+
+/* ═══════════════════════════════════════════════════════════
+   Zeiterfassung Section in Employee Detail Modal
+   ═══════════════════════════════════════════════════════════ */
+
+/* Section container */
+.ze-section {
+  border-top: 1px solid var(--border);
+  margin-top: 20px;
+  padding-top: 16px;
+}
+.ze-section-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.ze-section-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.ze-badge-ro {
+  font-size: .55rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(59,79,210,.08);
+  color: var(--accent);
+  vertical-align: middle;
+}
+
+/* Controls row */
+.ze-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.ze-select, .ze-date-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.ze-select:focus, .ze-date-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Stats row (4 mini cards) */
+.ze-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+@media (max-width: 640px) { .ze-stats-row { grid-template-columns: repeat(2, 1fr); } }
+
+.ze-stat-card {
+  background: var(--bg-input);
+  border-radius: 14px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent);
+  transition: transform .15s;
+}
+.ze-stat-card:hover { transform: translateY(-1px); }
+.ze-stat-card.is-green  { border-left-color: #10b981; }
+.ze-stat-card.is-red    { border-left-color: #ef4444; }
+.ze-stat-card.is-blue   { border-left-color: var(--accent); }
+.ze-stat-card.is-orange { border-left-color: #f97316; }
+
+.ze-stat-label {
+  font-size: .6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.ze-stat-val {
+  font-family: 'Space Mono', monospace;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.ze-stat-val.positive { color: #10b981; }
+.ze-stat-val.negative { color: #ef4444; }
+
+/* Data table */
+.ze-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.ze-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .78rem;
+}
+.ze-table thead th {
+  padding: 10px 12px;
+  font-size: .6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  text-align: left;
+  white-space: nowrap;
+}
+.ze-table tbody tr {
+  border-top: 1px solid var(--border);
+  transition: background .1s;
+}
+.ze-table tbody tr:hover { background: rgba(59,79,210,.02); }
+.ze-table tbody td {
+  padding: 8px 12px;
+  font-family: 'Space Mono', monospace;
+  font-size: .72rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.ze-table tbody td.ze-td-day {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Code badges */
+.ze-code {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: .6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.ze-code.code-k  { background: rgba(239,68,68,.1);   color: #dc2626; }
+.ze-code.code-u  { background: rgba(59,130,246,.1);  color: #2563eb; }
+.ze-code.code-uu { background: rgba(245,158,11,.1);  color: #d97706; }
+.ze-code.code-f  { background: rgba(120,113,108,.1); color: #78716c; }
+.ze-code.code-fb { background: rgba(16,185,129,.1);  color: #059669; }
+
+/* Stundenkonto bar chart */
+.ze-konto {
+  margin-bottom: 16px;
+}
+.ze-konto-title {
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+.ze-konto-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 6px;
+}
+.ze-konto-item {
+  background: var(--bg-input);
+  border-radius: 10px;
+  padding: 8px 6px;
+  text-align: center;
+  transition: transform .12s;
+}
+.ze-konto-item:hover { transform: translateY(-1px); }
+.ze-konto-month {
+  font-size: .6rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 4px;
+}
+.ze-konto-val {
+  font-family: 'Space Mono', monospace;
+  font-size: .72rem;
+  font-weight: 700;
+}
+.ze-konto-val.positive { color: #10b981; }
+.ze-konto-val.negative { color: #ef4444; }
+.ze-konto-bar {
+  height: 3px;
+  border-radius: 2px;
+  margin-top: 4px;
+  background: var(--border);
+  overflow: hidden;
+}
+.ze-konto-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width .3s ease;
+}
+
+/* Breakdown row */
+.ze-breakdown {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.ze-break-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .72rem;
+  color: var(--text-secondary);
+}
+.ze-break-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* PDF buttons */
+.ze-pdf-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ze-pdf-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all .15s;
+}
+.ze-pdf-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(59,79,210,.04);
+}
+.ze-pdf-btn .ms {
+  font-size: 1rem;
+  color: var(--accent);
+}
+
+/* Tagesansicht card */
+.ze-day-card {
+  background: var(--bg-input);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border-left: 3px solid var(--accent);
+}
+.ze-day-card-title {
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+.ze-day-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+@media (max-width: 500px) { .ze-day-grid { grid-template-columns: repeat(2, 1fr); } }
+.ze-day-field-label {
+  font-size: .6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.ze-day-field-val {
+  font-family: 'Space Mono', monospace;
+  font-size: .9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Empty & loading states */
+.ze-empty {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--text-muted);
+  font-size: .82rem;
+}
+.ze-empty .ms {
+  display: block;
+  font-size: 2rem;
+  margin-bottom: 8px;
+  opacity: .5;
+}
+.ze-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: .78rem;
+}
+.ze-loading::after {
+  content: '';
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  vertical-align: middle;
+  margin-left: 8px;
+}
+
+/* View mode tabs */
+.ze-view-tabs {
+  display: flex;
+  background: var(--bg-input);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.ze-view-tab {
+  background: none;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .13s;
+}
+.ze-view-tab.active {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+.ze-view-tab:hover:not(.active) { color: var(--accent); }
+
