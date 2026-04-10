@@ -4035,7 +4035,9 @@ function renderQrGenerator(){
   const pg=document.getElementById('page-qr_generator');
   if(!pg)return;
 
-  const domain=localStorage.getItem('qr_domain')||'';
+  let domain=localStorage.getItem('qr_domain')||'';
+  // Clean domain: only keep origin
+  if(domain){try{domain=new URL(domain).origin;}catch(e){}}
 
   pg.innerHTML=`
     <div class="section-header"><h2>📱 QR Check-in Codes</h2><p>QR-Codes für Standort-Check-in generieren und drucken</p></div>
@@ -4051,8 +4053,16 @@ function renderQrGenerator(){
 }
 
 function generateQrCodes(){
-  const domain=document.getElementById('qrDomainInput')?.value?.trim()?.replace(/\/+$/,'');
-  if(!domain||!domain.startsWith('http')){toast('Bitte gültige HTTPS-Domain eingeben','err');return;}
+  let raw=document.getElementById('qrDomainInput')?.value?.trim()?.replace(/\/+$/,'');
+  if(!raw||!raw.startsWith('http')){toast('Bitte gültige HTTPS-Domain eingeben','err');return;}
+
+  // Extract just the origin (https://example.com) — strip path, params, etc.
+  try{
+    const u=new URL(raw);
+    raw=u.origin; // e.g. https://hr-ebon-five.vercel.app
+  }catch(e){}
+  const domain=raw;
+  document.getElementById('qrDomainInput').value=domain; // Update input to show clean domain
   localStorage.setItem('qr_domain',domain);
 
   // Load qrcode.js if not loaded
