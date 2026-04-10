@@ -344,6 +344,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Show loading overlay immediately on page load
   showLoading('Verbindung wird hergestellt...');
 
+  // QR Check-in: save URL params before login if not logged in yet
+  const qrParams = new URLSearchParams(window.location.search);
+  const qrLoc = qrParams.get('checkin');
+  const qrKey = qrParams.get('key');
+  if (qrLoc && qrKey) {
+    sessionStorage.setItem('pendingCheckin', qrLoc);
+    sessionStorage.setItem('pendingCheckinKey', qrKey);
+    console.log('[QR] Check-in params saved for after login:', qrLoc);
+  }
+
   // Check for existing session; hide loading if no session found
   checkExistingSession().then(hasSession => {
     if (!hasSession) {

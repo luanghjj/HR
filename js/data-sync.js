@@ -260,7 +260,11 @@ async function syncCheckIn(record) {
       distance_m: record.distanceM,
       shift_id: record.shiftId || null,
       is_late: record.isLate || false,
-      late_min: record.lateMin || 0
+      late_min: record.lateMin || 0,
+      method: record.method || 'gps',
+      qr_location: record.qrLocation || null,
+      gps_verified: record.gpsVerified ?? null,
+      gps_suspicious: record.gpsSuspicious || false
     }).select().single();
     if (error) {
       console.warn('[Sync] Check-in error:', error.message);

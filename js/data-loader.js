@@ -243,7 +243,11 @@ async function loadDataFromSupabase() {
         isLate: r.is_late,
         lateMin: r.late_min,
         totalHours: r.total_hours,
-        note: r.note
+        note: r.note,
+        method: r.method || 'gps',
+        qrLocation: r.qr_location,
+        gpsVerified: r.gps_verified,
+        gpsSuspicious: r.gps_suspicious
       }));
     }
 

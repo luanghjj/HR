@@ -545,7 +545,7 @@ function filterCheckins(){
   const empMap={}; DATA.employees.forEach(e=>empMap[e.id]=e.name);
 
   document.getElementById('checkinTable').innerHTML=`<table>
-    <thead><tr><th>ID</th><th>Mitarbeiter</th><th>Standort</th><th>Check-in</th><th>Check-out</th><th>Dauer (Std)</th><th>Distanz</th><th>Verspätet</th><th>GPS In</th><th>GPS Out</th><th>Akt.</th></tr></thead>
+    <thead><tr><th>ID</th><th>Mitarbeiter</th><th>Standort</th><th>Methode</th><th>Check-in</th><th>Check-out</th><th>Dauer</th><th>Distanz</th><th>GPS</th><th>Akt.</th></tr></thead>
     <tbody>${d.length?d.map(r=>{
       const name=empMap[r.emp_id]||'ID '+r.emp_id;
       const ciDate=r.check_in?new Date(r.check_in):null;
@@ -553,22 +553,22 @@ function filterCheckins(){
       const ciStr=ciDate?ciDate.toLocaleString('de-DE'):'—';
       const coStr=coDate?coDate.toLocaleString('de-DE'):'<span class="badge badge-warning">Offen</span>';
       const dur=r.total_hours?fmtNum(r.total_hours,2):(ciDate&&coDate?fmtNum((coDate-ciDate)/3600000,2):'—');
-      const gpsIn=r.check_in_lat?`${Number(r.check_in_lat).toFixed(4)}, ${Number(r.check_in_lng).toFixed(4)}`:'';
-      const gpsOut=r.check_out_lat?`${Number(r.check_out_lat).toFixed(4)}, ${Number(r.check_out_lng).toFixed(4)}`:'';
-      return `<tr>
+      const m=r.method||'gps';
+      const mB=m==='qr+gps'?'<span class="badge badge-success">QR+GPS</span>':m==='qr'?'<span class="badge badge-warning">QR</span>':'<span class="badge badge-info">GPS</span>';
+      const gs=r.gps_suspicious?'<span class="badge badge-danger">🔴</span>':r.gps_verified===true?'<span class="badge badge-success">✅</span>':r.gps_verified===false?'<span class="badge badge-warning">⚠️</span>':'—';
+      return `<tr${r.gps_suspicious?' style="background:rgba(231,76,60,.08)"':''}>
         <td>${r.id}</td>
         <td><strong>${name}</strong></td>
         <td>${STANDORTE[r.location]||r.location||''}</td>
+        <td>${mB}</td>
         <td>${ciStr}</td>
         <td>${coStr}</td>
         <td style="font-weight:700">${dur}</td>
         <td>${r.distance_m?r.distance_m+'m':''}</td>
-        <td>${r.is_late?`<span class="badge badge-warning">+${r.late_min}m</span>`:''}</td>
-        <td style="font-size:.7rem;color:var(--text-muted)">${gpsIn}</td>
-        <td style="font-size:.7rem;color:var(--text-muted)">${gpsOut}</td>
+        <td>${gs}</td>
         <td class="row-actions"><button class="del" onclick="deleteRow('time_records',${r.id})">🗑️</button></td>
       </tr>`;
-    }).join(''):'<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:40px">Noch keine Check-in Records.<br>Mitarbeiter stempeln über die HRM-App ein.</td></tr>'}</tbody>
+    }).join(''):'<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:40px">Noch keine Check-in Records.</td></tr>'}</tbody>
   </table>`;
 }
 

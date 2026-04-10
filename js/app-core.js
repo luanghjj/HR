@@ -84,6 +84,150 @@ function genShifts(){
   console.log('[Shifts]', SHIFTS.length, 'shifts from Supabase');
 }
 
+// ═══ QR CHECK-IN CONFIG ═══
+const QR_KEYS = {
+  okyu: 'oK4xY9',
+  origami: 'rG3mI7',
+  enso: 'eN5oS2'
+};
+
+/**
+ * Detect QR check-in from URL parameters
+ * Called after login / session restore in initApp()
+ * URL format: ?checkin=okyu&key=oK4xY9
+ */
+function detectQrCheckin() {
+  // Check URL params
+  const params = new URLSearchParams(window.location.search);
+  const loc = params.get('checkin');
+  const key = params.get('key');
+
+  // Also check sessionStorage (from pending login flow)
+  const pending = sessionStorage.getItem('pendingCheckin');
+
+  if (loc && key) {
+    // Verify key
+    if (QR_KEYS[loc] !== key) {
+      toast('❌ Ungültiger QR-Code', 'err');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+
+    if (!currentUser) {
+      // Not logged in yet → save for after login
+      sessionStorage.setItem('pendingCheckin', loc);
+      console.log('[QR] Pending check-in saved:', loc);
+      return;
+    }
+
+    // Logged in → execute check-in
+    window.history.replaceState({}, '', window.location.pathname);
+    setTimeout(() => handleQrCheckin(loc), 500);
+
+  } else if (pending && currentUser) {
+    // Returning from login with pending check-in
+    const savedKey = sessionStorage.getItem('pendingCheckinKey');
+    sessionStorage.removeItem('pendingCheckin');
+    sessionStorage.removeItem('pendingCheckinKey');
+    // Verify saved key
+    if (QR_KEYS[pending] && QR_KEYS[pending] === savedKey) {
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => handleQrCheckin(pending), 500);
+    } else {
+      console.warn('[QR] Invalid saved key for:', pending);
+    }
+  }
+}
+
+/**
+ * Handle QR check-in/out (smart toggle)
+ * If already checked in today → check-out
+ * If not → check-in with GPS verify
+ */
+async function handleQrCheckin(locationId) {
+  const today = isoDate(new Date());
+
+  // Check if already checked in today (open record)
+  const openRecord = TIME_RECORDS.find(r =>
+    r.empId === currentUser.empId &&
+    r.checkIn?.startsWith(today) &&
+    !r.checkOut
+  );
+
+  if (openRecord) {
+    // Smart toggle → CHECK-OUT
+    console.log('[QR] Already checked in → triggering check-out');
+    activeCheckIn = openRecord;
+    await doCheckOut();
+    return;
+  }
+
+  // CHECK-IN with GPS verify
+  toast('📍 GPS wird geprüft...', 'info');
+
+  let pos = null, gpsVerified = null, gpsSuspicious = false, distanceM = null;
+  try {
+    pos = await getCurrentGPS();
+    const locData = LOCS.find(l => l.id === locationId);
+    if (locData && locData.lat && locData.lng) {
+      const dist = Math.round(haversineDistance(pos.lat, pos.lng, locData.lat, locData.lng));
+      distanceM = dist;
+      gpsVerified = dist <= 200;
+      gpsSuspicious = dist > 500;
+      if (gpsSuspicious) {
+        console.warn('[QR] GPS suspicious:', dist + 'm');
+      }
+    }
+  } catch (gpsErr) {
+    console.warn('[QR] GPS failed:', gpsErr.message);
+    // GPS failed → still allow QR check-in
+  }
+
+  // Late detection
+  const me = EMPS.find(e => e.id === currentUser.empId);
+  const todayShift = getVisibleShifts().find(s => s.empId === me?.id && s.date === today && !s.isSick && !s.isVacation);
+  let isLate = false, lateMin = 0;
+  if (todayShift) {
+    const [sh, sm] = todayShift.from.split(':').map(Number);
+    const shiftStart = new Date(); shiftStart.setHours(sh, sm, 0, 0);
+    const diff = (Date.now() - shiftStart.getTime()) / 60000;
+    if (diff > 5) { isLate = true; lateMin = Math.round(diff); }
+  }
+
+  // Create record
+  const record = {
+    empId: currentUser.empId,
+    location: locationId,
+    checkInLat: pos?.lat || null,
+    checkInLng: pos?.lng || null,
+    distanceM: distanceM,
+    shiftId: todayShift?.id || null,
+    isLate, lateMin,
+    method: pos ? 'qr+gps' : 'qr',
+    qrLocation: locationId,
+    gpsVerified,
+    gpsSuspicious
+  };
+
+  const data = await syncCheckIn(record);
+  if (data) {
+    activeCheckIn = { ...record, id: data.id, checkIn: data.check_in };
+    TIME_RECORDS.unshift(activeCheckIn);
+
+    const locName = getLocationName(locationId);
+    const gpsInfo = gpsVerified === true ? ' ✅ GPS bestätigt' :
+                    gpsVerified === false ? ' ⚠️ GPS nicht bestätigt' : '';
+    toast(`✅ Eingecheckt · ${locName}${gpsInfo}`, 'success');
+    if (isLate) toast(`⏰ ${lateMin} Min. verspätet`, 'warn');
+    if (gpsSuspicious) toast('🔴 GPS-Standort verdächtig — Admin wird benachrichtigt', 'warn');
+
+    renderDashboard();
+  } else {
+    toast('Check-in fehlgeschlagen', 'err');
+  }
+}
+
 // ═══ ZEITERFASSUNG (GPS Check-in/out) ═══
 
 function renderZeiterfassungCard(emp, todayShift) {
@@ -202,7 +346,11 @@ async function doCheckIn() {
       checkInLng: pos.lng,
       distanceM: nearest.distance,
       shiftId: todayShift?.id || null,
-      isLate, lateMin
+      isLate, lateMin,
+      method: 'gps',
+      qrLocation: null,
+      gpsVerified: true,
+      gpsSuspicious: false
     };
 
     const data = await syncCheckIn(record);
@@ -3875,4 +4023,6 @@ function initApp(){
   genShifts();renderPage('dashboard');renderNotifs();
   if(window.innerWidth<=900)document.getElementById('menuBtn').style.display='';
   window.addEventListener('resize',()=>{document.getElementById('menuBtn').style.display=window.innerWidth<=900?'':'none';});
+  // QR Check-in: detect URL params after app is ready
+  detectQrCheckin();
 }
