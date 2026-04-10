@@ -78,16 +78,11 @@ function renderPage(p){
   ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung})[p]?.();
 }
 
-// ═══ GENERATE SHIFTS ═══
+// ═══ SHIFTS (loaded from Supabase via data-loader.js) ═══
+var dragData = null;
 function genShifts(){
-  // Skip if shifts already loaded from Supabase
-  if(window._shiftsFromDB && SHIFTS.length > 0) { console.log('[Shifts] Using', SHIFTS.length, 'shifts from Supabase'); return; }
-  SHIFTS=[];const weekS=getWeekStart(scheduleDate);
-  for(let d=0;d<14;d++){const day=new Date(weekS);day.setDate(day.getDate()+d);const ds=isoDate(day);
-    EMPS.filter(e=>e.status==='active').forEach(emp=>{if(Math.random()>.35){const t=SHIFT_TEMPLATES[Math.floor(Math.random()*SHIFT_TEMPLATES.length)];
-      SHIFTS.push({id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:emp.location,date:ds,from:t.from,to:t.to,label:t.label,colorClass:getDeptColorClass(emp.dept),isSick:false,isVacation:false,isLate:false,lateMin:0});}});}
-  // Save generated shifts to Supabase
-  syncBulkShifts(SHIFTS);
+  // Shifts are loaded from Supabase — no random generation
+  console.log('[Shifts]', SHIFTS.length, 'shifts from Supabase');
 }
 
 // ═══ ZEITERFASSUNG (GPS Check-in/out) ═══
@@ -1885,13 +1880,13 @@ function renderSchedule(){
               <span class="compact-letter">${vLetter}</span>
               ${canEdit?`<div class="shift-actions"><button class="shift-action-btn vac-btn" onclick="event.stopPropagation();markVac(${s.id})" title="Aufheben">✅</button><button class="shift-action-btn" onclick="event.stopPropagation();deleteShift(${s.id})" title="Löschen" style="color:var(--danger)">🗑️</button></div>`:''}</div>`;
           } else if (s.label === 'Schule' || s.colorClass === 'schule') {
-            h+=`<div class="shift-block compact-block schule"
+            h+=`<div class="shift-block compact-block schule" ${canEdit?`onclick="editShift(${s.id})" style="cursor:pointer"`:''}  
               ${canEdit?`draggable="true" ondragstart="onDragStart(event,${s.id})" ondragend="onDragEnd(event)"`:''}  data-sid="${s.id}">
               <span class="compact-letter">S</span>
               <div class="shift-time">${s.from}–${s.to}</div>
               ${canEdit?`<div class="shift-actions"><button class="shift-action-btn sick-btn" onclick="event.stopPropagation();markSick(${s.id})" title="Krank">🏥</button><button class="shift-action-btn" onclick="event.stopPropagation();deleteShift(${s.id})" title="Löschen" style="color:var(--danger)">🗑️</button></div>`:''}</div>`;
           } else {
-            h+=`<div class="shift-block ${s.colorClass} ${s.isLate?'is-late':''}"
+            h+=`<div class="shift-block ${s.colorClass} ${s.isLate?'is-late':''}" ${canEdit?`onclick="editShift(${s.id})" style="cursor:pointer"`:''}  
               ${canEdit?`draggable="true" ondragstart="onDragStart(event,${s.id})" ondragend="onDragEnd(event)"`:''}  data-sid="${s.id}">
               <div class="shift-name">${s.label}${s.isLate?' <span class="late-marker">⏰+'+s.lateMin+'m</span>':''}</div>
               <div class="shift-time">${s.from}–${s.to}</div>
@@ -1966,7 +1961,7 @@ function renderSchedule(){
     dayS.forEach(s=>{if(seen.has(s.empId))return;seen.add(s.empId);
       const st=s.isSick?'<span class="badge badge-danger">Krank</span>':s.isVacation?'<span class="badge badge-info">Urlaub</span>':s.isLate?`<span class="badge badge-late">⏰+${s.lateMin}m</span>`:'<span class="badge badge-success">Aktiv</span>';
       h+=`<tr><td><strong style="color:var(--text-primary)">${s.empName}</strong></td><td>${s.dept}</td><td><div class="shift-block ${s.colorClass} ${s.isSick?'is-sick':''} ${s.isVacation?'is-vacation':''}">${s.label} (${s.from}–${s.to})</div></td><td>${st}</td>`;
-      if(canEdit)h+=`<td><button class="btn btn-sm" onclick="markSick(${s.id})">🏥</button> <button class="btn btn-sm" onclick="markVac(${s.id})">🏖️</button> <button class="btn btn-sm" onclick="markLateShift(${s.id})">⏰</button></td>`;
+      if(canEdit)h+=`<td><button class="btn btn-sm" onclick="editShift(${s.id})" title="Bearbeiten">✏️</button> <button class="btn btn-sm" onclick="markSick(${s.id})">🏥</button> <button class="btn btn-sm" onclick="markVac(${s.id})">🏖️</button> <button class="btn btn-sm" onclick="markLateShift(${s.id})">⏰</button></td>`;
       h+='</tr>';});
     if(!seen.size)h+='<tr><td colspan="'+(canEdit?5:4)+'" style="text-align:center;color:var(--text-muted)">Keine Schichten</td></tr>';
     h+='</tbody></table></div>';c.innerHTML=h;
@@ -1989,7 +1984,50 @@ function onDragLeave(e){e.currentTarget.classList.remove('drag-over');}
 function onDrop(e){e.preventDefault();e.currentTarget.classList.remove('drag-over');if(!dragData)return;
   const cell=e.currentTarget,nd=cell.dataset.date,ne=cell.dataset.emp,sh=SHIFTS.find(s=>s.id===dragData.sid);if(!sh)return;sh.date=nd;
   if(ne&&ne!==sh.empName){const emp=EMPS.find(x=>x.name===ne);if(emp){sh.empId=emp.id;sh.empName=emp.name;sh.dept=emp.dept;sh.location=emp.location;sh.colorClass=getDeptColorClass(emp.dept);}}
-  toast('Schicht verschoben');renderSchedule();}
+  syncUpdateShift(sh);toast('Schicht verschoben ✓');renderSchedule();}
+
+// ═══ EDIT SHIFT (click to edit) ═══
+function editShift(id){
+  const s=SHIFTS.find(x=>x.id===id);if(!s)return;
+  const emp=EMPS.find(x=>x.id===s.empId);
+  const tmplOpts=SHIFT_TEMPLATES.map((t,i)=>`<option value="${i}"${t.label===s.label?' selected':''}>${t.label} (${t.from}–${t.to})</option>`).join('');
+  document.getElementById('modalTitle').textContent='Schicht bearbeiten';
+  document.getElementById('modalBody').innerHTML=`<div class="form-grid">
+    <div class="form-group full">
+      <label class="form-label">Mitarbeiter</label>
+      <div class="form-input" style="background:var(--bg-secondary);cursor:default">${s.empName} — ${s.dept}</div>
+    </div>
+    <div class="form-group full">
+      <label class="form-label">Datum</label>
+      <input class="form-input" type="date" id="edShiftDate" value="${s.date}">
+    </div>
+    <div class="form-group full">
+      <label class="form-label">Vorlage</label>
+      <select class="form-input" id="edShiftTmpl" onchange="const t=SHIFT_TEMPLATES[this.value];if(t){document.getElementById('edShiftFrom').value=t.from;document.getElementById('edShiftTo').value=t.to;}">
+        <option value="">— Manuell —</option>
+        ${tmplOpts}
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label class="form-label">Von</label><input class="form-input" type="time" id="edShiftFrom" value="${s.from}"></div>
+      <div class="form-group"><label class="form-label">Bis</label><input class="form-input" type="time" id="edShiftTo" value="${s.to}"></div>
+    </div>
+  </div>`;
+  document.getElementById('modalFooter').innerHTML=`<button class="btn btn-danger" onclick="deleteShift(${id});closeModal()">Löschen</button><button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="updateShiftFromModal(${id})">Speichern</button>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+function updateShiftFromModal(id){
+  const s=SHIFTS.find(x=>x.id===id);if(!s)return;
+  const nd=document.getElementById('edShiftDate').value;
+  const nf=document.getElementById('edShiftFrom').value;
+  const nt=document.getElementById('edShiftTo').value;
+  const tmplIdx=document.getElementById('edShiftTmpl').value;
+  if(!nd||!nf||!nt){toast('Bitte alle Felder ausfüllen','err');return;}
+  s.date=nd;s.from=nf;s.to=nt;
+  if(tmplIdx!==''){s.label=SHIFT_TEMPLATES[tmplIdx].label;}
+  syncUpdateShift(s);
+  closeModal();toast('Schicht aktualisiert ✓');renderSchedule();
+}
 function markSick(id){const s=SHIFTS.find(x=>x.id===id);if(!s)return;s.isSick=!s.isSick;s.isVacation=false;const e=EMPS.find(x=>x.id===s.empId);if(s.isSick){if(e){e.sickDays++;syncEmployeeField(e.id,'sickDays',e.sickDays);}addNotif('sick','Krank',`${s.empName}: ${formatDateDE(s.date)}`);}else{if(e){e.sickDays=Math.max(0,e.sickDays-1);syncEmployeeField(e.id,'sickDays',e.sickDays);}}syncUpdateShift(s);renderSchedule();}
 function markVac(id){
   const s=SHIFTS.find(x=>x.id===id);if(!s)return;
