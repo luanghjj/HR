@@ -6,42 +6,54 @@ function toggleTheme(){const h=document.documentElement;const n=h.getAttribute('
 // doLogin(), doLoginDemo(), doLogout(), checkExistingSession() → see auth.js
 
 // ═══ DYNAMIC SIDEBAR ═══
+// Each tab is shown/hidden based on user permissions (from SuperAdmin or role defaults)
 function buildSidebar(){
   const mi = (name) => `<span class="ms">${name}</span>`;
   let html='';
+
+  // ── ÜBERSICHT (always visible) ──
   html+=`<div class="nav-section">Übersicht</div>`;
   html+=`<div class="nav-item active" onclick="navigate('dashboard',this)">${mi('grid_view')} Dashboard</div>`;
 
-  if(can('seeAllEmployees')){
+  // ── PERSONAL ──
+  const showMitarbeiter = can('seeAllEmployees');
+  const showBereiche = can('seeDepartments');
+  if(showMitarbeiter || showBereiche){
     html+=`<div class="nav-section">Personal</div>`;
-    html+=`<div class="nav-item" onclick="navigate('employees',this)">${mi('people')} Mitarbeiter</div>`;
-  }
-  if(can('seeDepartments')){
-    if(!can('seeAllEmployees')) html+=`<div class="nav-section">Personal</div>`;
-    html+=`<div class="nav-item" onclick="navigate('departments',this)">${mi('domain')} Bereiche</div>`;
+    if(showMitarbeiter) html+=`<div class="nav-item" onclick="navigate('employees',this)">${mi('people')} Mitarbeiter</div>`;
+    if(showBereiche) html+=`<div class="nav-item" onclick="navigate('departments',this)">${mi('domain')} Bereiche</div>`;
   }
 
-  html+=`<div class="nav-section">Planung</div>`;
-  html+=`<div class="nav-item" onclick="navigate('schedule',this)">${mi('calendar_month')} Arbeitsplan</div>`;
-  html+=`<div class="nav-item" onclick="navigate('vacation',this)">${mi('beach_access')} ${can('seeAllVacations')?'Urlaubsplan':'Mein Urlaub'}<span class="nav-badge" id="vacBadge" style="display:none">0</span></div>`;
-  html+=`<div class="nav-item" onclick="navigate('sick',this)">${mi('medical_services')} ${can('seeAllSick')?'Krankmeldungen':'Meine Krankmeldungen'}<span class="nav-badge" id="sickBadge" style="display:none">0</span></div>`;
+  // ── PLANUNG ──
+  const showSchedule = can('seeAllSchedules') || currentUser.role === 'mitarbeiter' || currentUser.role === 'azubi';
+  const showVacation = can('seeAllVacations') || true; // Everyone sees own vacation
+  const showSick = can('seeAllSick') || true; // Everyone sees own sick
+  if(showSchedule || showVacation || showSick){
+    html+=`<div class="nav-section">Planung</div>`;
+    if(showSchedule) html+=`<div class="nav-item" onclick="navigate('schedule',this)">${mi('calendar_month')} Arbeitsplan</div>`;
+    if(showVacation) html+=`<div class="nav-item" onclick="navigate('vacation',this)">${mi('beach_access')} ${can('seeAllVacations')?'Urlaubsplan':'Mein Urlaub'}<span class="nav-badge" id="vacBadge" style="display:none">0</span></div>`;
+    if(showSick) html+=`<div class="nav-item" onclick="navigate('sick',this)">${mi('medical_services')} ${can('seeAllSick')?'Krankmeldungen':'Meine Krankmeldungen'}<span class="nav-badge" id="sickBadge" style="display:none">0</span></div>`;
+  }
 
+  // ── DOKUMENTE ──
   html+=`<div class="nav-section">Dokumente</div>`;
   html+=`<div class="nav-item" onclick="navigate('documents',this)">${mi('folder')} ${can('seeAllDocs')?'Unterlagen':'Meine Unterlagen'}</div>`;
-  html+=`<div class="nav-item" onclick="navigate('checklists',this)">${mi('checklist')} Checklisten</div>`;
+  if(can('seeDepartments')) html+=`<div class="nav-item" onclick="navigate('checklists',this)">${mi('checklist')} Checklisten</div>`;
 
-  // Ausbildung: visible to azubi (own data) + manager/inhaber (all azubis)
-  if(currentUser.role==='azubi' || can('seeAllEmployees')){
+  // ── AUSBILDUNG ──
+  if(currentUser.role==='azubi' || can('editTraining')){
     html+=`<div class="nav-section">Ausbildung</div>`;
     html+=`<div class="nav-item" onclick="navigate('ausbildung',this)">${mi('school')} ${currentUser.role==='azubi'?'Meine Ausbildung':'Ausbildung'}</div>`;
   }
 
-  if(can('seeAllEmployees')){
+  // ── AUSWERTUNG ──
+  if(can('seeAllEmployees') || can('canExport')){
     html+=`<div class="nav-section">Auswertung</div>`;
-    html+=`<div class="nav-item" onclick="navigate('calendar',this)">${mi('event_note')} Personalkalender</div>`;
-    html+=`<div class="nav-item" onclick="navigate('reports',this)">${mi('analytics')} Berichte</div>`;
+    if(can('seeAllEmployees')) html+=`<div class="nav-item" onclick="navigate('calendar',this)">${mi('event_note')} Personalkalender</div>`;
+    if(can('seeAllEmployees') || can('canExport')) html+=`<div class="nav-item" onclick="navigate('reports',this)">${mi('analytics')} Berichte</div>`;
   }
 
+  // ── SYSTEM (admin only) ──
   if(can('manageAccess')){
     html+=`<div class="nav-section">System</div>`;
     html+=`<div class="nav-item" onclick="navigate('access',this)">${mi('admin_panel_settings')} Zugangsverwaltung</div>`;
