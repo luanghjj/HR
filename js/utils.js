@@ -152,13 +152,27 @@ function calcMonthlyFromHourly(hourlyRate, plannedHours) {
 
 // ═══ Data Filter Functions ═══
 
+/** Check if location is allowed by custom permissions */
+function _isLocAllowed(loc) {
+  const locs = currentUser?._allowedLocations;
+  if (!locs || locs.includes('all')) return true;
+  return locs.includes(loc);
+}
+
 /** Get employees visible to current user */
 function getVisibleEmps() {
   if (can('seeAllEmployees')) {
-    if (currentUser.location === 'all') {
-      return currentLocation === 'all' ? EMPS : EMPS.filter(e => e.location === currentLocation);
+    let emps = EMPS;
+    // Apply custom location restriction
+    const locs = currentUser?._allowedLocations;
+    if (locs && !locs.includes('all')) {
+      emps = emps.filter(e => locs.includes(e.location));
     }
-    return EMPS.filter(e => e.location === currentUser.location);
+    // Apply UI location filter
+    if (currentUser.location === 'all') {
+      return currentLocation === 'all' ? emps : emps.filter(e => e.location === currentLocation);
+    }
+    return emps.filter(e => e.location === currentUser.location);
   }
   return EMPS.filter(e => e.id === currentUser.empId);
 }
@@ -166,10 +180,15 @@ function getVisibleEmps() {
 /** Get vacations visible to current user */
 function getVisibleVacs() {
   if (can('seeAllVacations')) {
-    if (currentUser.location === 'all') {
-      return currentLocation === 'all' ? VACS : VACS.filter(v => v.location === currentLocation);
+    let vacs = VACS;
+    const locs = currentUser?._allowedLocations;
+    if (locs && !locs.includes('all')) {
+      vacs = vacs.filter(v => locs.includes(v.location));
     }
-    return VACS.filter(v => v.location === currentUser.location);
+    if (currentUser.location === 'all') {
+      return currentLocation === 'all' ? vacs : vacs.filter(v => v.location === currentLocation);
+    }
+    return vacs.filter(v => v.location === currentUser.location);
   }
   return VACS.filter(v => v.empId === currentUser.empId);
 }
@@ -177,10 +196,15 @@ function getVisibleVacs() {
 /** Get sick leaves visible to current user */
 function getVisibleSicks() {
   if (can('seeAllSick')) {
-    if (currentUser.location === 'all') {
-      return currentLocation === 'all' ? SICKS : SICKS.filter(s => s.location === currentLocation);
+    let sicks = SICKS;
+    const locs = currentUser?._allowedLocations;
+    if (locs && !locs.includes('all')) {
+      sicks = sicks.filter(s => locs.includes(s.location));
     }
-    return SICKS.filter(s => s.location === currentUser.location);
+    if (currentUser.location === 'all') {
+      return currentLocation === 'all' ? sicks : sicks.filter(s => s.location === currentLocation);
+    }
+    return sicks.filter(s => s.location === currentUser.location);
   }
   return SICKS.filter(s => s.empId === currentUser.empId);
 }
@@ -188,10 +212,15 @@ function getVisibleSicks() {
 /** Get shifts visible to current user */
 function getVisibleShifts() {
   if (can('seeAllSchedules')) {
-    if (currentUser.location === 'all') {
-      return currentLocation === 'all' ? SHIFTS : SHIFTS.filter(s => s.location === currentLocation);
+    let shifts = SHIFTS;
+    const locs = currentUser?._allowedLocations;
+    if (locs && !locs.includes('all')) {
+      shifts = shifts.filter(s => locs.includes(s.location));
     }
-    return SHIFTS.filter(s => s.location === currentUser.location);
+    if (currentUser.location === 'all') {
+      return currentLocation === 'all' ? shifts : shifts.filter(s => s.location === currentLocation);
+    }
+    return shifts.filter(s => s.location === currentUser.location);
   }
   const me = EMPS.find(e => e.id === currentUser.empId);
   if (!me) return [];

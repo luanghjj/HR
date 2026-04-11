@@ -36,9 +36,19 @@ const PERMS = {
 
 /**
  * Check if current user has a specific permission
+ * Checks custom permissions first (from user_permissions table),
+ * falls back to role-based defaults if mode is 'standard' or no custom data.
  * @param {string} perm - Permission key from PERMS
  * @returns {boolean}
  */
 function can(perm) {
-  return currentUser && PERMS[currentUser.role]?.[perm];
+  if (!currentUser) return false;
+
+  // If user has custom permissions (mode='custom') → use those
+  if (currentUser._permMode === 'custom' && currentUser._customPerms) {
+    return !!currentUser._customPerms[perm];
+  }
+
+  // Fallback: role-based defaults
+  return !!PERMS[currentUser.role]?.[perm];
 }

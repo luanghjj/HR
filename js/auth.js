@@ -3,6 +3,35 @@
 // ═══════════════════════════════════════════════════════════
 
 /**
+ * Load custom permissions from user_permissions table
+ * Attaches _permMode, _customPerms, _allowedLocations, _allowedDepts to currentUser
+ */
+async function loadUserPermissions() {
+  if (!currentUser) return;
+  try {
+    const { data: permData } = await sb.from('user_permissions')
+      .select('mode, permissions, allowed_locations, allowed_depts')
+      .eq('user_id', currentUser.id)
+      .single();
+    if (permData) {
+      currentUser._permMode = permData.mode;  // 'standard' | 'custom'
+      currentUser._customPerms = permData.permissions || {};
+      currentUser._allowedLocations = permData.allowed_locations || ['all'];
+      currentUser._allowedDepts = permData.allowed_depts || ['all'];
+      console.log('[Auth] Custom perms loaded:', permData.mode, permData.permissions);
+    } else {
+      currentUser._permMode = 'standard';
+      currentUser._customPerms = null;
+      currentUser._allowedLocations = ['all'];
+      currentUser._allowedDepts = ['all'];
+    }
+  } catch (e) {
+    console.log('[Auth] No custom permissions found, using role defaults');
+    currentUser._permMode = 'standard';
+  }
+}
+
+/**
  * Login with Supabase Auth
  * Falls back to demo mode if Supabase is not configured
  */
@@ -81,6 +110,9 @@ async function doLogin() {
       lastLogin: new Date().toLocaleDateString('de-DE'),
       status: 'active'
     };
+
+    // Load custom permissions from user_permissions table
+    await loadUserPermissions();
 
     // Set location
     if (currentUser.location !== 'all') {
@@ -296,6 +328,9 @@ async function checkExistingSession() {
           lastLogin: new Date().toLocaleDateString('de-DE'),
           status: 'active'
         };
+
+        // Load custom permissions
+        await loadUserPermissions();
 
         if (currentUser.location !== 'all') currentLocation = currentUser.location;
         else currentLocation = 'all';

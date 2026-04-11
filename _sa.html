@@ -96,6 +96,37 @@ td input:focus,td select:focus{border-color:var(--accent);outline:none}
 
 /* LOADING */
 .loading{text-align:center;padding:40px;color:var(--text-muted)}
+
+/* PERMISSION UI */
+.perm-layout{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:16px}
+@media(max-width:1100px){.perm-layout{grid-template-columns:1fr}}
+.perm-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.perm-panel-title{font-size:.85rem;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.perm-mode-radio{display:flex;gap:0;margin-bottom:16px;border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+.perm-mode-radio label{flex:1;padding:10px 16px;text-align:center;font-size:.82rem;cursor:pointer;background:var(--bg-primary);color:var(--text-secondary);transition:all .15s;font-weight:500}
+.perm-mode-radio input{display:none}
+.perm-mode-radio input:checked+label{background:var(--accent);color:#fff;font-weight:600}
+.perm-group{margin-bottom:16px}
+.perm-group-title{font-size:.65rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
+.perm-item{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .1s;font-size:.82rem}
+.perm-item:hover{background:var(--bg-hover)}
+.perm-item input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.perm-item.is-on{background:rgba(99,102,241,.08)}
+.perm-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.perm-pill{padding:6px 14px;border-radius:20px;font-size:.78rem;cursor:pointer;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-secondary);transition:all .15s;font-weight:500}
+.perm-pill:hover{border-color:var(--accent)}
+.perm-pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.perm-save-bar{display:flex;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+.role-hierarchy{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.role-chip{display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:600}
+.role-chip.inhaber{background:rgba(239,68,68,.12);color:#ef4444}
+.role-chip.manager{background:rgba(59,130,246,.12);color:#3b82f6}
+.role-chip.mitarbeiter{background:rgba(34,197,94,.12);color:#22c55e}
+.role-chip.azubi{background:rgba(245,158,11,.12);color:#f59e0b}
+.user-detail-banner{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;gap:16px}
+.user-detail-avatar{width:48px;height:48px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;color:#fff}
+.user-detail-info h3{font-size:1rem;margin-bottom:2px}
+.user-detail-info p{font-size:.78rem;color:var(--text-muted)}
 </style>
 </head>
 <body>
@@ -129,6 +160,8 @@ td input:focus,td select:focus{border-color:var(--accent);outline:none}
       <div class="nav-section">System</div>
       <div class="nav-item" onclick="navTo('documents',this)"><span class="ms">folder</span> Dokumente</div>
       <div class="nav-item" onclick="navTo('checklists',this)"><span class="ms">checklist</span> Checklisten</div>
+      <div class="nav-section">Verwaltung</div>
+      <div class="nav-item" onclick="navTo('users',this)"><span class="ms">admin_panel_settings</span> Benutzer</div>
       <div class="sidebar-footer">
         <button onclick="toggleTheme()">🌓 Theme</button>
         <button onclick="location.reload()">🔄 Reload</button>
@@ -193,14 +226,16 @@ async function initApp(){
 }
 
 async function loadAllData(){
-  const [emps,shifts,vacs,sicks,timeRec,docs,checks]=await Promise.all([
+  const [emps,shifts,vacs,sicks,timeRec,docs,checks,uprofs,uperms]=await Promise.all([
     sb.from('employees').select('*').order('id'),
     sb.from('shifts').select('*').order('shift_date',{ascending:false}),
     sb.from('vacations').select('*').order('id',{ascending:false}),
     sb.from('sick_leaves').select('*').order('id',{ascending:false}),
     sb.from('time_records').select('*').order('id',{ascending:false}),
     sb.from('documents').select('*').order('id',{ascending:false}),
-    sb.from('checklists').select('*').order('id',{ascending:false})
+    sb.from('checklists').select('*').order('id',{ascending:false}),
+    sb.from('user_profiles').select('*').order('id'),
+    sb.from('user_permissions').select('*').order('id')
   ]);
   DATA.employees=emps.data||[];
   DATA.shifts=shifts.data||[];
@@ -209,6 +244,8 @@ async function loadAllData(){
   DATA.time_records=timeRec.data||[];
   DATA.documents=docs.data||[];
   DATA.checklists=checks.data||[];
+  DATA.user_profiles=uprofs.data||[];
+  DATA.user_permissions=uperms.data||[];
 }
 
 // ═══ NAVIGATION ═══
@@ -230,7 +267,8 @@ function renderPage(page){
     checkinout:renderCheckinOut,
     monthly_real:renderMonthlyReal,
     documents:renderDocuments,
-    checklists:renderChecklists
+    checklists:renderChecklists,
+    users:renderUsers
   };
   if(fn[page])fn[page](m);
 }
@@ -617,6 +655,300 @@ function renderChecklists(m){
       </tr>`).join('')}</tbody>
     </table></div>
   `;
+}
+
+// ═══ BENUTZER & ZUGÄNGE ═══
+
+const PERM_GROUPS = [
+  {title:'ÜBERSICHT', perms:[
+    {key:'seeFinancials', label:'💰 Finanzen sichtbar'}
+  ]},
+  {title:'MITARBEITER', perms:[
+    {key:'seeAllEmployees', label:'👥 Alle Mitarbeiter sehen'},
+    {key:'editEmployees', label:'✏️ Mitarbeiter bearbeiten'},
+    {key:'editVacDays', label:'📅 Urlaubstage verwalten'},
+    {key:'editTraining', label:'🎓 Fortbildung verwalten'},
+    {key:'markLate', label:'⏰ Verspätung vermerken'}
+  ]},
+  {title:'DIENSTPLAN', perms:[
+    {key:'seeAllSchedules', label:'📋 Alle Dienstpläne sehen'},
+    {key:'editSchedules', label:'✏️ Schichten bearbeiten'},
+    {key:'canExport', label:'📄 Export (PDF/CSV)'}
+  ]},
+  {title:'URLAUB & KRANK', perms:[
+    {key:'seeAllVacations', label:'🏖️ Alle Urlaubsanträge'},
+    {key:'approveVacations', label:'✅ Urlaub genehmigen'},
+    {key:'seeAllSick', label:'🏥 Alle Krankmeldungen'}
+  ]},
+  {title:'BEREICHE & DOKUMENTE', perms:[
+    {key:'seeDepartments', label:'🏢 Bereiche sehen'},
+    {key:'seeAllDocs', label:'📁 Alle Dokumente'}
+  ]},
+  {title:'ADMINISTRATION', perms:[
+    {key:'seeAllLocations', label:'📍 Alle Standorte'},
+    {key:'manageAccess', label:'🔐 Zugangsverwaltung'}
+  ]}
+];
+
+const ROLE_DEFAULTS = {
+  inhaber:{seeAllLocations:true,seeAllEmployees:true,editEmployees:true,seeDepartments:true,seeAllSchedules:true,editSchedules:true,seeAllVacations:true,approveVacations:true,seeAllSick:true,seeAllDocs:true,canExport:true,manageAccess:true,markLate:true,seeFinancials:true,editVacDays:true,editTraining:true},
+  manager:{seeAllLocations:false,seeAllEmployees:true,editEmployees:true,seeDepartments:true,seeAllSchedules:true,editSchedules:true,seeAllVacations:true,approveVacations:true,seeAllSick:true,seeAllDocs:true,canExport:true,manageAccess:false,markLate:true,seeFinancials:false,editVacDays:false,editTraining:false},
+  mitarbeiter:{seeAllLocations:false,seeAllEmployees:false,editEmployees:false,seeDepartments:true,seeAllSchedules:false,editSchedules:false,seeAllVacations:false,approveVacations:false,seeAllSick:false,seeAllDocs:false,canExport:false,manageAccess:false,markLate:false,seeFinancials:false,editVacDays:false,editTraining:false},
+  azubi:{seeAllLocations:false,seeAllEmployees:false,editEmployees:false,seeDepartments:true,seeAllSchedules:false,editSchedules:false,seeAllVacations:false,approveVacations:false,seeAllSick:false,seeAllDocs:false,canExport:false,manageAccess:false,markLate:false,seeFinancials:false,editVacDays:false,editTraining:false}
+};
+
+const ALL_LOCATIONS = ['origami','enso','okyu'];
+const ALL_DEPTS = ['Küche','Service','Bar','Sushi','Verwaltung','Ausbildung'];
+
+let _editingUserId = null;
+
+function renderUsers(m) {
+  const users = DATA.user_profiles || [];
+  const perms = DATA.user_permissions || [];
+  const permMap = {};
+  perms.forEach(p => permMap[p.user_id] = p);
+
+  const roleLabels = {inhaber:'Inhaber',manager:'Manager',mitarbeiter:'Mitarbeiter',azubi:'Azubi'};
+
+  m.innerHTML = `
+    <div class="page-title">Benutzer & Zugänge <span class="record-count">${users.length} Users</span></div>
+    <div class="page-sub">Verwalten Sie Benutzerrollen, Standort-Zugriffe und individuelle Berechtigungen</div>
+
+    <div class="role-hierarchy">
+      <div class="role-chip inhaber"><span class="ms" style="font-size:16px">shield</span> Inhaber — Vollzugriff</div>
+      <div class="role-chip manager"><span class="ms" style="font-size:16px">supervisor_account</span> Manager — Personal & Planung</div>
+      <div class="role-chip mitarbeiter"><span class="ms" style="font-size:16px">person</span> Mitarbeiter — Eigene Daten</div>
+      <div class="role-chip azubi"><span class="ms" style="font-size:16px">school</span> Azubi — Eigene Daten + Ausbildung</div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" onclick="loadAllData().then(()=>renderPage('users'))"><span class="ms">refresh</span> Aktualisieren</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Name</th><th>User-ID</th><th>Rolle</th><th>Standort</th><th>Modus</th><th>Standort-Zugriff</th><th>Aktionen</th>
+        </tr></thead>
+        <tbody>${users.length ? users.map(u => {
+          const p = permMap[u.user_id];
+          const mode = p?.mode || 'standard';
+          const locs = p?.allowed_locations || ['all'];
+          const locsStr = locs.includes('all') ? 'Alle Standorte' : locs.map(l => STANDORTE[l]||l).join(', ');
+          const roleClass = u.role || 'mitarbeiter';
+          return `<tr>
+            <td><strong>${u.name}</strong><div style="font-size:.7rem;color:var(--text-muted)">${u.avatar||''}</div></td>
+            <td style="font-family:'Space Mono',monospace;font-size:.78rem">${u.user_id}</td>
+            <td><span class="role-chip ${roleClass}" style="font-size:.7rem">${roleLabels[u.role]||u.role}</span></td>
+            <td>${STANDORTE[u.location]||u.location||''}</td>
+            <td>${mode==='custom'?'<span class="badge badge-warning">Custom</span>':'<span class="badge badge-muted">Standard</span>'}</td>
+            <td style="font-size:.78rem">${locsStr}</td>
+            <td class="row-actions">
+              <button onclick="openUserPerms('${u.user_id}')" title="Berechtigungen"><span class="ms" style="font-size:16px">tune</span></button>
+            </td>
+          </tr>`;
+        }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">Keine Benutzer gefunden</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <div id="userPermPanel" style="margin-top:24px"></div>
+  `;
+}
+
+function openUserPerms(userId) {
+  _editingUserId = userId;
+  const u = (DATA.user_profiles||[]).find(p => p.user_id === userId);
+  if (!u) { toast('User nicht gefunden','err'); return; }
+
+  const existingPerm = (DATA.user_permissions||[]).find(p => p.user_id === userId);
+  const mode = existingPerm?.mode || 'standard';
+  const customPerms = existingPerm?.permissions || {};
+  const allowedLocs = existingPerm?.allowed_locations || ['all'];
+  const allowedDepts = existingPerm?.allowed_depts || ['all'];
+  const roleDefaults = ROLE_DEFAULTS[u.role] || {};
+  const roleLabels = {inhaber:'Inhaber',manager:'Manager',mitarbeiter:'Mitarbeiter',azubi:'Azubi'};
+
+  // Build permission groups HTML
+  let groupsHTML = '';
+  PERM_GROUPS.forEach(g => {
+    let items = '';
+    g.perms.forEach(p => {
+      const isOn = mode === 'custom' ? !!customPerms[p.key] : !!roleDefaults[p.key];
+      const disabled = mode === 'standard' ? 'disabled' : '';
+      items += `<div class="perm-item ${isOn?'is-on':''}">
+        <input type="checkbox" id="perm_${p.key}" data-key="${p.key}" ${isOn?'checked':''} ${disabled} onchange="permItemToggle(this)">
+        <label for="perm_${p.key}">${p.label}</label>
+      </div>`;
+    });
+    groupsHTML += `<div class="perm-group"><div class="perm-group-title">${g.title}</div>${items}</div>`;
+  });
+
+  // Location pills
+  const locPills = `<div class="perm-pill ${allowedLocs.includes('all')?'active':''}" onclick="toggleLocPill(this,'all')">Alle Standorte</div>` +
+    ALL_LOCATIONS.map(l => `<div class="perm-pill ${allowedLocs.includes(l)?'active':''}" onclick="toggleLocPill(this,'${l}')">${STANDORTE[l]||l}</div>`).join('');
+
+  // Dept pills
+  const deptPills = `<div class="perm-pill ${allowedDepts.includes('all')?'active':''}" onclick="toggleDeptPill(this,'all')">Alle Bereiche</div>` +
+    ALL_DEPTS.map(d => `<div class="perm-pill ${allowedDepts.includes(d)?'active':''}" onclick="toggleDeptPill(this,'${d}')">${d}</div>`).join('');
+
+  document.getElementById('userPermPanel').innerHTML = `
+    <div class="user-detail-banner">
+      <div class="user-detail-avatar">${u.avatar||u.name.substring(0,2)}</div>
+      <div class="user-detail-info">
+        <h3>${u.name}</h3>
+        <p>${u.user_id} · <span class="role-chip ${u.role}" style="font-size:.65rem">${roleLabels[u.role]||u.role}</span> · ${STANDORTE[u.location]||u.location}</p>
+      </div>
+    </div>
+
+    <div class="perm-layout">
+      <div class="perm-panel">
+        <div class="perm-panel-title"><span class="ms">security</span> Berechtigungen</div>
+
+        <div class="perm-mode-radio">
+          <input type="radio" name="permMode" id="modeStd" value="standard" ${mode==='standard'?'checked':''} onchange="switchPermMode('standard')">
+          <label for="modeStd">Standard nach Rolle (${roleLabels[u.role]||u.role})</label>
+          <input type="radio" name="permMode" id="modeCustom" value="custom" ${mode==='custom'?'checked':''} onchange="switchPermMode('custom')">
+          <label for="modeCustom">✓ Individuell anpassen</label>
+        </div>
+
+        <div id="permGroupsWrap">${groupsHTML}</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="perm-panel">
+          <div class="perm-panel-title"><span class="ms">location_on</span> Standort-Zugriff</div>
+          <div class="perm-pills" id="locPillsWrap">${locPills}</div>
+        </div>
+
+        <div class="perm-panel">
+          <div class="perm-panel-title"><span class="ms">domain</span> Zugewiesene Bereiche</div>
+          <div class="perm-pills" id="deptPillsWrap">${deptPills}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="perm-save-bar">
+      <button class="btn btn-accent" onclick="saveUserPerms()"><span class="ms">save</span> Speichern</button>
+      <button class="btn" onclick="document.getElementById('userPermPanel').innerHTML='';_editingUserId=null"><span class="ms">close</span> Schließen</button>
+    </div>
+  `;
+
+  // Scroll to panel
+  document.getElementById('userPermPanel').scrollIntoView({behavior:'smooth'});
+}
+
+function switchPermMode(mode) {
+  const u = (DATA.user_profiles||[]).find(p => p.user_id === _editingUserId);
+  if (!u) return;
+  const roleDefaults = ROLE_DEFAULTS[u.role] || {};
+  const checkboxes = document.querySelectorAll('#permGroupsWrap input[type=checkbox]');
+
+  if (mode === 'standard') {
+    checkboxes.forEach(cb => {
+      cb.disabled = true;
+      cb.checked = !!roleDefaults[cb.dataset.key];
+      cb.closest('.perm-item').classList.toggle('is-on', cb.checked);
+    });
+  } else {
+    checkboxes.forEach(cb => {
+      cb.disabled = false;
+    });
+  }
+}
+
+function permItemToggle(cb) {
+  cb.closest('.perm-item').classList.toggle('is-on', cb.checked);
+}
+
+function toggleLocPill(el, loc) {
+  const wrap = document.getElementById('locPillsWrap');
+  if (loc === 'all') {
+    // Toggle 'all' — deselect others
+    wrap.querySelectorAll('.perm-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+  } else {
+    // Deselect 'all', toggle this one
+    wrap.querySelector('.perm-pill').classList.remove('active'); // first = 'all'
+    el.classList.toggle('active');
+    // If none selected, re-select 'all'
+    if (!wrap.querySelectorAll('.perm-pill.active').length) {
+      wrap.querySelector('.perm-pill').classList.add('active');
+    }
+  }
+}
+
+function toggleDeptPill(el, dept) {
+  const wrap = document.getElementById('deptPillsWrap');
+  if (dept === 'all') {
+    wrap.querySelectorAll('.perm-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+  } else {
+    wrap.querySelector('.perm-pill').classList.remove('active');
+    el.classList.toggle('active');
+    if (!wrap.querySelectorAll('.perm-pill.active').length) {
+      wrap.querySelector('.perm-pill').classList.add('active');
+    }
+  }
+}
+
+async function saveUserPerms() {
+  if (!_editingUserId) return;
+  const mode = document.getElementById('modeCustom')?.checked ? 'custom' : 'standard';
+
+  // Collect permissions
+  const permissions = {};
+  document.querySelectorAll('#permGroupsWrap input[type=checkbox]').forEach(cb => {
+    permissions[cb.dataset.key] = cb.checked;
+  });
+
+  // Collect locations
+  const locPills = document.querySelectorAll('#locPillsWrap .perm-pill.active');
+  const allowed_locations = [];
+  locPills.forEach(p => {
+    const val = p.textContent.trim();
+    if (val === 'Alle Standorte') allowed_locations.push('all');
+    else {
+      const locId = Object.keys(STANDORTE).find(k => STANDORTE[k] === val) || val;
+      allowed_locations.push(locId);
+    }
+  });
+
+  // Collect depts
+  const deptPills = document.querySelectorAll('#deptPillsWrap .perm-pill.active');
+  const allowed_depts = [];
+  deptPills.forEach(p => {
+    const val = p.textContent.trim();
+    if (val === 'Alle Bereiche') allowed_depts.push('all');
+    else allowed_depts.push(val);
+  });
+
+  const payload = {
+    user_id: _editingUserId,
+    mode,
+    permissions,
+    allowed_locations,
+    allowed_depts,
+    updated_at: new Date().toISOString(),
+    updated_by: 'superadmin'
+  };
+
+  try {
+    // Upsert: insert or update
+    const {error} = await sb.from('user_permissions').upsert(payload, {onConflict:'user_id'});
+    if (error) throw error;
+
+    // Update local cache
+    const idx = DATA.user_permissions.findIndex(p => p.user_id === _editingUserId);
+    if (idx >= 0) DATA.user_permissions[idx] = {...DATA.user_permissions[idx], ...payload};
+    else DATA.user_permissions.push(payload);
+
+    toast('✓ Berechtigungen gespeichert');
+    renderUsers(document.getElementById('mainContent'));
+    // Re-open the perm panel
+    setTimeout(() => openUserPerms(_editingUserId), 100);
+  } catch(e) {
+    toast('Fehler: ' + e.message, 'err');
+  }
 }
 
 // ═══ CRUD ═══
