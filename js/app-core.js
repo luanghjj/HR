@@ -1370,27 +1370,52 @@ async function zeRenderTag(area, empNr, standort) {
 
 
 // ═══ ZEITERFASSUNG – Build today entry from real time_records ═══
+
+// 15-min snap helpers (Japanese-style 丸め)
+// Check-in: round UP to next 15-min mark (10:48 → 11:00)
+function snap15Ceil(date) {
+  const d = new Date(date);
+  const min = d.getMinutes();
+  const remainder = min % 15;
+  if (remainder === 0) return d;
+  d.setMinutes(min + (15 - remainder), 0, 0);
+  return d;
+}
+
+// Check-out: round DOWN to previous 15-min mark (22:07 → 22:00)
+function snap15Floor(date) {
+  const d = new Date(date);
+  const min = d.getMinutes();
+  const remainder = min % 15;
+  d.setMinutes(min - remainder, 0, 0);
+  return d;
+}
+
 function buildTodayEntry(todayRecords, todayISO) {
   if (!todayRecords || !todayRecords.length) return null;
 
-  // Beginn = earliest check_in
-  const firstIn = new Date(todayRecords[0].check_in);
+  // Beginn = earliest check_in → snap UP to 15-min grid
+  const rawFirstIn = new Date(todayRecords[0].check_in);
+  const firstIn = snap15Ceil(rawFirstIn);
   const beginn = firstIn.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Berlin'});
 
-  // Ende = latest check_out (if any)
+  // Ende = latest check_out → snap DOWN to 15-min grid (if any)
   const checkouts = todayRecords.filter(r => r.check_out).map(r => new Date(r.check_out));
   let ende = null;
   let endeStr = '—';
   if (checkouts.length) {
-    ende = new Date(Math.max(...checkouts));
+    const rawEnde = new Date(Math.max(...checkouts));
+    ende = snap15Floor(rawEnde);
     endeStr = ende.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Berlin'});
   }
 
-  // Pause = total gap between consecutive check_out[i] → check_in[i+1]
+  // Pause = total gap between consecutive snapped check_out[i] → check_in[i+1]
   let pauseMin = 0;
   for (let i = 0; i < todayRecords.length - 1; i++) {
     if (todayRecords[i].check_out && todayRecords[i+1].check_in) {
-      const gapMs = new Date(todayRecords[i+1].check_in) - new Date(todayRecords[i].check_out);
+      const snappedOut = snap15Floor(new Date(todayRecords[i].check_out));
+      const snappedIn = snap15Ceil(new Date(todayRecords[i+1].check_in));
+      const gapMs = snappedIn - snappedOut;
       if (gapMs > 0) pauseMin += Math.round(gapMs / 60000);
     }
   }
@@ -1398,7 +1423,7 @@ function buildTodayEntry(todayRecords, todayISO) {
   const pauseM = pauseMin % 60;
   const pauseStr = pauseH + ':' + String(pauseM).padStart(2, '0');
 
-  // Dauer = Ende - Beginn - Pause
+  // Dauer = snapped Ende - snapped Beginn - Pause
   let dauerStr = '—';
   let istStunden = 0;
   if (ende) {
