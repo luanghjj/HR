@@ -10,12 +10,12 @@ function toggleTheme(){const h=document.documentElement;const n=h.getAttribute('
 function buildSidebar(){
   const isCustom = currentUser?._permMode === 'custom';
   const mi = (name) => `<span class="ms">${name}</span>`;
-  const collapsed = JSON.parse(localStorage.getItem('sidebarCollapsed') || '{}');
+  const opened = JSON.parse(localStorage.getItem('sidebarOpened') || '{}');
   let html='';
 
-  // Helper: section header + collapsible group
+  // Helper: section header + collapsible group (default: collapsed)
   function sectionStart(key, label) {
-    const isCollapsed = collapsed[key] ? 'collapsed' : '';
+    const isCollapsed = opened[key] ? '' : 'collapsed';
     html += `<div class="nav-section ${isCollapsed}" onclick="toggleNavSection('${key}',this)"><span>${label}</span><span class="ms nav-chevron">expand_more</span></div>`;
     html += `<div class="nav-group ${isCollapsed}" data-section="${key}">`;
   }
@@ -86,17 +86,17 @@ function buildSidebar(){
 function toggleNavSection(key, el) {
   const group = document.querySelector(`.nav-group[data-section="${key}"]`);
   if (!group) return;
-  const collapsed = JSON.parse(localStorage.getItem('sidebarCollapsed') || '{}');
+  const opened = JSON.parse(localStorage.getItem('sidebarOpened') || '{}');
   if (group.classList.contains('collapsed')) {
     group.classList.remove('collapsed');
     el.classList.remove('collapsed');
-    delete collapsed[key];
+    opened[key] = true;
   } else {
     group.classList.add('collapsed');
     el.classList.add('collapsed');
-    collapsed[key] = true;
+    delete opened[key];
   }
-  localStorage.setItem('sidebarCollapsed', JSON.stringify(collapsed));
+  localStorage.setItem('sidebarOpened', JSON.stringify(opened));
 }
 
 function buildLocationSelect(){
