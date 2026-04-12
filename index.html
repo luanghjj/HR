@@ -38,7 +38,8 @@
   <link rel="stylesheet" href="css/reports.css">
   <link rel="stylesheet" href="css/mitarbeiter.css">
   <link rel="stylesheet" href="css/checklists.css">
-  <link rel="stylesheet" href="css/dashboard.css">
+  <!-- Mobile Responsive (must be LAST) -->
+  <link rel="stylesheet" href="css/mobile.css">
 </head>
 <body>
 <div class="toast-container" id="toastContainer"></div>
@@ -131,6 +132,7 @@
 
 <!-- APP -->
 <div class="app hidden" id="app">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-brand">OKYU</div>
@@ -147,7 +149,7 @@
   <div class="main">
     <header class="header">
       <div class="header-left">
-        <button class="btn" style="display:none" id="menuBtn" onclick="document.getElementById('sidebar').classList.toggle('open')"><span class="ms">menu</span></button>
+        <button class="btn" style="display:none" id="menuBtn" onclick="toggleSidebar()"><span class="ms">menu</span></button>
         <h1 class="page-title" id="pageTitle">Dashboard</h1>
         <select class="location-select" id="locationSelect" onchange="currentLocation=this.value;renderPage(getCurrentPage())"></select>
       </div>

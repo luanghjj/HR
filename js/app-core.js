@@ -82,7 +82,7 @@ function navigate(page,el){
   if(el)el.classList.add('active');
   document.getElementById('pageTitle').textContent=PAGE_TITLES[page]||page;
   // Auto-close sidebar on mobile
-  if(window.innerWidth<=900) document.getElementById('sidebar').classList.remove('open');
+  if(window.innerWidth<=900) closeSidebar();
   renderPage(page);
 }
 function renderPage(p){
@@ -4287,11 +4287,31 @@ function printQrSingle(locId,locName,icon){
   w.document.close();
 }
 
+// ═══ MOBILE SIDEBAR ═══
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('sidebarOverlay');
+  const isOpen=sb.classList.toggle('open');
+  if(ov) isOpen ? ov.classList.add('active') : ov.classList.remove('active');
+}
+function closeSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('sidebarOverlay');
+  sb.classList.remove('open');
+  if(ov) ov.classList.remove('active');
+}
+
 // ═══ INIT ═══
 function initApp(){
   document.getElementById('dateDisplay').textContent=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   genShifts();renderPage('dashboard');renderNotifs();
-  if(window.innerWidth<=900)document.getElementById('menuBtn').style.display='';
+  if(window.innerWidth<=900){
+    document.getElementById('menuBtn').style.display='';
+    // Ensure notif panel is closed on mobile init
+    document.getElementById('notifPanel')?.classList.remove('open');
+    document.getElementById('notifOverlay')?.classList.remove('open');
+    closeSidebar();
+  }
   window.addEventListener('resize',()=>{document.getElementById('menuBtn').style.display=window.innerWidth<=900?'':'none';});
   // QR Check-in: detect URL params after app is ready
   detectQrCheckin();
