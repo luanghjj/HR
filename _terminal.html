@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OKYU Terminal</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg: #0c0e14; --bg-card: #14171f; --bg-card-hover: #1a1e2a;
+    --border: #1e2230; --accent: #6c5ce7; --accent-light: #a29bfe;
+    --green: #00b894; --red: #e17055; --yellow: #fdcb6e; --blue: #74b9ff;
+    --text: #eee; --text-muted: #8892a4;
+  }
+  body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  /* ─── LOCATION PICKER ─── */
+  .picker { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; gap:24px; padding:24px; }
+  .picker h1 { font-size:2.5rem; font-weight:800; letter-spacing:4px; color:var(--accent-light); }
+  .picker p { color:var(--text-muted); font-size:.95rem; margin-bottom:12px; }
+  .loc-cards { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; }
+  .loc-card {
+    width:220px; padding:32px 24px; background:var(--bg-card); border:1px solid var(--border);
+    border-radius:16px; text-align:center; cursor:pointer; transition:all .3s;
+  }
+  .loc-card:hover { transform:translateY(-4px); border-color:var(--accent); background:var(--bg-card-hover); box-shadow:0 8px 32px rgba(108,92,231,.2); }
+  .loc-card .icon { font-size:3rem; margin-bottom:12px; }
+  .loc-card .name { font-size:1.15rem; font-weight:700; margin-bottom:4px; }
+  .loc-card .city { font-size:.82rem; color:var(--text-muted); }
+
+  /* ─── DASHBOARD ─── */
+  .dashboard { display:none; padding:20px; max-width:1200px; margin:0 auto; }
+  .dash-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 24px; background:var(--bg-card); border:1px solid var(--border);
+    border-radius:12px; margin-bottom:20px;
+  }
+  .dash-header .left { display:flex; align-items:center; gap:12px; }
+  .dash-header .loc-name { font-size:1.2rem; font-weight:700; }
+  .dash-header .loc-badge { padding:4px 12px; border-radius:20px; background:var(--accent); font-size:.75rem; font-weight:600; }
+  .dash-header .right { display:flex; align-items:center; gap:12px; }
+  .dash-header .clock { font-size:1.4rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .dash-header .refresh { font-size:.75rem; color:var(--text-muted); }
+  .back-btn { background:none; border:1px solid var(--border); color:var(--text-muted); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:.82rem; transition:all .2s; }
+  .back-btn:hover { border-color:var(--accent); color:var(--text); }
+
+  /* ─── TABS ─── */
+  .tabs { display:flex; gap:0; margin-bottom:20px; border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+  .tab-btn { flex:1; padding:10px; text-align:center; font-size:.85rem; font-weight:600; cursor:pointer; border:none; background:var(--bg-card); color:var(--text-muted); transition:all .2s; }
+  .tab-btn.active { background:var(--accent); color:#fff; }
+
+  /* ─── STATS ROW ─── */
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:20px; }
+  .stat-card { padding:16px; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; text-align:center; }
+  .stat-card .num { font-size:2rem; font-weight:800; }
+  .stat-card .label { font-size:.75rem; color:var(--text-muted); margin-top:4px; }
+
+  /* ─── EMPLOYEE GRID ─── */
+  .emp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+  .emp-card {
+    display:flex; align-items:center; gap:12px; padding:14px 16px;
+    background:var(--bg-card); border:1px solid var(--border); border-radius:12px;
+    transition:all .2s;
+  }
+  .emp-card.checked-in { border-color:var(--green); background:rgba(0,184,148,.06); }
+  .emp-card.not-in { opacity:.5; }
+  .emp-avatar {
+    width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:.85rem; flex-shrink:0;
+  }
+  .emp-card.checked-in .emp-avatar { background:var(--green); color:#fff; }
+  .emp-card.not-in .emp-avatar { background:var(--border); color:var(--text-muted); }
+  .emp-info .emp-name { font-size:.9rem; font-weight:600; }
+  .emp-info .emp-pos { font-size:.75rem; color:var(--text-muted); }
+  .emp-info .emp-time { font-size:.72rem; color:var(--green); font-weight:600; margin-top:2px; }
+  .emp-card.not-in .emp-info .emp-time { color:var(--text-muted); }
+
+  /* ─── CHECKLIST ─── */
+  .checklist-panel { display:none; }
+  .cl-section { margin-bottom:20px; }
+  .cl-title { font-size:1rem; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+  .cl-title .badge { padding:2px 10px; border-radius:12px; font-size:.72rem; font-weight:600; }
+  .cl-item {
+    display:flex; align-items:center; gap:12px; padding:12px 16px;
+    background:var(--bg-card); border:1px solid var(--border); border-radius:10px;
+    margin-bottom:6px; cursor:pointer; transition:all .2s;
+  }
+  .cl-item:hover { border-color:var(--accent); }
+  .cl-item.done { opacity:.5; text-decoration:line-through; }
+  .cl-check { width:22px; height:22px; border:2px solid var(--border); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .cl-item.done .cl-check { background:var(--green); border-color:var(--green); }
+  .cl-item.done .cl-check::after { content:'✓'; color:#fff; font-size:.8rem; }
+  .cl-text { font-size:.88rem; }
+  .cl-text .prio { font-size:.7rem; padding:2px 6px; border-radius:4px; margin-left:6px; }
+  .prio.high { background:rgba(225,112,85,.2); color:var(--red); }
+  .prio.med { background:rgba(253,203,110,.2); color:var(--yellow); }
+
+  /* ─── EMPTY ─── */
+  .empty { text-align:center; padding:60px 20px; color:var(--text-muted); }
+  .empty .icon { font-size:3rem; margin-bottom:12px; }
+
+  /* ─── PULSE ANIMATION ─── */
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+  .live-dot { width:8px; height:8px; border-radius:50%; background:var(--green); display:inline-block; animation:pulse 2s infinite; margin-right:6px; }
+</style>
+</head>
+<body>
+
+<!-- LOCATION PICKER -->
+<div class="picker" id="picker">
+  <h1>OKYU</h1>
+  <p>Terminal — Standort auswählen</p>
+  <div class="loc-cards">
+    <div class="loc-card" onclick="selectLocation('origami')">
+      <div class="icon">🍣</div>
+      <div class="name">Origami</div>
+      <div class="city">Göppingen</div>
+    </div>
+    <div class="loc-card" onclick="selectLocation('enso')">
+      <div class="icon">🔥</div>
+      <div class="name">Enso</div>
+      <div class="city">Stuttgart</div>
+    </div>
+    <div class="loc-card" onclick="selectLocation('okyu_central')">
+      <div class="icon">🏢</div>
+      <div class="name">OKYU Zentrale</div>
+      <div class="city">Stuttgart</div>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard" id="dashboard">
+  <div class="dash-header">
+    <div class="left">
+      <button class="back-btn" onclick="goBack()">← Zurück</button>
+      <span class="loc-name" id="locName"></span>
+      <span class="loc-badge"><span class="live-dot"></span>LIVE</span>
+    </div>
+    <div class="right">
+      <span class="refresh" id="refreshInfo">Auto-Refresh: 30s</span>
+      <span class="clock" id="clock"></span>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('checkin')">📍 Check-In Status</button>
+    <button class="tab-btn" onclick="switchTab('checklist')">📋 Checklisten</button>
+  </div>
+
+  <!-- CHECK-IN TAB -->
+  <div id="tabCheckin">
+    <div class="stats" id="stats"></div>
+    <div class="emp-grid" id="empGrid"></div>
+  </div>
+
+  <!-- CHECKLIST TAB -->
+  <div class="checklist-panel" id="tabChecklist"></div>
+</div>
+
+<script>
+const SB_URL = 'https://zkxsyipyjqikqxswpbks.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpreHN5aXB5anFpa3F4c3dwYmtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM5NTUzMDQsImV4cCI6MjA1OTUzMTMwNH0.GDP0R-OsvVcFBx-N-jfVjZAPmpb_JOQ4LPGiBcs9MIw';
+const sb = supabase.createClient(SB_URL, SB_KEY);
+
+let currentLoc = null;
+let refreshInterval = null;
+
+const LOC_NAMES = {
+  origami: 'Origami Sushi & Asian Cuisine',
+  enso: 'Enso Sushi & Grill',
+  okyu_central: 'OKYU Zentrale'
+};
+
+// ─── CLOCK ───
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+// ─── SELECT LOCATION ───
+function selectLocation(loc) {
+  currentLoc = loc;
+  document.getElementById('picker').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('locName').textContent = LOC_NAMES[loc] || loc;
+
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  loadData();
+  refreshInterval = setInterval(loadData, 30000);
+}
+
+function goBack() {
+  if (refreshInterval) clearInterval(refreshInterval);
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('picker').style.display = 'flex';
+  currentLoc = null;
+}
+
+// ─── LOAD DATA ───
+async function loadData() {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Get employees for this location
+  const { data: emps } = await sb.from('employees')
+    .select('*')
+    .eq('location', currentLoc)
+    .eq('status', 'active');
+
+  // Get today's time records for this location
+  const { data: records } = await sb.from('time_records')
+    .select('*')
+    .eq('location', currentLoc)
+    .gte('check_in', today + 'T00:00:00')
+    .lte('check_in', today + 'T23:59:59');
+
+  renderCheckin(emps || [], records || []);
+  document.getElementById('refreshInfo').textContent = 'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+}
+
+// ─── RENDER CHECK-IN ───
+function renderCheckin(emps, records) {
+  const checkedInIds = new Set();
+  const recordMap = {};
+  records.forEach(r => {
+    if (!r.check_out) {
+      checkedInIds.add(r.emp_id);
+      recordMap[r.emp_id] = r;
+    }
+  });
+
+  const totalActive = emps.length;
+  const totalIn = emps.filter(e => checkedInIds.has(e.id)).length;
+  const totalLate = records.filter(r => r.is_late).length;
+
+  // Stats
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="num" style="color:var(--blue)">${totalActive}</div><div class="label">Mitarbeiter</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--green)">${totalIn}</div><div class="label">Eingecheckt</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--text-muted)">${totalActive - totalIn}</div><div class="label">Nicht da</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--red)">${totalLate}</div><div class="label">Verspätet</div></div>
+  `;
+
+  // Sort: checked-in first
+  const sorted = [...emps].sort((a, b) => {
+    const aIn = checkedInIds.has(a.id) ? 0 : 1;
+    const bIn = checkedInIds.has(b.id) ? 0 : 1;
+    return aIn - bIn || a.name.localeCompare(b.name);
+  });
+
+  if (sorted.length === 0) {
+    document.getElementById('empGrid').innerHTML = '<div class="empty"><div class="icon">🏠</div><p>Keine Mitarbeiter an diesem Standort</p></div>';
+    return;
+  }
+
+  document.getElementById('empGrid').innerHTML = sorted.map(e => {
+    const isIn = checkedInIds.has(e.id);
+    const rec = recordMap[e.id];
+    const timeStr = isIn
+      ? '✅ Seit ' + new Date(rec.check_in).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })
+      : '— Nicht eingecheckt';
+
+    return `<div class="emp-card ${isIn ? 'checked-in' : 'not-in'}">
+      <div class="emp-avatar">${e.avatar || '??'}</div>
+      <div class="emp-info">
+        <div class="emp-name">${e.name}</div>
+        <div class="emp-pos">${e.position} · ${e.dept}</div>
+        <div class="emp-time">${timeStr}${rec?.is_late ? ' ⚠️' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── TABS ───
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (tab === 'checkin' && i === 0) || (tab === 'checklist' && i === 1));
+  });
+  document.getElementById('tabCheckin').style.display = tab === 'checkin' ? 'block' : 'none';
+  document.getElementById('tabChecklist').style.display = tab === 'checklist' ? 'block' : 'none';
+
+  if (tab === 'checklist') renderChecklists();
+}
+
+// ─── CHECKLISTS ───
+const CHECKLISTS = {
+  origami: {
+    'Öffnung (11:00)': [
+      { text: 'Sushi-Theke vorbereiten', prio: 'high' },
+      { text: 'Reis kochen & würzen', prio: 'high' },
+      { text: 'Fisch aus Kühlraum holen', prio: 'high' },
+      { text: 'Terasse Tische eindecken', prio: 'med' },
+      { text: 'Musik & Beleuchtung einschalten', prio: null },
+      { text: 'Reservierungen prüfen', prio: 'med' },
+      { text: 'Getränke auffüllen (Bar)', prio: null },
+    ],
+    'Schließung (22:30)': [
+      { text: 'Küche komplett reinigen', prio: 'high' },
+      { text: 'Sushi-Theke abbauen & kühlen', prio: 'high' },
+      { text: 'Kasse abrechnen', prio: 'high' },
+      { text: 'Müll rausbringen', prio: 'med' },
+      { text: 'Böden wischen', prio: null },
+      { text: 'Alle Geräte ausschalten', prio: null },
+      { text: 'Türen & Fenster abschließen', prio: 'high' },
+    ]
+  },
+  enso: {
+    'Öffnung (11:30)': [
+      { text: 'Grill vorheizen', prio: 'high' },
+      { text: 'Sushi-Bar vorbereiten', prio: 'high' },
+      { text: 'Tische eindecken', prio: 'med' },
+      { text: 'Reservierungen checken', prio: 'med' },
+      { text: 'Getränkekühlschrank prüfen', prio: null },
+      { text: 'Musik & Licht starten', prio: null },
+    ],
+    'Schließung (23:00)': [
+      { text: 'Grill reinigen', prio: 'high' },
+      { text: 'Küche komplett reinigen', prio: 'high' },
+      { text: 'Kasse abrechnen & Umsatz notieren', prio: 'high' },
+      { text: 'Müll rausbringen', prio: 'med' },
+      { text: 'Böden wischen', prio: null },
+      { text: 'Alles abschließen', prio: 'high' },
+    ]
+  },
+  okyu_central: {
+    'Morgens (09:00)': [
+      { text: 'Mails & Nachrichten prüfen', prio: 'med' },
+      { text: 'Tages-Agenda durchgehen', prio: null },
+      { text: 'Lieferanten-Status prüfen', prio: 'med' },
+    ],
+    'Abends (17:00)': [
+      { text: 'Offene Aufgaben dokumentieren', prio: null },
+      { text: 'Morgen-Planung erstellen', prio: 'med' },
+    ]
+  }
+};
+
+// Store checklist state per day in localStorage
+function getChecklistKey() {
+  return `terminal_cl_${currentLoc}_${new Date().toISOString().slice(0,10)}`;
+}
+function getCheckedItems() {
+  try { return JSON.parse(localStorage.getItem(getChecklistKey()) || '{}'); } catch { return {}; }
+}
+function toggleChecklist(section, idx) {
+  const checked = getCheckedItems();
+  const key = section + '_' + idx;
+  checked[key] = !checked[key];
+  localStorage.setItem(getChecklistKey(), JSON.stringify(checked));
+  renderChecklists();
+}
+
+function renderChecklists() {
+  const lists = CHECKLISTS[currentLoc] || {};
+  const checked = getCheckedItems();
+
+  if (Object.keys(lists).length === 0) {
+    document.getElementById('tabChecklist').innerHTML = '<div class="empty"><div class="icon">📋</div><p>Keine Checklisten für diesen Standort</p></div>';
+    return;
+  }
+
+  let html = '';
+  for (const [section, items] of Object.entries(lists)) {
+    const doneCount = items.filter((_, i) => checked[section + '_' + i]).length;
+    const badgeColor = doneCount === items.length ? 'var(--green)' : 'var(--yellow)';
+
+    html += `<div class="cl-section">
+      <div class="cl-title">${section} <span class="badge" style="background:${badgeColor};color:#000">${doneCount}/${items.length}</span></div>`;
+
+    items.forEach((item, i) => {
+      const isDone = checked[section + '_' + i];
+      html += `<div class="cl-item ${isDone ? 'done' : ''}" onclick="toggleChecklist('${section}',${i})">
+        <div class="cl-check"></div>
+        <div class="cl-text">${item.text}${item.prio ? `<span class="prio ${item.prio}">${item.prio === 'high' ? '🔴 Wichtig' : '🟡 Mittel'}</span>` : ''}</div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  document.getElementById('tabChecklist').innerHTML = html;
+}
+
+// ─── URL PARAM SUPPORT ───
+const urlLoc = new URLSearchParams(window.location.search).get('loc');
+if (urlLoc && LOC_NAMES[urlLoc]) {
+  selectLocation(urlLoc);
+}
+</script>
+</body>
+</html>
