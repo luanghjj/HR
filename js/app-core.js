@@ -2479,11 +2479,11 @@ function renderAccess(){
   const roleOpts = ['inhaber','manager','mitarbeiter','azubi'];
   const locOpts = [{id:'all',name:'Alle Standorte'},...LOCS];
 
-  // Pending = status pending OR employee status 'inactive' (Google auto-register)
+  // Pending = user_profile status 'pending' OR Google auto-registered (id starts with google_) with inactive employee
   const pending = USERS.filter(u => {
     if (u.status === 'pending') return true;
-    // Google users: have empId but employee is inactive
-    if (u.empId) {
+    // Only Google auto-registered users (id starts with 'google_')
+    if (u.id?.startsWith('google_') && u.empId) {
       const emp = EMPS.find(e => e.id === u.empId);
       if (emp && emp.status === 'inactive') return true;
     }
@@ -2761,7 +2761,7 @@ function updatePendingBadge(){
   if(!badge) return;
   const count = (USERS || []).filter(u => {
     if (u.status === 'pending') return true;
-    if (u.empId) {
+    if (u.id?.startsWith('google_') && u.empId) {
       const emp = (typeof EMPS !== 'undefined' ? EMPS : []).find(e => e.id === u.empId);
       if (emp && emp.status === 'inactive') return true;
     }
