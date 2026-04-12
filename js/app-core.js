@@ -2556,7 +2556,10 @@ function renderAccess(){
       <td>${locSelect}</td>
       <td>${u.empId ? (emp?.name||'—') : '—'}</td>
       <td>${statusBadge(u.status)}</td>
-      <td><button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" title="Benutzer löschen"><span class="ms" style="font-size:16px">delete</span></button></td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-sm" onclick="openPermissionsModal('${u.id}')" title="Berechtigungen"><span class="ms" style="font-size:16px">shield_person</span></button>
+        <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" title="Löschen"><span class="ms" style="font-size:16px">delete</span></button>
+      </div></td>
     </tr>`;
   }).join('');
 
@@ -2788,6 +2791,121 @@ async function deleteUser(userId){
     console.error('[DeleteUser]', e);
     toast('Fehler beim Löschen', 'err');
   }
+}
+
+// ═══ PERMISSIONS MODAL ═══
+const PERM_GROUPS = {
+  'Personal': [
+    { key: 'seeAllEmployees', label: 'Alle Mitarbeiter sehen' },
+    { key: 'editEmployees', label: 'Mitarbeiter bearbeiten' },
+    { key: 'seeDepartments', label: 'Bereiche sehen' },
+    { key: 'seeAllLocations', label: 'Alle Standorte sehen' }
+  ],
+  'Planung': [
+    { key: 'seeAllSchedules', label: 'Alle Arbeitspläne sehen' },
+    { key: 'editSchedules', label: 'Arbeitspläne bearbeiten' },
+    { key: 'seeAllVacations', label: 'Alle Urlaubsanträge sehen' },
+    { key: 'approveVacations', label: 'Urlaub genehmigen' },
+    { key: 'seeAllSick', label: 'Alle Krankmeldungen sehen' },
+    { key: 'markLate', label: 'Verspätungen markieren' }
+  ],
+  'Dokumente': [
+    { key: 'seeAllDocs', label: 'Alle Unterlagen sehen' },
+    { key: 'canExport', label: 'Berichte exportieren' },
+    { key: 'editTraining', label: 'Ausbildung verwalten' }
+  ],
+  'System': [
+    { key: 'manageAccess', label: 'Zugangsverwaltung' }
+  ],
+  'Finanzen': [
+    { key: 'seeFinancials', label: 'Gehalt & Finanzen sehen' },
+    { key: 'editVacDays', label: 'Urlaubstage bearbeiten' }
+  ]
+};
+
+async function openPermissionsModal(userId) {
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+
+  // Load current permissions from Supabase
+  let mode = 'standard';
+  let perms = {};
+  const { data } = await sb.from('user_permissions').select('*').eq('user_id', userId).maybeSingle();
+  if (data) {
+    mode = data.mode || 'standard';
+    perms = data.permissions || {};
+  }
+
+  const roleDefaults = PERMS[u.role] || {};
+
+  // Build grouped checkboxes
+  let groupsHtml = '';
+  for (const [group, items] of Object.entries(PERM_GROUPS)) {
+    groupsHtml += `<div style="margin-bottom:14px">
+      <div style="font-size:.75rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${group}</div>`;
+    items.forEach(p => {
+      const checked = mode === 'custom' ? (perms[p.key] ? 'checked' : '') : (roleDefaults[p.key] ? 'checked' : '');
+      const isDefault = roleDefaults[p.key] ? '✓' : '✕';
+      groupsHtml += `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.85rem;cursor:pointer">
+        <input type="checkbox" class="permCheck" data-key="${p.key}" ${checked}>
+        <span>${p.label}</span>
+        <span style="font-size:.68rem;color:var(--text-muted);margin-left:auto">${isDefault} Standard</span>
+      </label>`;
+    });
+    groupsHtml += '</div>';
+  }
+
+  const isCustom = mode === 'custom';
+  openModal('Berechtigungen: ' + u.name, `
+    <div style="margin-bottom:16px">
+      <div style="font-size:.82rem;color:var(--text-secondary);margin-bottom:8px">Modus:</div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px">
+        <input type="radio" name="permMode" value="standard" ${!isCustom?'checked':''} onchange="togglePermMode(false)">
+        <span style="font-size:.9rem;font-weight:600">Standard nach Rolle (${u.role === 'inhaber' ? 'Inhaber' : u.role === 'manager' ? 'Manager' : u.role === 'mitarbeiter' ? 'Mitarbeiter' : 'Azubi'})</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="radio" name="permMode" value="custom" ${isCustom?'checked':''} onchange="togglePermMode(true)">
+        <span style="font-size:.9rem;font-weight:600">✏️ Individuell anpassen</span>
+      </label>
+    </div>
+    <div id="permCheckboxes" style="opacity:${isCustom?'1':'.4'};pointer-events:${isCustom?'auto':'none'};border-top:1px solid var(--border);padding-top:14px">
+      ${groupsHtml}
+    </div>
+  `, `<button class="btn btn-primary" onclick="savePermissions('${userId}')">Speichern</button>`);
+}
+
+function togglePermMode(isCustom) {
+  const box = document.getElementById('permCheckboxes');
+  if (box) {
+    box.style.opacity = isCustom ? '1' : '.4';
+    box.style.pointerEvents = isCustom ? 'auto' : 'none';
+  }
+}
+
+async function savePermissions(userId) {
+  const mode = document.querySelector('input[name="permMode"]:checked')?.value || 'standard';
+  const perms = {};
+
+  if (mode === 'custom') {
+    document.querySelectorAll('.permCheck').forEach(cb => {
+      perms[cb.dataset.key] = cb.checked;
+    });
+  }
+
+  // Upsert to user_permissions table
+  const { error } = await sb.from('user_permissions').upsert({
+    user_id: userId,
+    mode,
+    permissions: mode === 'custom' ? perms : null
+  }, { onConflict: 'user_id' });
+
+  if (error) {
+    toast('Fehler: ' + error.message, 'err');
+    return;
+  }
+
+  closeModal();
+  toast('Berechtigungen gespeichert ✓', 'success');
 }
 
 // ═══ NOTIFICATIONS ═══
