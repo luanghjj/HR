@@ -2457,8 +2457,16 @@ function renderAccess(){
   const roleOpts = ['inhaber','manager','mitarbeiter','azubi'];
   const locOpts = [{id:'all',name:'Alle Standorte'},...LOCS];
 
-  // Pending = status pending OR inactive (Google auto-register uses 'inactive')
-  const pending = USERS.filter(u => u.status === 'pending' || (u.status === 'inactive' && !u.empId));
+  // Pending = status pending OR employee status 'inactive' (Google auto-register)
+  const pending = USERS.filter(u => {
+    if (u.status === 'pending') return true;
+    // Google users: have empId but employee is inactive
+    if (u.empId) {
+      const emp = EMPS.find(e => e.id === u.empId);
+      if (emp && emp.status === 'inactive') return true;
+    }
+    return false;
+  });
   let pendingHtml = '';
   if (pending.length > 0) {
     pendingHtml = `<div class="table-wrap" style="margin-bottom:20px;border-left:3px solid var(--warning)">
@@ -2489,7 +2497,8 @@ function renderAccess(){
   }
 
   // Active users — sort
-  const activeUsers = USERS.filter(u => u.status !== 'pending' && !(u.status === 'inactive' && !u.empId));
+  const pendingIds = new Set(pending.map(u => u.id));
+  const activeUsers = USERS.filter(u => !pendingIds.has(u.id));
   activeUsers.sort((a, b) => {
     if (accessSort === 'location') {
       const locA = getLocationName(a.location);
@@ -2618,54 +2627,76 @@ async function approveRegistration(userId) {
   if (!confirm(`${u.name} genehmigen und als Mitarbeiter anlegen?`)) return;
 
   try {
-    // 1. Create employee from registration data
-    const newEmp = {
-      name: u.name,
-      location: u.location,
-      dept: u.regDept || 'Service',
-      position: u.regPosition || 'Mitarbeiter',
-      status: 'active',
-      start_date: isoDate(new Date()),
-      avatar: u.avatar,
-      vac_total: 26,
-      vac_used: 0,
-      sick_days: 0,
-      late_count: 0,
-      soll_stunden: 160,
-      brutto_gehalt: 0,
-      schule_tage: 0,
-      birthday: u.regBirthday || null,
-      prob_end: null
-    };
+    let empId = u.empId;
 
-    const { data: empData, error: empErr } = await sb.from('employees').insert(newEmp).select().single();
-    if (empErr) { toast('Fehler: ' + empErr.message, 'err'); return; }
+    if (empId) {
+      // Google user: employee already exists → just activate
+      const { error: empErr } = await sb.from('employees').update({
+        status: 'active',
+        dept: u.regDept || 'Service',
+        position: u.regPosition || 'Mitarbeiter'
+      }).eq('id', empId);
+      if (empErr) { toast('Fehler: ' + empErr.message, 'err'); return; }
 
-    // 2. Update user_profile: status='active', emp_id linked, role stays mitarbeiter
+      // Update local employee data
+      const emp = EMPS.find(e => e.id === empId);
+      if (emp) {
+        emp.status = 'active';
+        emp.dept = u.regDept || emp.dept;
+        emp.position = u.regPosition || emp.position;
+      }
+    } else {
+      // Manual registration: create new employee
+      const newEmp = {
+        name: u.name,
+        location: u.location,
+        dept: u.regDept || 'Service',
+        position: u.regPosition || 'Mitarbeiter',
+        status: 'active',
+        start_date: isoDate(new Date()),
+        avatar: u.avatar,
+        vac_total: 26,
+        vac_used: 0,
+        sick_days: 0,
+        late_count: 0,
+        soll_stunden: 160,
+        brutto_gehalt: 0,
+        schule_tage: 0,
+        birthday: u.regBirthday || null,
+        prob_end: null
+      };
+
+      const { data: empData, error: empErr } = await sb.from('employees').insert(newEmp).select().single();
+      if (empErr) { toast('Fehler: ' + empErr.message, 'err'); return; }
+      empId = empData.id;
+
+      EMPS.push({
+        id: empData.id,
+        name: u.name,
+        location: u.location,
+        dept: u.regDept || 'Service',
+        position: u.regPosition || 'Mitarbeiter',
+        status: 'active',
+        start: isoDate(new Date()),
+        avatar: u.avatar,
+        vacTotal: 26, vacUsed: 0,
+        sickDays: 0, lateCount: 0,
+        sollStunden: 160, bruttoGehalt: 0, schuleTage: 0,
+        birthday: u.regBirthday || '',
+        probEnd: ''
+      });
+    }
+
+    // Update user_profile: status='active', emp_id linked
     const { error: profErr } = await sb.from('user_profiles').update({
       status: 'active',
-      emp_id: empData.id
+      emp_id: empId
     }).eq('user_id', userId);
     if (profErr) { toast('Profil-Fehler: ' + profErr.message, 'err'); return; }
 
-    // 3. Update local data
+    // Update local user data
     u.status = 'active';
-    u.empId = empData.id;
-    EMPS.push({
-      id: empData.id,
-      name: u.name,
-      location: u.location,
-      dept: u.regDept || 'Service',
-      position: u.regPosition || 'Mitarbeiter',
-      status: 'active',
-      start: isoDate(new Date()),
-      avatar: u.avatar,
-      vacTotal: 26, vacUsed: 0,
-      sickDays: 0, lateCount: 0,
-      sollStunden: 160, bruttoGehalt: 0, schuleTage: 0,
-      birthday: u.regBirthday || '',
-      probEnd: ''
-    });
+    u.empId = empId;
 
     addNotif('info', 'Neuer Mitarbeiter', `${u.name} wurde genehmigt und angelegt`);
     toast(`✓ ${u.name} genehmigt!`, 'success');
@@ -2703,7 +2734,14 @@ async function rejectRegistration(userId) {
 function updatePendingBadge(){
   const badge = document.getElementById('pendingBadge');
   if(!badge) return;
-  const count = (USERS || []).filter(u => u.status === 'pending' || (u.status === 'inactive' && !u.empId)).length;
+  const count = (USERS || []).filter(u => {
+    if (u.status === 'pending') return true;
+    if (u.empId) {
+      const emp = (typeof EMPS !== 'undefined' ? EMPS : []).find(e => e.id === u.empId);
+      if (emp && emp.status === 'inactive') return true;
+    }
+    return false;
+  }).length;
   badge.textContent = count;
   badge.style.display = count > 0 ? '' : 'none';
 }
