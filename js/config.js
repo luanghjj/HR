@@ -26,7 +26,8 @@ const PAGE_TITLES = {
   reports: 'Berichte & Auswertungen',
   checklists: 'Checklisten',
   ausbildung: 'Ausbildung',
-  qr_generator: 'QR Check-in'
+  qr_generator: 'QR Check-in',
+  locations: 'Standorte'
 };
 
 // Shift templates

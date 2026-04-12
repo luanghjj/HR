@@ -68,10 +68,13 @@ function buildSidebar(){
   // ── SYSTEM (admin only) ──
   if(can('manageAccess')){
     html+=`<div class="nav-section">System</div>`;
-    html+=`<div class="nav-item" onclick="navigate('access',this)">${mi('admin_panel_settings')} Zugangsverwaltung</div>`;
+    html+=`<div class="nav-item" onclick="navigate('access',this)">${mi('admin_panel_settings')} Zugangsverwaltung<span class="nav-badge" id="pendingBadge" style="display:none">0</span></div>`;
+    html+=`<div class="nav-item" onclick="navigate('locations',this)">${mi('location_city')} Standorte</div>`;
     html+=`<div class="nav-item" onclick="navigate('qr_generator',this)">${mi('qr_code_2')} QR Check-in</div>`;
   }
   document.getElementById('sidebarNav').innerHTML=html;
+  // Show pending registration count
+  setTimeout(updatePendingBadge, 100);
 }
 
 function buildLocationSelect(){
@@ -100,7 +103,7 @@ function navigate(page,el){
 function renderPage(p){
   const c=document.getElementById('contentArea');
   c.innerHTML='<div class="page active" id="page-'+p+'"></div>';
-  ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung,qr_generator:renderQrGenerator})[p]?.();
+  ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung,qr_generator:renderQrGenerator,locations:renderLocations})[p]?.();
 }
 
 // ═══ SHIFTS (loaded from Supabase via data-loader.js) ═══
@@ -2500,16 +2503,20 @@ function renderAccess(){
       <td>${locSelect}</td>
       <td>${u.empId ? (emp?.name||'—') : '—'}</td>
       <td>${statusBadge(u.status)}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" title="Benutzer löschen"><span class="ms" style="font-size:16px">delete</span></button></td>
     </tr>`;
   }).join('');
 
   pg.innerHTML=`${pendingHtml}<div class="table-wrap"><div class="table-header"><span class="table-title">Zugangsverwaltung (${USERS.filter(u=>u.status!=='pending').length} Benutzer)</span></div>
-  <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Position</th><th>Rolle</th><th>Standort</th><th>Mitarbeiter</th><th>Status</th></tr></thead><tbody>
+  <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Position</th><th>Rolle</th><th>Standort</th><th>Mitarbeiter</th><th>Status</th><th></th></tr></thead><tbody>
   ${rows}
   </tbody></table></div></div>
   <div style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:8px;font-size:.82rem;color:var(--text-muted)">
     💡 Name, Position, Rolle und Standort direkt in der Tabelle ändern. Änderungen werden sofort gespeichert.
   </div>`;
+
+  // Update pending badge in sidebar
+  updatePendingBadge();
 }
 
 async function changeUserRole(userId, newRole) {
@@ -2661,6 +2668,36 @@ async function rejectRegistration(userId) {
   }
 }
 
+function updatePendingBadge(){
+  const badge = document.getElementById('pendingBadge');
+  if(!badge) return;
+  const count = (USERS || []).filter(u => u.status === 'pending').length;
+  badge.textContent = count;
+  badge.style.display = count > 0 ? '' : 'none';
+}
+
+async function deleteUser(userId){
+  const u = USERS.find(x => x.id === userId);
+  if(!u) return;
+  if(!confirm(`Benutzer "${u.name}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.`)) return;
+
+  try {
+    // Delete user_profile
+    const { error } = await sb.from('user_profiles').delete().eq('user_id', userId);
+    if(error){ toast('Fehler: ' + error.message, 'err'); return; }
+
+    // Remove from local array
+    const idx = USERS.findIndex(x => x.id === userId);
+    if(idx >= 0) USERS.splice(idx, 1);
+
+    toast(`${u.name} gelöscht`, 'warn');
+    renderAccess();
+  } catch(e) {
+    console.error('[DeleteUser]', e);
+    toast('Fehler beim Löschen', 'err');
+  }
+}
+
 // ═══ NOTIFICATIONS ═══
 function toggleNotifications(){document.getElementById('notifPanel').classList.toggle('open');document.getElementById('notifOverlay').classList.toggle('open');renderNotifs();}
 function renderNotifs(){document.getElementById('notifList').innerHTML=getVisibleNotifs().map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}" onclick="markRead(${n.id})"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('')||'<p style="padding:16px;color:var(--text-muted)">Keine Benachrichtigungen</p>';}
@@ -2668,8 +2705,18 @@ function markRead(id){const n=NOTIFS.find(x=>x.id===id);if(n){n.unread=false;ren
 function addNotif(type,title,text){NOTIFS.unshift({id:Date.now(),type,title,text,time:'Gerade eben',unread:true,forRole:['inhaber','manager']});updateBadges();}
 
 // ═══ MODALS ═══
-function openModal(type){
+function openModal(type, bodyHtml, footerHtml){
   const b=document.getElementById('modalBody'),f=document.getElementById('modalFooter'),t=document.getElementById('modalTitle');
+
+  // Generic modal (title, bodyHtml, footerHtml)
+  if(bodyHtml && typeof bodyHtml === 'string') {
+    t.textContent = type;
+    b.innerHTML = bodyHtml;
+    f.innerHTML = footerHtml || '<button class="btn" onclick="closeModal()">Schließen</button>';
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    return;
+  }
+
   if(type==='addEmployee'){
     t.textContent='Neuen Mitarbeiter';
     const adm=can('seeFinancials');
@@ -4153,6 +4200,169 @@ function getWeekNumber(dateStr){
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+// ═══ STANDORTE (Location Management) ═══
+function renderLocations(){
+  const pg=document.getElementById('page-locations');
+  if(!can('manageAccess')){pg.innerHTML=permBanner('Standorte-Verwaltung ist nur für Inhaber verfügbar.');return;}
+
+  const locs = LOCS || [];
+
+  let rows = locs.map(l => {
+    const empCount = EMPS.filter(e => e.location === l.id).length;
+    const gps = GPS_COORDS[l.id];
+    const sched = LOCATION_SCHEDULE[l.id];
+    const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+    const offDays = sched ? sched.dayOff.map(d => dayNames[d]).join(', ') : '—';
+
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:10px">
+        <div class="emp-avatar" style="width:38px;height:38px;font-size:.9rem;background:var(--accent);color:#fff">${l.id.slice(0,2).toUpperCase()}</div>
+        <div><strong style="font-size:.9rem">${l.name}</strong><div style="font-size:.75rem;color:var(--text-muted)">${l.id}</div></div>
+      </div></td>
+      <td>${l.city || '—'}</td>
+      <td style="font-size:.82rem">${empCount} MA</td>
+      <td style="font-size:.82rem">${gps ? `${gps.lat.toFixed(4)}, ${gps.lng.toFixed(4)} (${gps.radius_m}m)` : '—'}</td>
+      <td style="font-size:.82rem">${offDays}</td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="editLocation('${l.id}')" title="Bearbeiten"><span class="ms" style="font-size:16px">edit</span></button>
+          ${empCount === 0 ? `<button class="btn btn-sm btn-danger" onclick="deleteLocation('${l.id}')" title="Löschen"><span class="ms" style="font-size:16px">delete</span></button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  pg.innerHTML=`
+    <div class="table-wrap">
+      <div class="table-header">
+        <span class="table-title">Standorte (${locs.length})</span>
+        <button class="btn btn-primary" onclick="showAddLocationModal()"><span class="ms" style="font-size:16px">add</span> Neuer Standort</button>
+      </div>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th>Standort</th><th>Stadt</th><th>Mitarbeiter</th><th>GPS Koordinaten</th><th>Ruhetage</th><th>Aktionen</th>
+      </tr></thead><tbody>${rows}</tbody></table></div>
+    </div>
+    <div style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:8px;font-size:.82rem;color:var(--text-muted)">
+      💡 Standorte können nur gelöscht werden, wenn keine Mitarbeiter zugeordnet sind. GPS-Koordinaten werden für QR Check-in benötigt.
+    </div>`;
+}
+
+function showAddLocationModal(){
+  openModal('Neuer Standort', `
+    <div class="form-group"><label>ID (intern, z.B. "sushi_bar")</label><input class="form-input" id="locId" placeholder="lowercase_name"></div>
+    <div class="form-group"><label>Name</label><input class="form-input" id="locName" placeholder="z.B. Sushi Bar Tokyo"></div>
+    <div class="form-group"><label>Stadt</label><input class="form-input" id="locCity" placeholder="z.B. Stuttgart"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="form-group"><label>Latitude</label><input class="form-input" id="locLat" type="number" step="0.0001" placeholder="48.7752"></div>
+      <div class="form-group"><label>Longitude</label><input class="form-input" id="locLng" type="number" step="0.0001" placeholder="9.1724"></div>
+      <div class="form-group"><label>Radius (m)</label><input class="form-input" id="locRadius" type="number" value="50"></div>
+    </div>
+  `, `<button class="btn btn-primary" onclick="saveNewLocation()">Speichern</button>`);
+}
+
+async function saveNewLocation(){
+  const id = document.getElementById('locId').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
+  const name = document.getElementById('locName').value.trim();
+  const city = document.getElementById('locCity').value.trim();
+  if(!id || !name){ alert('ID und Name sind erforderlich.'); return; }
+  if(LOCS.find(l => l.id === id)){ alert('Diese ID existiert bereits.'); return; }
+
+  const { error } = await sb.from('locations').insert({ id, name, city });
+  if(error){ alert('Fehler: ' + error.message); return; }
+
+  // Update local data
+  LOCS.push({ id, name, city });
+
+  // Save GPS if provided
+  const lat = parseFloat(document.getElementById('locLat').value);
+  const lng = parseFloat(document.getElementById('locLng').value);
+  const radius = parseInt(document.getElementById('locRadius').value) || 50;
+  if(!isNaN(lat) && !isNaN(lng)){
+    GPS_COORDS[id] = { lat, lng, radius_m: radius };
+  }
+  LOCATION_SCHEDULE[id] = { dayOff: [0], halfDays: [] };
+
+  closeModal();
+  buildLocationSelect();
+  renderLocations();
+  showToast('Standort "' + name + '" erstellt ✓');
+}
+
+function editLocation(locId){
+  const loc = LOCS.find(l => l.id === locId);
+  if(!loc) return;
+  const gps = GPS_COORDS[locId] || { lat: '', lng: '', radius_m: 50 };
+  const sched = LOCATION_SCHEDULE[locId] || { dayOff: [0], halfDays: [] };
+  const dayNames = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+
+  openModal('Standort bearbeiten: ' + loc.name, `
+    <div class="form-group"><label>Name</label><input class="form-input" id="editLocName" value="${loc.name}"></div>
+    <div class="form-group"><label>Stadt</label><input class="form-input" id="editLocCity" value="${loc.city || ''}"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div class="form-group"><label>Latitude</label><input class="form-input" id="editLocLat" type="number" step="0.0001" value="${gps.lat || ''}"></div>
+      <div class="form-group"><label>Longitude</label><input class="form-input" id="editLocLng" type="number" step="0.0001" value="${gps.lng || ''}"></div>
+      <div class="form-group"><label>Radius (m)</label><input class="form-input" id="editLocRadius" type="number" value="${gps.radius_m || 50}"></div>
+    </div>
+    <div class="form-group"><label>Ruhetage</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+        ${dayNames.map((d,i) => `<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer">
+          <input type="checkbox" class="editDayOff" value="${i}" ${sched.dayOff.includes(i)?'checked':''}>
+          ${d}
+        </label>`).join('')}
+      </div>
+    </div>
+  `, `<button class="btn btn-primary" onclick="saveEditLocation('${locId}')">Speichern</button>`);
+}
+
+async function saveEditLocation(locId){
+  const name = document.getElementById('editLocName').value.trim();
+  const city = document.getElementById('editLocCity').value.trim();
+  if(!name){ alert('Name ist erforderlich.'); return; }
+
+  const { error } = await sb.from('locations').update({ name, city }).eq('id', locId);
+  if(error){ alert('Fehler: ' + error.message); return; }
+
+  const loc = LOCS.find(l => l.id === locId);
+  if(loc){ loc.name = name; loc.city = city; }
+
+  // Update GPS
+  const lat = parseFloat(document.getElementById('editLocLat').value);
+  const lng = parseFloat(document.getElementById('editLocLng').value);
+  const radius = parseInt(document.getElementById('editLocRadius').value) || 50;
+  if(!isNaN(lat) && !isNaN(lng)){
+    GPS_COORDS[locId] = { lat, lng, radius_m: radius };
+  }
+
+  // Update schedule
+  const dayOff = [...document.querySelectorAll('.editDayOff:checked')].map(cb => parseInt(cb.value));
+  LOCATION_SCHEDULE[locId] = { dayOff, halfDays: LOCATION_SCHEDULE[locId]?.halfDays || [] };
+
+  closeModal();
+  buildLocationSelect();
+  renderLocations();
+  showToast('Standort aktualisiert ✓');
+}
+
+async function deleteLocation(locId){
+  const loc = LOCS.find(l => l.id === locId);
+  if(!loc) return;
+  const empCount = EMPS.filter(e => e.location === locId).length;
+  if(empCount > 0){ alert('Kann nicht gelöscht werden — ' + empCount + ' Mitarbeiter zugeordnet.'); return; }
+  if(!confirm('Standort "' + loc.name + '" wirklich löschen?')) return;
+
+  const { error } = await sb.from('locations').delete().eq('id', locId);
+  if(error){ alert('Fehler: ' + error.message); return; }
+
+  const idx = LOCS.findIndex(l => l.id === locId);
+  if(idx >= 0) LOCS.splice(idx, 1);
+  delete GPS_COORDS[locId];
+  delete LOCATION_SCHEDULE[locId];
+
+  buildLocationSelect();
+  renderLocations();
+  showToast('Standort gelöscht ✓');
 }
 
 // ═══ QR GENERATOR (Admin-only) ═══
