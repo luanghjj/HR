@@ -2855,10 +2855,39 @@ async function openPermissionsModal(userId) {
     groupsHtml += '</div>';
   }
 
+  // Standort + Bereiche assignment
+  const allowedLocs = data?.allowed_locations || [u.location];
+  const allowedDepts = data?.allowed_depts || [];
+  const allDepts = [...new Set(DEPTS.map(d => d.name))].sort();
+
+  let locCheckboxes = LOCS.map(l => {
+    const checked = allowedLocs.includes(l.id) || allowedLocs.includes('all') ? 'checked' : '';
+    return `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.85rem;cursor:pointer">
+      <input type="checkbox" class="permLoc" value="${l.id}" ${checked}> ${l.name}
+    </label>`;
+  }).join('');
+
+  let deptCheckboxes = allDepts.map(d => {
+    const checked = allowedDepts.length === 0 || allowedDepts.includes(d) ? 'checked' : '';
+    return `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.85rem;cursor:pointer">
+      <input type="checkbox" class="permDept" value="${d}" ${checked}> ${d}
+    </label>`;
+  }).join('');
+
   const isCustom = mode === 'custom';
   openModal('Berechtigungen: ' + u.name, `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div style="background:var(--bg-input);border-radius:8px;padding:12px">
+        <div style="font-size:.75rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">📍 Standorte</div>
+        ${locCheckboxes}
+      </div>
+      <div style="background:var(--bg-input);border-radius:8px;padding:12px">
+        <div style="font-size:.75rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">🏷️ Bereiche</div>
+        ${deptCheckboxes}
+      </div>
+    </div>
     <div style="margin-bottom:16px">
-      <div style="font-size:.82rem;color:var(--text-secondary);margin-bottom:8px">Modus:</div>
+      <div style="font-size:.82rem;color:var(--text-secondary);margin-bottom:8px">Rechte-Modus:</div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px">
         <input type="radio" name="permMode" value="standard" ${!isCustom?'checked':''} onchange="togglePermMode(false)">
         <span style="font-size:.9rem;font-weight:600">Standard nach Rolle (${u.role === 'inhaber' ? 'Inhaber' : u.role === 'manager' ? 'Manager' : u.role === 'mitarbeiter' ? 'Mitarbeiter' : 'Azubi'})</span>
@@ -2892,11 +2921,17 @@ async function savePermissions(userId) {
     });
   }
 
+  // Collect allowed locations & departments
+  const allowedLocs = [...document.querySelectorAll('.permLoc:checked')].map(cb => cb.value);
+  const allowedDepts = [...document.querySelectorAll('.permDept:checked')].map(cb => cb.value);
+
   // Upsert to user_permissions table
   const { error } = await sb.from('user_permissions').upsert({
     user_id: userId,
     mode,
-    permissions: mode === 'custom' ? perms : null
+    permissions: mode === 'custom' ? perms : null,
+    allowed_locations: allowedLocs,
+    allowed_depts: allowedDepts
   }, { onConflict: 'user_id' });
 
   if (error) {
