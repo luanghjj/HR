@@ -2493,10 +2493,18 @@ function renderAccess(){
     const locSelect = `<select class="form-select" style="min-width:140px" onchange="changeUserLocation('${u.id}',this.value)">
       ${locOpts.map(l => `<option value="${l.id}" ${u.location===l.id?'selected':''}>${l.name}</option>`).join('')}
     </select>`;
+    const emailInfo = u.regEmail ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:2px" title="${u.regEmail}">📧 ${u.regEmail}</div>` : '';
+    const googleBadge = u.regEmail?.includes('gmail') || u.bannerUrl ? '<span style="font-size:.68rem;background:var(--bg-input);padding:1px 6px;border-radius:4px;color:var(--text-muted);margin-left:4px">Google</span>' : '';
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:10px">
         <div class="emp-avatar">${u.avatar}</div>
-        <input class="form-input" style="width:150px;font-weight:600;font-size:.85rem" value="${u.name}" onblur="changeUserName('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+        <div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input class="form-input" style="width:140px;font-weight:600;font-size:.85rem" value="${u.name}" onblur="changeUserName('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+            ${googleBadge}
+          </div>
+          ${emailInfo}
+        </div>
       </div></td>
       <td><input class="form-input" style="width:140px;font-size:.82rem" value="${emp?.position||u.regPosition||''}" placeholder="Position..." onblur="changeUserPosition('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></td>
       <td>${roleSelect}</td>
