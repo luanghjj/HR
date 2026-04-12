@@ -8,9 +8,11 @@ function toggleTheme(){const h=document.documentElement;const n=h.getAttribute('
 // ═══ DYNAMIC SIDEBAR ═══
 // Each tab is shown/hidden based on user permissions (from SuperAdmin or role defaults)
 function buildSidebar(){
+  const isCustom = currentUser?._permMode === 'custom';
   console.log('[Sidebar] Building with permissions:', {
     role: currentUser?.role,
     mode: currentUser?._permMode,
+    isCustom,
     customPerms: currentUser?._customPerms
   });
   const mi = (name) => `<span class="ms">${name}</span>`;
@@ -30,9 +32,11 @@ function buildSidebar(){
   }
 
   // ── PLANUNG ──
-  const showSchedule = can('seeAllSchedules') || currentUser.role === 'mitarbeiter' || currentUser.role === 'azubi';
-  const showVacation = can('seeAllVacations') || true; // Everyone sees own vacation
-  const showSick = can('seeAllSick') || true; // Everyone sees own sick
+  // Custom mode: only show if permission is explicitly set
+  // Standard mode: mitarbeiter/azubi see own schedule/vacation/sick
+  const showSchedule = isCustom ? can('seeAllSchedules') : (can('seeAllSchedules') || ['mitarbeiter','azubi'].includes(currentUser.role));
+  const showVacation = isCustom ? can('seeAllVacations') || can('approveVacations') : true;
+  const showSick = isCustom ? can('seeAllSick') : true;
   if(showSchedule || showVacation || showSick){
     html+=`<div class="nav-section">Planung</div>`;
     if(showSchedule) html+=`<div class="nav-item" onclick="navigate('schedule',this)">${mi('calendar_month')} Arbeitsplan</div>`;
@@ -41,9 +45,12 @@ function buildSidebar(){
   }
 
   // ── DOKUMENTE ──
-  html+=`<div class="nav-section">Dokumente</div>`;
-  html+=`<div class="nav-item" onclick="navigate('documents',this)">${mi('folder')} ${can('seeAllDocs')?'Unterlagen':'Meine Unterlagen'}</div>`;
-  if(can('seeDepartments')) html+=`<div class="nav-item" onclick="navigate('checklists',this)">${mi('checklist')} Checklisten</div>`;
+  const showDocs = isCustom ? can('seeAllDocs') : true;
+  if(showDocs || !isCustom){
+    html+=`<div class="nav-section">Dokumente</div>`;
+    html+=`<div class="nav-item" onclick="navigate('documents',this)">${mi('folder')} ${can('seeAllDocs')?'Unterlagen':'Meine Unterlagen'}</div>`;
+    if(can('seeDepartments')) html+=`<div class="nav-item" onclick="navigate('checklists',this)">${mi('checklist')} Checklisten</div>`;
+  }
 
   // ── AUSBILDUNG ──
   if(currentUser.role==='azubi' || can('editTraining')){
