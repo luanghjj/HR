@@ -8,6 +8,11 @@ function toggleTheme(){const h=document.documentElement;const n=h.getAttribute('
 // ═══ DYNAMIC SIDEBAR ═══
 // Each tab is shown/hidden based on user permissions (from SuperAdmin or role defaults)
 function buildSidebar(){
+  console.log('[Sidebar] Building with permissions:', {
+    role: currentUser?.role,
+    mode: currentUser?._permMode,
+    customPerms: currentUser?._customPerms
+  });
   const mi = (name) => `<span class="ms">${name}</span>`;
   let html='';
 

@@ -9,24 +9,37 @@
 async function loadUserPermissions() {
   if (!currentUser) return;
   try {
-    const { data: permData } = await sb.from('user_permissions')
+    const { data: permData, error } = await sb.from('user_permissions')
       .select('mode, permissions, allowed_locations, allowed_depts')
       .eq('user_id', currentUser.id)
-      .single();
+      .maybeSingle();  // Won't throw if no row found
+
+    if (error) {
+      console.warn('[Auth] Permission query error:', error.message);
+      currentUser._permMode = 'standard';
+      return;
+    }
+
     if (permData) {
       currentUser._permMode = permData.mode;  // 'standard' | 'custom'
       currentUser._customPerms = permData.permissions || {};
       currentUser._allowedLocations = permData.allowed_locations || ['all'];
       currentUser._allowedDepts = permData.allowed_depts || ['all'];
-      console.log('[Auth] Custom perms loaded:', permData.mode, permData.permissions);
+      console.log('[Auth] ✓ Permissions loaded:', {
+        mode: permData.mode,
+        perms: permData.permissions,
+        locations: permData.allowed_locations,
+        depts: permData.allowed_depts
+      });
     } else {
+      console.log('[Auth] No custom permissions row found for', currentUser.id, '→ using role defaults');
       currentUser._permMode = 'standard';
       currentUser._customPerms = null;
       currentUser._allowedLocations = ['all'];
       currentUser._allowedDepts = ['all'];
     }
   } catch (e) {
-    console.log('[Auth] No custom permissions found, using role defaults');
+    console.error('[Auth] Permission loading failed:', e);
     currentUser._permMode = 'standard';
   }
 }
