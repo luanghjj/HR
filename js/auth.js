@@ -328,48 +328,116 @@ async function checkExistingSession() {
         .from('user_profiles')
         .select('*')
         .eq('auth_user_id', session.user.id)
-        .single();
+        .maybeSingle();
 
-      if (profile) {
-        currentUser = {
-          id: profile.user_id,
-          name: profile.name,
-          role: profile.role,
-          location: profile.location,
-          avatar: profile.avatar,
-          empId: profile.emp_id,
-          lastLogin: new Date().toLocaleDateString('de-DE'),
-          status: 'active'
-        };
+      // No profile found — auto-create for Google OAuth users
+      if (!profile) {
+        const user = session.user;
+        const isGoogle = user.app_metadata?.provider === 'google' || user.identities?.some(i => i.provider === 'google');
 
-        // Load custom permissions
-        await loadUserPermissions();
+        if (isGoogle) {
+          // Extract name from Google metadata
+          const googleName = user.user_metadata?.full_name || user.user_metadata?.name || user.email.split('@')[0];
+          const avatar = googleName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+          const empId = 'emp_' + googleName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 10) + '_' + Date.now().toString(36);
 
-        if (currentUser.location !== 'all') currentLocation = currentUser.location;
-        else currentLocation = 'all';
+          // Create pending user_profiles + employees entry
+          const newProfile = {
+            user_id: empId,
+            auth_user_id: user.id,
+            name: googleName,
+            role: 'mitarbeiter',
+            location: 'origami',
+            avatar: avatar,
+            emp_id: empId,
+            status: 'pending'
+          };
 
-        document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-        document.getElementById('userName').textContent = currentUser.name;
-        document.getElementById('userRole').innerHTML =
-          currentUser.role === 'inhaber' ? 'Geschäftsführung' :
-          currentUser.role === 'manager' ? 'Manager – ' + getLocationName(currentUser.location) :
-          EMPS.find(e => e.id === currentUser.empId)?.position || 'Mitarbeiter';
-        document.getElementById('userAvatar').textContent = currentUser.avatar;
+          const { error: profErr } = await sb.from('user_profiles').insert(newProfile);
+          if (profErr) console.error('[Auth] Profile create error:', profErr);
 
-        buildSidebar();
-        buildLocationSelect();
-        showLoading('Sitzung wird wiederhergestellt...');
-        await loadDataFromSupabase();
+          // Also create employee entry
+          const newEmp = {
+            id: empId,
+            name: googleName,
+            position: 'Neu',
+            department: 'Service',
+            location: 'origami',
+            status: 'pending',
+            email: user.email,
+            avatar: avatar,
+            role: 'mitarbeiter',
+            entry_date: new Date().toISOString().slice(0, 10),
+            vac_total: 26,
+            vac_used: 0,
+            sick_days: 0,
+            late_count: 0
+          };
+
+          const { error: empErr } = await sb.from('employees').insert(newEmp);
+          if (empErr) console.error('[Auth] Employee create error:', empErr);
+
+          console.log('[Auth] ✓ Google user auto-registered:', googleName, '(pending)');
+        }
+
+        // Show pending screen
         hideLoading();
-        initApp();
+        document.getElementById('loginSupabase').style.display = 'none';
+        document.getElementById('loginRegister').style.display = 'none';
+        document.getElementById('loginPending').style.display = 'block';
+        document.querySelector('.login-tabs').style.display = 'none';
+        return true; // Prevent showing login form
+      }
 
-        console.log('[Auth] ✓ Session restored:', currentUser.name);
+      // Profile exists but pending
+      if (profile.status === 'pending') {
+        hideLoading();
+        document.getElementById('loginSupabase').style.display = 'none';
+        document.getElementById('loginRegister').style.display = 'none';
+        document.getElementById('loginPending').style.display = 'block';
+        document.querySelector('.login-tabs').style.display = 'none';
         return true;
       }
+
+      // Profile OK — restore session
+      currentUser = {
+        id: profile.user_id,
+        name: profile.name,
+        role: profile.role,
+        location: profile.location,
+        avatar: profile.avatar,
+        empId: profile.emp_id,
+        lastLogin: new Date().toLocaleDateString('de-DE'),
+        status: 'active'
+      };
+
+      // Load custom permissions
+      await loadUserPermissions();
+
+      if (currentUser.location !== 'all') currentLocation = currentUser.location;
+      else currentLocation = 'all';
+
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+      document.getElementById('userName').textContent = currentUser.name;
+      document.getElementById('userRole').innerHTML =
+        currentUser.role === 'inhaber' ? 'Geschäftsführung' :
+        currentUser.role === 'manager' ? 'Manager – ' + getLocationName(currentUser.location) :
+        EMPS.find(e => e.id === currentUser.empId)?.position || 'Mitarbeiter';
+      document.getElementById('userAvatar').textContent = currentUser.avatar;
+
+      buildSidebar();
+      buildLocationSelect();
+      showLoading('Sitzung wird wiederhergestellt...');
+      await loadDataFromSupabase();
+      hideLoading();
+      initApp();
+
+      console.log('[Auth] ✓ Session restored:', currentUser.name);
+      return true;
     }
   } catch (e) {
-    console.log('[Auth] No existing session');
+    console.log('[Auth] No existing session:', e);
   }
   return false;
 }
