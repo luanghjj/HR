@@ -105,18 +105,14 @@ body { background-color: #f7f9fb; color: #191c1e; }
   <!-- Top Nav -->
   <header class="fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-xl shadow-sm border-b border-gray-200/60">
     <div class="flex justify-between items-center w-full px-8 py-4 max-w-[1920px] mx-auto">
-      <div class="flex items-center gap-8">
+      <div class="flex items-center gap-6">
         <span class="text-xl font-black tracking-tighter text-indigo-600 font-headline">Check-In Terminal</span>
-        <nav class="hidden md:flex items-center space-x-6" id="navTabs">
-          <a onclick="switchTab('checkin')" class="nav-tab active-tab text-indigo-600 border-b-2 border-indigo-600 pb-1 font-headline font-bold tracking-tight cursor-pointer">Dashboard</a>
-          <a onclick="switchTab('checklist')" class="nav-tab text-slate-400 hover:text-indigo-600 transition-colors font-headline font-bold tracking-tight cursor-pointer border-b-2 border-transparent pb-1">Checklisten</a>
-        </nav>
+        <span class="text-slate-400 font-label text-[11px] tracking-widest hidden sm:block" id="refreshInfo">Auto-Refresh: 30s</span>
       </div>
-      <div class="flex items-center gap-4">
-        <span class="text-slate-500 font-label text-xs tracking-widest hidden sm:block" id="refreshInfo">Auto-Refresh: 30s</span>
-        <span class="text-lg font-headline font-light tracking-widest text-indigo-600" id="clock">--:--:--</span>
+      <div class="flex items-center gap-5">
+        <span class="text-3xl md:text-4xl font-headline font-extrabold tracking-tight text-slate-800" id="clock">--:--:--</span>
         <button onclick="goBack()" class="text-slate-400 hover:text-indigo-600 transition-colors" title="Standort wechseln">
-          <span class="material-symbols-outlined">swap_horiz</span>
+          <span class="material-symbols-outlined text-2xl">swap_horiz</span>
         </button>
       </div>
     </div>
