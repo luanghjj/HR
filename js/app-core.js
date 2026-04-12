@@ -2448,6 +2448,8 @@ function renderDocuments(){
 }
 
 // ═══ ACCESS ═══
+let accessSort = 'location'; // 'location' or 'name'
+
 function renderAccess(){
   const pg=document.getElementById('page-access');
   if(!can('manageAccess')){pg.innerHTML=permBanner('Zugangsverwaltung ist nur für Inhaber verfügbar.');return;}
@@ -2455,18 +2457,20 @@ function renderAccess(){
   const roleOpts = ['inhaber','manager','mitarbeiter','azubi'];
   const locOpts = [{id:'all',name:'Alle Standorte'},...LOCS];
 
-  // Pending registrations
-  const pending = USERS.filter(u => u.status === 'pending');
+  // Pending = status pending OR inactive (Google auto-register uses 'inactive')
+  const pending = USERS.filter(u => u.status === 'pending' || (u.status === 'inactive' && !u.empId));
   let pendingHtml = '';
   if (pending.length > 0) {
     pendingHtml = `<div class="table-wrap" style="margin-bottom:20px;border-left:3px solid var(--warning)">
       <div class="table-header"><span class="table-title">🔔 Neue Registrierungen (${pending.length})</span></div>
       <div style="padding:0 20px 16px">`;
     pending.forEach(u => {
+      const isGoogle = u.regEmail?.includes('gmail') || u.bannerUrl;
       pendingHtml += `<div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)">
         <div class="emp-avatar" style="width:44px;height:44px;font-size:1rem">${u.avatar}</div>
         <div style="flex:1">
           <strong style="font-size:.95rem">${u.name}</strong>
+          ${isGoogle ? '<span style="font-size:.68rem;background:var(--bg-input);padding:1px 6px;border-radius:4px;color:var(--text-muted);margin-left:6px">Google</span>' : ''}
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;font-size:.78rem;color:var(--text-secondary)">
             <span>📧 ${u.regEmail||'—'}</span>
             <span>🎂 ${u.regBirthday?formatDateDE(u.regBirthday):'—'}</span>
@@ -2484,8 +2488,18 @@ function renderAccess(){
     pendingHtml += '</div></div>';
   }
 
-  // Active users only in main table
-  let rows = USERS.filter(u => u.status !== 'pending').map(u => {
+  // Active users — sort
+  const activeUsers = USERS.filter(u => u.status !== 'pending' && !(u.status === 'inactive' && !u.empId));
+  activeUsers.sort((a, b) => {
+    if (accessSort === 'location') {
+      const locA = getLocationName(a.location);
+      const locB = getLocationName(b.location);
+      return locA.localeCompare(locB) || a.name.localeCompare(b.name);
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  let rows = activeUsers.map(u => {
     const emp = u.empId ? EMPS.find(e=>e.id===u.empId) : null;
     const roleSelect = `<select class="form-select" style="min-width:120px" onchange="changeUserRole('${u.id}',this.value)">
       ${roleOpts.map(r => `<option value="${r}" ${u.role===r?'selected':''}>${r==='inhaber'?'👑 Inhaber':r==='manager'?'🏢 Manager':r==='mitarbeiter'?'👤 Mitarbeiter':'🎓 Azubi'}</option>`).join('')}
@@ -2515,7 +2529,17 @@ function renderAccess(){
     </tr>`;
   }).join('');
 
-  pg.innerHTML=`${pendingHtml}<div class="table-wrap"><div class="table-header"><span class="table-title">Zugangsverwaltung (${USERS.filter(u=>u.status!=='pending').length} Benutzer)</span></div>
+  const sortBtnLoc = accessSort === 'location' ? 'btn-primary' : '';
+  const sortBtnName = accessSort === 'name' ? 'btn-primary' : '';
+
+  pg.innerHTML=`${pendingHtml}<div class="table-wrap"><div class="table-header" style="display:flex;align-items:center;justify-content:space-between">
+    <span class="table-title">Zugangsverwaltung (${activeUsers.length} Benutzer)</span>
+    <div style="display:flex;gap:6px;align-items:center">
+      <span style="font-size:.75rem;color:var(--text-muted)">Sortieren:</span>
+      <button class="btn btn-sm ${sortBtnLoc}" onclick="accessSort='location';renderAccess()">📍 Standort</button>
+      <button class="btn btn-sm ${sortBtnName}" onclick="accessSort='name';renderAccess()">🔤 Name</button>
+    </div>
+  </div>
   <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Position</th><th>Rolle</th><th>Standort</th><th>Mitarbeiter</th><th>Status</th><th></th></tr></thead><tbody>
   ${rows}
   </tbody></table></div></div>
@@ -2679,7 +2703,7 @@ async function rejectRegistration(userId) {
 function updatePendingBadge(){
   const badge = document.getElementById('pendingBadge');
   if(!badge) return;
-  const count = (USERS || []).filter(u => u.status === 'pending').length;
+  const count = (USERS || []).filter(u => u.status === 'pending' || (u.status === 'inactive' && !u.empId)).length;
   badge.textContent = count;
   badge.style.display = count > 0 ? '' : 'none';
 }
