@@ -70,6 +70,18 @@ function buildSidebar(){
     sectionEnd();
   }
 
+  // ── GEHALTSMANAGER (permission gated) ──
+  if(can('gm_see_dash') || can('gm_see_abr') || can('gm_see_banken') || can('gm_see_ma') || can('gm_see_hrm') || can('gm_see_smart')){
+    sectionStart('gehalt', 'Gehaltsmanager');
+    if(can('gm_see_dash'))   html+=`<div class="nav-item" onclick="navigate('gehalt_dash',this)">${mi('monitoring')} Dashboard</div>`;
+    if(can('gm_see_abr'))    html+=`<div class="nav-item" onclick="navigate('gehalt_abr',this)">${mi('payments')} Abrechnung</div>`;
+    if(can('gm_see_ma'))     html+=`<div class="nav-item" onclick="navigate('gehalt_ma',this)">${mi('badge')} Mitarbeiter</div>`;
+    if(can('gm_see_banken')) html+=`<div class="nav-item" onclick="navigate('gehalt_banken',this)">${mi('account_balance')} Banken</div>`;
+    if(can('gm_see_hrm'))   html+=`<div class="nav-item" onclick="navigate('gehalt_hrm',this)">${mi('analytics')} HRM Intern</div>`;
+    if(can('gm_see_smart'))  html+=`<div class="nav-item" onclick="navigate('gehalt_smart',this)">${mi('savings')} Smart Money</div>`;
+    sectionEnd();
+  }
+
   // ── SYSTEM (admin only) ──
   if(can('manageAccess')){
     sectionStart('system', 'System');
@@ -124,8 +136,49 @@ function navigate(page,el){
 }
 function renderPage(p){
   const c=document.getElementById('contentArea');
+
+  // ── GEHALTSMANAGER TABS (lazy-loaded) ──
+  if (p.startsWith('gehalt_')) {
+    c.innerHTML='<div class="page active" id="page-'+p+'" data-gehalt-container style="padding:4px 0"></div>';
+    const container = document.getElementById('page-'+p);
+    if (!window._gehaltLoaded) {
+      container.innerHTML='<div style="text-align:center;padding:60px 0;color:var(--text-muted)"><div class="loading-spinner" style="margin:0 auto 16px;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite"></div>GehaltsManager wird geladen…</div>';
+      _loadGehaltModule(p, container);
+    } else {
+      renderGehaltTab(p, container);
+    }
+    return;
+  }
+
   c.innerHTML='<div class="page active" id="page-'+p+'"></div>';
   ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung,qr_generator:renderQrGenerator,locations:renderLocations})[p]?.();
+}
+
+async function _loadGehaltModule(tabId, container) {
+  if (window._gehaltLoading) return; // prevent concurrent loads
+  window._gehaltLoading = true;
+  try {
+    const scripts = ['js/gehalt-constants.js','js/gehalt-mappers.js','js/gehalt-utils.js','js/gehalt-module.js'];
+    for (const src of scripts) {
+      // Skip if already loaded
+      if (document.querySelector(`script[src="${src}"]`)) continue;
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('Failed to load: ' + src));
+        document.head.appendChild(s);
+      });
+    }
+    await initGehaltModule();
+    window._gehaltLoaded = true;
+    renderGehaltTab(tabId, container);
+  } catch (e) {
+    console.error('[GehaltsManager] Load error:', e);
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--error)">❌ Fehler beim Laden des GehaltsManagers<br><small>'+e.message+'</small></div>';
+  } finally {
+    window._gehaltLoading = false;
+  }
 }
 
 // ═══ SHIFTS (loaded from Supabase via data-loader.js) ═══
@@ -2842,6 +2895,62 @@ const PERM_GROUPS = {
   'Finanzen': [
     { key: 'seeFinancials', label: 'Gehalt & Finanzen sehen' },
     { key: 'editVacDays', label: 'Urlaubstage bearbeiten' }
+  ],
+  '💰 GM — Seiten': [
+    { key: 'gm_see_dash', label: 'Dashboard' },
+    { key: 'gm_see_abr', label: 'Abrechnung' },
+    { key: 'gm_see_banken', label: 'Banken' },
+    { key: 'gm_see_ma', label: 'Mitarbeiter' },
+    { key: 'gm_see_smart', label: 'Smart Money' }
+  ],
+  '💰 GM — Spalten': [
+    { key: 'gm_see_gehalt', label: 'Gehalt-Spalte' },
+    { key: 'gm_see_brutto', label: 'Gesamt-Brutto' },
+    { key: 'gm_see_netto', label: 'Netto' },
+    { key: 'gm_see_ueberw', label: 'Überweisung' },
+    { key: 'gm_see_ue_status', label: 'Ü-Status' },
+    { key: 'gm_see_bar', label: 'Bar/TG' },
+    { key: 'gm_see_bar_status', label: 'B-Status' },
+    { key: 'gm_see_summe', label: 'Summe' },
+    { key: 'gm_see_ziel', label: 'Ziel-Gehalt' },
+    { key: 'gm_see_notiz', label: 'Notizen' },
+    { key: 'gm_see_typ', label: 'Beschäftigungstyp' },
+    { key: 'gm_see_extras', label: 'Extras im Export' }
+  ],
+  '💰 GM — Popup': [
+    { key: 'gm_see_popup', label: 'Popup öffnen' },
+    { key: 'gm_pop_kpi', label: 'KPIs anzeigen' },
+    { key: 'gm_pop_stamm', label: 'Stammdaten' },
+    { key: 'gm_pop_chart', label: 'Diagramm' },
+    { key: 'gm_pop_history', label: 'Gehaltshistorie' },
+    { key: 'gm_pop_table', label: 'Zahlungstabelle' },
+    { key: 'gm_pop_cross', label: 'Standortübergreifend' }
+  ],
+  '💰 GM — Bearbeitung': [
+    { key: 'gm_edit_brutto', label: 'Brutto ändern' },
+    { key: 'gm_edit_status', label: 'Überw.-Status ändern' },
+    { key: 'gm_edit_bar', label: 'Bar/TG-Status ändern' },
+    { key: 'gm_edit_notiz', label: 'Notizen schreiben' },
+    { key: 'gm_edit_values', label: 'Werte bearbeiten' },
+    { key: 'gm_edit_stamm', label: 'Stammdaten bearbeiten' }
+  ],
+  '💰 GM — Funktionen': [
+    { key: 'gm_fn_create_ma', label: 'MA anlegen/löschen' },
+    { key: 'gm_fn_deactivate', label: 'MA deaktivieren' },
+    { key: 'gm_fn_abrechnung', label: 'Abrechnung erstellen' },
+    { key: 'gm_fn_import', label: 'Excel Import' },
+    { key: 'gm_fn_export', label: 'Excel Export' },
+    { key: 'gm_fn_betrieb', label: 'Betrieb hinzufügen' },
+    { key: 'gm_fn_users', label: 'Benutzerverwaltung' }
+  ],
+  '💰 GM — HRM-Modul': [
+    { key: 'gm_see_hrm', label: 'HRM Tab sehen' },
+    { key: 'gm_ansicht_hrm_intern', label: 'HRM Intern' },
+    { key: 'gm_ansicht_hrm_stb', label: 'HRM Steuerberater' },
+    { key: 'gm_ansicht_hrm_gehalt', label: 'Gehaltsdaten' },
+    { key: 'gm_ansicht_hrm_summen', label: 'Summen & KPIs' },
+    { key: 'gm_hrm_daten_import', label: 'HRM Import' },
+    { key: 'gm_edit_hrm_status', label: 'Status bearbeiten' }
   ]
 };
 

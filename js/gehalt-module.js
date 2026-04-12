@@ -1,15 +1,7 @@
-// ═══════════════════════════════════════════════════════════
-// app.js — GehaltsManager Main Application
-// GehaltsManager — SieuVuong
-// ═══════════════════════════════════════════════════════════
 
-import { supabase } from './supabase.js';
-import { mapGehaltFromDB, mapMitarbeiterFromDB } from './mappers.js';
-import { BETRIEBE, MONAT_NAMEN, getStatusConfig, getTypFarben } from './constants.js';
-import { formatEUR, todayStr, checkBirthday, getTenure, calcAGKosten, compareMonat } from './utils.js';
 
 // ── STATE ──
-const state = {
+var gmState = {
   currentTab: 'dashboard',
   currentMonat: '',
   monate: [],
@@ -23,7 +15,7 @@ const state = {
 };
 
 // ── TAB CONFIG ──
-const TABS = [
+var GM_TABS = [
   { id: 'dashboard',   icon: '📊', label: 'Dashboard' },
   { id: 'abrechnung',  icon: '💰', label: 'Abrechnung' },
   { id: 'mitarbeiter', icon: '👥', label: 'Mitarbeiter' },
@@ -33,14 +25,14 @@ const TABS = [
   { id: 'einstellungen', icon: '⚙️', label: 'Einstellungen' },
 ];
 
-const BETRIEB_COLORS = {
+var GM_BETRIEB_COLORS = {
   Blossom: '#3b7ddd',
   Enso:    '#4f46e5',
   Okyu:    '#10b981',
   Origami: '#d97706',
 };
 
-const SIEUVUONG_CHARS = [
+var GM_SIEUVUONG_CHARS = [
   { c: 'S', color: '#e91e63' },
   { c: 'i', color: '#ff9800' },
   { c: 'e', color: '#ffc107' },
@@ -53,9 +45,9 @@ const SIEUVUONG_CHARS = [
 ];
 
 // ── HELPERS ──
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => document.querySelectorAll(sel);
-const el = (tag, attrs = {}, ...children) => {
+var gm$ = (sel) => document.querySelector(sel);
+var gm$$ = (sel) => document.querySelectorAll(sel);
+var el = (tag, attrs = {}, ...children) => {
   const e = document.createElement(tag);
   Object.entries(attrs).forEach(([k, v]) => {
     if (k === 'style' && typeof v === 'object') {
@@ -82,57 +74,50 @@ const el = (tag, attrs = {}, ...children) => {
 };
 
 // ── DATA LOADING ──
-async function loadMonate() {
-  const { data, error } = await supabase
+async function gmLoadMonate() {
+  const { data, error } = await sbGehalt
     .from('gehaelter')
     .select('monat')
     .order('monat', { ascending: false });
   if (error) { console.error('Monate error:', error); return []; }
-  const unique = [...new Set(data.map(d => d.monat))].sort(compareMonat).reverse();
+  const unique = [...new Set(data.map(d => d.monat))].sort(gmCompareMonat).reverse();
   return unique;
 }
 
-async function loadGehaltData(monat) {
-  const { data, error } = await supabase
+async function gmLoadGehaltData(monat) {
+  const { data, error } = await sbGehalt
     .from('gehaelter')
     .select('*')
     .eq('monat', monat);
   if (error) { console.error('Gehalt error:', error); return []; }
-  return data.map(mapGehaltFromDB);
+  return data.map(gmMapGehaltFromDB);
 }
 
-async function loadMitarbeiterData() {
-  const { data, error } = await supabase
+async function gmLoadMitarbeiterData() {
+  const { data, error } = await sbGehalt
     .from('mitarbeiter')
     .select('*')
     .eq('aktiv', true);
   if (error) { console.error('MA error:', error); return []; }
-  return data.map(mapMitarbeiterFromDB);
+  return data.map(gmMapMitarbeiterFromDB);
 }
 
-async function loadUsersData() {
-  const { data, error } = await supabase
+async function gmLoadUsersData() {
+  const { data, error } = await sbGehalt
     .from('users')
     .select('*');
   if (error) { console.error('Users error:', error); return []; }
   return data || [];
 }
 
-async function initApp() {
-  if (state.dark) document.body.classList.add('dark');
-
-  state.monate = await loadMonate();
-  state.currentMonat = state.monate[0] || 'Mär 2026';
-  state.mitarbeiterData = await loadMitarbeiterData();
-  state.gehaltData = await loadGehaltData(state.currentMonat);
-  state.usersData = await loadUsersData();
-  state.loading = false;
-
-  renderApp();
+// NOTE: Original initApp is replaced by initGehaltModule() at the bottom
+// This function is kept for reference but NOT called
+function _gmInitApp_unused() {
+  // handled by initGehaltModule()
 }
 
 // ── RENDER ──
-function renderApp() {
+function gmRenderCurrentTab() {
   const app = $('#app');
   app.innerHTML = '';
   app.className = 'gm-app';
@@ -142,12 +127,12 @@ function renderApp() {
 
   // Mobile overlay + sidebar
   const overlay = el('div', {
-    className: `gm-overlay ${state.mobileMenuOpen ? 'show' : ''}`,
-    onClick: () => { state.mobileMenuOpen = false; renderApp(); }
+    className: `gm-overlay ${gmState.mobileMenuOpen ? 'show' : ''}`,
+    onClick: () => { gmState.mobileMenuOpen = false; gmRenderCurrentTab(); }
   });
   app.appendChild(overlay);
 
-  const mobileSidebar = renderSidebar('gm-sidebar-mobile' + (state.mobileMenuOpen ? ' open' : ''));
+  const mobileSidebar = renderSidebar('gm-sidebar-mobile' + (gmState.mobileMenuOpen ? ' open' : ''));
   app.appendChild(mobileSidebar);
 
   // Main
@@ -159,17 +144,17 @@ function renderApp() {
   // Body
   const body = el('div', { className: 'gm-body' });
 
-  if (state.loading) {
+  if (gmState.loading) {
     body.appendChild(renderLoading());
   } else {
-    switch (state.currentTab) {
+    switch (gmState.currentTab) {
       case 'dashboard':   body.appendChild(renderDashboard()); break;
       case 'abrechnung':  body.appendChild(renderAbrechnung()); break;
       case 'mitarbeiter': body.appendChild(renderMitarbeiterTab()); break;
       case 'banken':      body.appendChild(renderBanken()); break;
       case 'hrm':          body.appendChild(renderHRM()); break;
       case 'einstellungen': body.appendChild(renderEinstellungen()); break;
-      default:            body.appendChild(renderPlaceholder(state.currentTab)); break;
+      default:            body.appendChild(renderPlaceholder(gmState.currentTab)); break;
     }
   }
 
@@ -187,27 +172,27 @@ function renderSidebar(className) {
     '🍣 ',
     el('span', { style: { marginLeft: '4px' } }, 'HRM Manager')
   ));
-  titleRow.appendChild(el('button', { className: 'gm-sidebar-close', onClick: () => { state.mobileMenuOpen = false; renderApp(); } }, '✕'));
+  titleRow.appendChild(el('button', { className: 'gm-sidebar-close', onClick: () => { gmState.mobileMenuOpen = false; gmRenderCurrentTab(); } }, '✕'));
   header.appendChild(titleRow);
 
   // User info
-  header.appendChild(el('div', { className: 'gm-sidebar-user' }, `${state.user.name} · ${state.user.icon} ${state.user.role}`));
+  header.appendChild(el('div', { className: 'gm-sidebar-user' }, `${gmState.user.name} · ${gmState.user.icon} ${gmState.user.role}`));
 
   // Month select
   const monatSel = el('select', {
     className: 'gm-sidebar-monat',
     onChange: async (e) => {
-      state.currentMonat = e.target.value;
-      state.loading = true;
-      renderApp();
-      state.gehaltData = await loadGehaltData(state.currentMonat);
-      state.loading = false;
-      renderApp();
+      gmState.currentMonat = e.target.value;
+      gmState.loading = true;
+      gmRenderCurrentTab();
+      gmState.gehaltData = await gmLoadGehaltData(gmState.currentMonat);
+      gmState.loading = false;
+      gmRenderCurrentTab();
     }
   });
-  state.monate.forEach(m => {
+  gmState.monate.forEach(m => {
     const opt = el('option', { value: m }, m + ' 🏢');
-    if (m === state.currentMonat) opt.selected = true;
+    if (m === gmState.currentMonat) opt.selected = true;
     monatSel.appendChild(opt);
   });
   header.appendChild(monatSel);
@@ -225,11 +210,11 @@ function renderSidebar(className) {
   const nav = el('div', { className: 'gm-nav' });
   TABS.forEach(tab => {
     const btn = el('button', {
-      className: `gm-nav-btn ${state.currentTab === tab.id ? 'active' : ''}`,
+      className: `gm-nav-btn ${gmState.currentTab === tab.id ? 'active' : ''}`,
       onClick: () => {
-        state.currentTab = tab.id;
-        state.mobileMenuOpen = false;
-        renderApp();
+        gmState.currentTab = tab.id;
+        gmState.mobileMenuOpen = false;
+        gmRenderCurrentTab();
       }
     }, el('span', {}, tab.icon), tab.label);
     nav.appendChild(btn);
@@ -240,12 +225,12 @@ function renderSidebar(className) {
   const footer = el('div', { className: 'gm-sidebar-footer' });
   footer.appendChild(el('button', {
     onClick: () => {
-      state.dark = !state.dark;
-      localStorage.setItem('gm_dark', state.dark);
-      document.body.classList.toggle('dark', state.dark);
-      renderApp();
+      gmState.dark = !gmState.dark;
+      localStorage.setItem('gm_dark', gmState.dark);
+      document.body.classList.toggle('dark', gmState.dark);
+      gmRenderCurrentTab();
     }
-  }, state.dark ? '☀️ Hell' : '🌙 Dunkel'));
+  }, gmState.dark ? '☀️ Hell' : '🌙 Dunkel'));
   footer.appendChild(el('button', {}, '🚪 Abmelden'));
   footer.appendChild(el('div', { className: 'gm-version' }, 'v2.9.53'));
   side.appendChild(footer);
@@ -257,24 +242,24 @@ function renderMobileHeader() {
   const header = el('div', { className: 'gm-mobile-header' });
   header.appendChild(el('button', {
     className: 'gm-hamburger',
-    onClick: () => { state.mobileMenuOpen = true; renderApp(); }
+    onClick: () => { gmState.mobileMenuOpen = true; gmRenderCurrentTab(); }
   }, '☰'));
   header.appendChild(el('span', { className: 'gm-mobile-title' }, 'HRM Manager'));
 
   const monatSel = el('select', {
     className: 'gm-mobile-monat',
     onChange: async (e) => {
-      state.currentMonat = e.target.value;
-      state.loading = true;
-      renderApp();
-      state.gehaltData = await loadGehaltData(state.currentMonat);
-      state.loading = false;
-      renderApp();
+      gmState.currentMonat = e.target.value;
+      gmState.loading = true;
+      gmRenderCurrentTab();
+      gmState.gehaltData = await gmLoadGehaltData(gmState.currentMonat);
+      gmState.loading = false;
+      gmRenderCurrentTab();
     }
   });
-  state.monate.forEach(m => {
+  gmState.monate.forEach(m => {
     const opt = el('option', { value: m }, m + ' 🏢');
-    if (m === state.currentMonat) opt.selected = true;
+    if (m === gmState.currentMonat) opt.selected = true;
     monatSel.appendChild(opt);
   });
   header.appendChild(monatSel);
@@ -300,7 +285,7 @@ function renderPlaceholder(tab) {
 //  DASHBOARD
 // ════════════════════════════════════════════
 function renderDashboard() {
-  const data = state.gehaltData;
+  const data = gmState.gehaltData;
   const container = el('div', { className: 'anim-up' });
 
   // Month pill header
@@ -311,7 +296,7 @@ function renderDashboard() {
     el('button', {
       className: 'gm-btn',
       style: { border: '1px solid var(--ac)', background: 'var(--acG)', color: 'var(--ac)', fontWeight: 700 }
-    }, state.currentMonat)
+    }, gmState.currentMonat)
   ));
   container.appendChild(headerRow);
 
@@ -323,15 +308,15 @@ function renderDashboard() {
   // AG-Kosten calculation
   let totalAGKosten = 0;
   data.forEach(d => {
-    const ma = state.mitarbeiterData.find(m => m.persNr === d.persNr && m.betrieb === d.betrieb);
-    const ag = calcAGKosten(d.brutto, ma?.extras);
+    const ma = gmState.mitarbeiterData.find(m => m.persNr === d.persNr && m.betrieb === d.betrieb);
+    const ag = gmCalcAGKosten(d.brutto, ma?.extras);
     totalAGKosten += ag.gesamt;
   });
 
   container.appendChild(renderKPIRow([
-    { label: 'Brutto', value: formatEUR(totalBrutto), sub: `${state.currentMonat} · ${maCount} MA`, color: 'var(--ac)' },
-    { label: 'Netto', value: formatEUR(totalNetto), color: 'var(--ok)' },
-    { label: 'AG-Kosten gesamt', value: formatEUR(totalAGKosten), sub: 'inkl. SV + Extras', color: '#a78bfa' },
+    { label: 'Brutto', value: gmFormatEUR(totalBrutto), sub: `${gmState.currentMonat} · ${maCount} MA`, color: 'var(--ac)' },
+    { label: 'Netto', value: gmFormatEUR(totalNetto), color: 'var(--ok)' },
+    { label: 'AG-Kosten gesamt', value: gmFormatEUR(totalAGKosten), sub: 'inkl. SV + Extras', color: '#a78bfa' },
   ]));
 
   // Status Grid (Überweisungen / Bar-TG)
@@ -379,7 +364,7 @@ function renderKPIRow(items) {
 }
 
 function renderStatusGrid(data) {
-  const statusCfg = getStatusConfig();
+  const statusCfg = gmGetStatusConfig();
   const grid = el('div', { className: 'gm-status-grid' });
 
   // Überweisungen
@@ -392,10 +377,10 @@ function renderStatusGrid(data) {
   const uePct = ueTotal > 0 ? Math.round(ueDoneAmt / ueTotal * 100) : 0;
 
   grid.appendChild(renderStatusCard(
-    '🏦 Überweisungen', formatEUR(ueTotal), 'var(--ac)',
+    '🏦 Überweisungen', gmFormatEUR(ueTotal), 'var(--ac)',
     uePct,
-    `✓ ${ueDone.length} erledigt · ${formatEUR(ueDoneAmt)}`,
-    `○ ${ueOpen.length} offen · ${formatEUR(ueOpenAmt)}`
+    `✓ ${ueDone.length} erledigt · ${gmFormatEUR(ueDoneAmt)}`,
+    `○ ${ueOpen.length} offen · ${gmFormatEUR(ueOpenAmt)}`
   ));
 
   // Bar/TG
@@ -408,10 +393,10 @@ function renderStatusGrid(data) {
   const barPct = barTotal > 0 ? Math.round(barDoneAmt / barTotal * 100) : 0;
 
   grid.appendChild(renderStatusCard(
-    '💵 Bar / Taschengeld', formatEUR(barTotal), 'var(--wn)',
+    '💵 Bar / Taschengeld', gmFormatEUR(barTotal), 'var(--wn)',
     barPct,
-    `✓ ${barDone.length} erledigt · ${formatEUR(barDoneAmt)}`,
-    `○ ${barOpen.length} offen · ${formatEUR(barOpenAmt)}`
+    `✓ ${barDone.length} erledigt · ${gmFormatEUR(barDoneAmt)}`,
+    `○ ${barOpen.length} offen · ${gmFormatEUR(barOpenAmt)}`
   ));
 
   return grid;
@@ -444,7 +429,7 @@ function renderStatusCard(title, amount, color, pct, doneText, openText) {
 
 function renderZahlungsvergleich(data) {
   const card = el('div', { className: 'gm-card' });
-  card.appendChild(el('div', { className: 'gm-title' }, `💰 Zahlungsvergleich — ${state.currentMonat}`));
+  card.appendChild(el('div', { className: 'gm-title' }, `💰 Zahlungsvergleich — ${gmState.currentMonat}`));
 
   const wrap = el('div', { style: { overflow: 'auto', marginBottom: '12px' } });
   const table = el('table', { className: 'gm-table' });
@@ -465,7 +450,7 @@ function renderZahlungsvergleich(data) {
   const tbody = el('tbody');
   let gUe = 0, gBar = 0, gSum = 0, gMA = 0, allDone = true;
 
-  BETRIEBE.forEach(betrieb => {
+  GM_BETRIEBE.forEach(betrieb => {
     const bd = data.filter(d => d.betrieb === betrieb);
     if (bd.length === 0) return;
 
@@ -495,14 +480,14 @@ function renderZahlungsvergleich(data) {
       el('span', { className: 'gm-badge gm-badge-ac' }, betrieb)
     ));
     tr.appendChild(el('td', { className: 'mono center', style: { fontSize: '10px' } }, String(bd.length)));
-    tr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--ac)' } }, formatEUR(ue)));
-    tr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--wn)' } }, formatEUR(bar)));
-    tr.appendChild(el('td', { className: 'mono right bold' }, formatEUR(sum)));
+    tr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--ac)' } }, gmFormatEUR(ue)));
+    tr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--wn)' } }, gmFormatEUR(bar)));
+    tr.appendChild(el('td', { className: 'mono right bold' }, gmFormatEUR(sum)));
     tr.appendChild(el('td', { className: 'center' },
       el('span', { style: { color: isDone ? 'var(--ok)' : 'var(--wn)', fontSize: '10px' } },
         isDone ? '✓ komplett' : '⏳ ausstehend')
     ));
-    tr.appendChild(el('td', {}, renderProgressWidget(pct, `Bezahlt: ${formatEUR(paid)} von ${formatEUR(total)}`)));
+    tr.appendChild(el('td', {}, renderProgressWidget(pct, `Bezahlt: ${gmFormatEUR(paid)} von ${gmFormatEUR(total)}`)));
     tbody.appendChild(tr);
   });
 
@@ -518,15 +503,15 @@ function renderZahlungsvergleich(data) {
   const totalTr = el('tr', { className: 'total-row' });
   totalTr.appendChild(el('td', { style: { fontSize: '11px' } }, 'GESAMT'));
   totalTr.appendChild(el('td', { className: 'mono center', style: { fontSize: '10px' } }, String(gMA)));
-  totalTr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--ac)' } }, formatEUR(gUe)));
-  totalTr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--wn)' } }, formatEUR(gBar)));
-  totalTr.appendChild(el('td', { className: 'mono right', style: { fontSize: '12px' } }, formatEUR(gSum)));
+  totalTr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--ac)' } }, gmFormatEUR(gUe)));
+  totalTr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--wn)' } }, gmFormatEUR(gBar)));
+  totalTr.appendChild(el('td', { className: 'mono right', style: { fontSize: '12px' } }, gmFormatEUR(gSum)));
   totalTr.appendChild(el('td', { className: 'center' },
     el('span', {
       style: { color: allDone ? 'var(--ok)' : 'var(--wn)', fontSize: '10px', fontWeight: 700 }
     }, allDone ? '✓ Alle bezahlt' : '⏳ Noch offen')
   ));
-  totalTr.appendChild(el('td', {}, renderProgressWidget(gPct, `Bezahlt: ${formatEUR(gPaid)} von ${formatEUR(gSum)}`)));
+  totalTr.appendChild(el('td', {}, renderProgressWidget(gPct, `Bezahlt: ${gmFormatEUR(gPaid)} von ${gmFormatEUR(gSum)}`)));
   tbody.appendChild(totalTr);
 
   table.appendChild(tbody);
@@ -574,13 +559,13 @@ function renderBarChart(container, data) {
   const chartH = H - pad.top - pad.bottom;
 
   // Group data by betrieb
-  const groups = BETRIEBE.map(b => {
+  const groups = GM_BETRIEBE.map(b => {
     const bd = data.filter(d => d.betrieb === b);
     return {
       name: b,
       ue: bd.reduce((s, d) => s + d.ueberweisung, 0),
       bar: bd.reduce((s, d) => s + d.bar_tg, 0),
-      color: BETRIEB_COLORS[b],
+      color: GM_BETRIEB_COLORS[b],
     };
   }).filter(g => g.ue + g.bar > 0);
 
@@ -591,7 +576,7 @@ function renderBarChart(container, data) {
   const gap = chartW / groups.length;
 
   // Y-Axis
-  const isDark = state.dark;
+  const isDark = gmState.dark;
   ctx.strokeStyle = isDark ? '#2d3140' : '#e2e4e9';
   ctx.fillStyle = isDark ? '#9ca3af' : '#6b7280';
   ctx.font = '9px "JetBrains Mono", monospace';
@@ -658,8 +643,8 @@ function renderBirthdaySection() {
   const now = new Date();
   const birthdays = [];
 
-  state.mitarbeiterData.forEach(ma => {
-    const bd = checkBirthday(ma.stamm?.geburtsdatum);
+  gmState.mitarbeiterData.forEach(ma => {
+    const bd = gmCheckBirthday(ma.stamm?.geburtsdatum);
     if (bd && bd.days <= 30) {
       birthdays.push({
         name: ma.name,
@@ -668,7 +653,7 @@ function renderBirthdaySection() {
         age: bd.age,
         day: bd.birthDay,
         month: bd.birthMonth,
-        tenure: getTenure(ma.eintritt),
+        tenure: gmGetTenure(ma.eintritt),
       });
     }
   });
@@ -727,12 +712,12 @@ function renderBruttoTrendCard(data) {
 
   // Legend
   const legend = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center', marginTop: '8px' } });
-  BETRIEBE.forEach(b => {
+  GM_BETRIEBE.forEach(b => {
     const bd = data.filter(d => d.betrieb === b);
     if (bd.length === 0) return;
     const item = el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px' } });
-    item.appendChild(el('span', { style: { width: '10px', height: '10px', borderRadius: '2px', background: BETRIEB_COLORS[b], display: 'inline-block' } }));
-    item.appendChild(el('span', { style: { color: BETRIEB_COLORS[b] } }, b));
+    item.appendChild(el('span', { style: { width: '10px', height: '10px', borderRadius: '2px', background: GM_BETRIEB_COLORS[b], display: 'inline-block' } }));
+    item.appendChild(el('span', { style: { color: GM_BETRIEB_COLORS[b] } }, b));
     legend.appendChild(item);
   });
   card.appendChild(legend);
@@ -756,12 +741,12 @@ function renderStackedBarChart(container, data) {
   const pad = { top: 10, right: 10, bottom: 35, left: 60 };
   const chartW = W - pad.left - pad.right;
   const chartH = H - pad.top - pad.bottom;
-  const isDark = state.dark;
+  const isDark = gmState.dark;
 
   // Only current month for now (single stacked bar)
-  const betriebData = BETRIEBE.map(b => {
+  const betriebData = GM_BETRIEBE.map(b => {
     const bd = data.filter(d => d.betrieb === b);
-    return { name: b, brutto: bd.reduce((s, d) => s + d.brutto, 0), color: BETRIEB_COLORS[b] };
+    return { name: b, brutto: bd.reduce((s, d) => s + d.brutto, 0), color: GM_BETRIEB_COLORS[b] };
   }).filter(g => g.brutto > 0);
 
   const totalBrutto = betriebData.reduce((s, g) => s + g.brutto, 0);
@@ -812,7 +797,7 @@ function renderStackedBarChart(container, data) {
   ctx.fillStyle = isDark ? '#9ca3af' : '#6b7280';
   ctx.font = '9px "DM Sans", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(state.currentMonat.split(' ')[0], cx, H - pad.bottom + 16);
+  ctx.fillText(gmState.currentMonat.split(' ')[0], cx, H - pad.bottom + 16);
 }
 
 // ════════════════════════════════════════════
@@ -820,7 +805,7 @@ function renderStackedBarChart(container, data) {
 // ════════════════════════════════════════════
 function renderVerteilungCard(data) {
   const card = el('div', { className: 'gm-card' });
-  card.appendChild(el('div', { className: 'gm-title' }, `Verteilung ${state.currentMonat}`));
+  card.appendChild(el('div', { className: 'gm-title' }, `Verteilung ${gmState.currentMonat}`));
 
   const chartWrap = el('div', { style: { height: '220px', position: 'relative' } });
   card.appendChild(chartWrap);
@@ -842,11 +827,11 @@ function renderPieChart(container, data) {
   ctx.scale(2, 2);
 
   const W = rect.width, H = rect.height;
-  const isDark = state.dark;
+  const isDark = gmState.dark;
 
-  const betriebData = BETRIEBE.map(b => {
+  const betriebData = GM_BETRIEBE.map(b => {
     const bd = data.filter(d => d.betrieb === b);
-    return { name: b, brutto: bd.reduce((s, d) => s + d.brutto, 0), color: BETRIEB_COLORS[b] };
+    return { name: b, brutto: bd.reduce((s, d) => s + d.brutto, 0), color: GM_BETRIEB_COLORS[b] };
   }).filter(g => g.brutto > 0);
 
   const totalBrutto = betriebData.reduce((s, g) => s + g.brutto, 0);
@@ -910,7 +895,7 @@ function renderBetriebVergleich(data) {
   const card = el('div', { className: 'gm-card' });
 
   const header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } });
-  header.appendChild(el('div', { className: 'gm-title', style: { marginBottom: 0 } }, `Betrieb-Vergleich ${state.currentMonat}`));
+  header.appendChild(el('div', { className: 'gm-title', style: { marginBottom: 0 } }, `Betrieb-Vergleich ${gmState.currentMonat}`));
 
   const toggle = el('div', { className: 'gm-tab-toggle' });
   toggle.appendChild(el('button', { className: 'active' }, 'Monat'));
@@ -942,15 +927,15 @@ function renderGroupedBarChart(container, data) {
   const pad = { top: 10, right: 20, bottom: 50, left: 70 };
   const chartW = W - pad.left - pad.right;
   const chartH = H - pad.top - pad.bottom;
-  const isDark = state.dark;
+  const isDark = gmState.dark;
 
-  const groups = BETRIEBE.map(b => {
+  const groups = GM_BETRIEBE.map(b => {
     const bd = data.filter(d => d.betrieb === b);
     return {
       name: b,
       brutto: bd.reduce((s, d) => s + d.brutto, 0),
       netto: bd.reduce((s, d) => s + d.netto, 0),
-      color: BETRIEB_COLORS[b],
+      color: GM_BETRIEB_COLORS[b],
     };
   }).filter(g => g.brutto > 0);
 
@@ -1035,7 +1020,7 @@ function renderBetriebSummary(data) {
   const tbody = el('tbody');
   const totalBrutto = data.reduce((s, d) => s + d.brutto, 0);
 
-  BETRIEBE.forEach(betrieb => {
+  GM_BETRIEBE.forEach(betrieb => {
     const bd = data.filter(d => d.betrieb === betrieb);
     if (bd.length === 0) return;
 
@@ -1046,13 +1031,13 @@ function renderBetriebSummary(data) {
 
     const tr = el('tr');
     tr.appendChild(el('td', { style: { fontWeight: 600 } },
-      el('span', { className: 'gm-dot', style: { background: BETRIEB_COLORS[betrieb] } }),
+      el('span', { className: 'gm-dot', style: { background: GM_BETRIEB_COLORS[betrieb] } }),
       betrieb
     ));
     tr.appendChild(el('td', { className: 'mono' }, String(bd.length)));
-    tr.appendChild(el('td', { className: 'mono bold' }, formatEUR(brutto)));
-    tr.appendChild(el('td', { className: 'mono' }, formatEUR(netto)));
-    tr.appendChild(el('td', { className: 'mono' }, formatEUR(avg)));
+    tr.appendChild(el('td', { className: 'mono bold' }, gmFormatEUR(brutto)));
+    tr.appendChild(el('td', { className: 'mono' }, gmFormatEUR(netto)));
+    tr.appendChild(el('td', { className: 'mono' }, gmFormatEUR(avg)));
     tr.appendChild(el('td', { className: 'mono' }, pct + '%'));
     tbody.appendChild(tr);
   });
@@ -1062,8 +1047,8 @@ function renderBetriebSummary(data) {
   const totalTr = el('tr', { style: { background: 'var(--sf2)' } });
   totalTr.appendChild(el('td', { style: { fontWeight: 700 } }, 'Gesamt'));
   totalTr.appendChild(el('td', { className: 'mono bold' }, String(data.length)));
-  totalTr.appendChild(el('td', { className: 'mono bold' }, formatEUR(totalBrutto)));
-  totalTr.appendChild(el('td', { className: 'mono bold' }, formatEUR(gNetto)));
+  totalTr.appendChild(el('td', { className: 'mono bold' }, gmFormatEUR(totalBrutto)));
+  totalTr.appendChild(el('td', { className: 'mono bold' }, gmFormatEUR(gNetto)));
   totalTr.appendChild(el('td', { colSpan: 2 }));
   tbody.appendChild(totalTr);
 
@@ -1075,7 +1060,7 @@ function renderBetriebSummary(data) {
 function renderCrossSiteEmployees() {
   // Find employees at multiple sites
   const nameMap = {};
-  state.mitarbeiterData.forEach(ma => {
+  gmState.mitarbeiterData.forEach(ma => {
     const key = ma.name.toLowerCase().trim();
     if (!nameMap[key]) nameMap[key] = [];
     nameMap[key].push(ma);
@@ -1087,7 +1072,7 @@ function renderCrossSiteEmployees() {
   let totalBrutto = 0;
   crossSite.forEach(arr => {
     arr.forEach(ma => {
-      const g = state.gehaltData.find(d => d.persNr === ma.persNr && d.betrieb === ma.betrieb);
+      const g = gmState.gehaltData.find(d => d.persNr === ma.persNr && d.betrieb === ma.betrieb);
       if (g) totalBrutto += g.brutto;
     });
   });
@@ -1108,7 +1093,7 @@ function renderCrossSiteEmployees() {
   const headerLeft = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
   headerLeft.appendChild(el('span', { className: 'gm-badge gm-badge-wn' }, `⚠ ${crossSite.length}`));
   headerLeft.appendChild(el('span', { style: { fontSize: '12px', fontWeight: 600 } }, 'Standortübergreifende Mitarbeiter'));
-  headerLeft.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--tx3)' } }, `Σ ${formatEUR(totalBrutto)} Brutto`));
+  headerLeft.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--tx3)' } }, `Σ ${gmFormatEUR(totalBrutto)} Brutto`));
   headerBtn.appendChild(headerLeft);
 
   const arrow = el('span', {
@@ -1138,11 +1123,11 @@ function renderCrossSiteEmployees() {
 //  ABRECHNUNG
 // ════════════════════════════════════════════
 function renderAbrechnung() {
-  const data = state.gehaltData;
+  const data = gmState.gehaltData;
   const container = el('div', { className: 'anim-up' });
-  if (!state.betriebFilter) state.betriebFilter = 'Alle';
-  if (!state.abrSearch) state.abrSearch = '';
-  if (!state.abrTypFilter) state.abrTypFilter = 'Alle Typen';
+  if (!gmState.betriebFilter) gmState.betriebFilter = 'Alle';
+  if (!gmState.abrSearch) gmState.abrSearch = '';
+  if (!gmState.abrTypFilter) gmState.abrTypFilter = 'Alle Typen';
 
   const BANKS = ['Commerzbank', 'Commerzbank Enso', 'Commerzbank Okyu', 'Commerzbank Origami',
     'Deutsche Bank', 'ING', 'Revolut Enso', 'Revolut Okyu', 'Revolut Ultra', 'Sparkasse', 'VR Bank', 'Volksbank'];
@@ -1150,11 +1135,11 @@ function renderAbrechnung() {
   // ── Betrieb tabs ──
   const tabBar = el('div', { style: { display: 'flex', gap: '0', borderBottom: '2px solid var(--bd)', marginBottom: '0' } });
   const betriebCounts = {};
-  BETRIEBE.forEach(b => { betriebCounts[b] = data.filter(d => d.betrieb === b).length; });
+  GM_BETRIEBE.forEach(b => { betriebCounts[b] = data.filter(d => d.betrieb === b).length; });
 
-  [{ key: 'Alle', label: 'Alle' }, ...BETRIEBE.map(b => ({ key: b, label: `${b} (${betriebCounts[b]})` }))].forEach(t => {
-    const active = state.betriebFilter === t.key;
-    const bCol = BETRIEB_COLORS[t.key] || 'var(--tx)';
+  [{ key: 'Alle', label: 'Alle' }, ...GM_BETRIEBE.map(b => ({ key: b, label: `${b} (${betriebCounts[b]})` }))].forEach(t => {
+    const active = gmState.betriebFilter === t.key;
+    const bCol = GM_BETRIEB_COLORS[t.key] || 'var(--tx)';
     tabBar.appendChild(el('button', {
       style: {
         padding: '8px 16px', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)',
@@ -1163,7 +1148,7 @@ function renderAbrechnung() {
         borderBottom: active ? `2px solid ${bCol}` : '2px solid transparent',
         background: 'transparent', marginBottom: '-2px', whiteSpace: 'nowrap'
       },
-      onClick: () => { state.betriebFilter = t.key; renderApp(); }
+      onClick: () => { gmState.betriebFilter = t.key; gmRenderCurrentTab(); }
     }, t.label));
   });
 
@@ -1194,18 +1179,18 @@ function renderAbrechnung() {
   const totalBrutto = data.reduce((s, d) => s + d.brutto, 0);
   toolbar.appendChild(el('span', {
     style: { fontSize: '9px', color: 'var(--tx2)', marginLeft: '4px' }
-  }, `${formatEUR(totalGehalt)} Gehalt \u00b7 ${formatEUR(totalBrutto)} Ges.-Brutto \u00b7 ${data.length} MA`));
+  }, `${gmFormatEUR(totalGehalt)} Gehalt \u00b7 ${gmFormatEUR(totalBrutto)} Ges.-Brutto \u00b7 ${data.length} MA`));
 
   // Betrieb status chips
   const spacer = el('div', { style: { flex: 1 } });
   toolbar.appendChild(spacer);
 
-  BETRIEBE.forEach(b => {
+  GM_BETRIEBE.forEach(b => {
     const bData = data.filter(d => d.betrieb === b);
     const done = bData.filter(d => d.ue_status === 'ueberwiesen' || d.ue_status === 'dauerauftrag').length;
     const total = bData.length;
     const allDone = done === total;
-    const bCol = BETRIEB_COLORS[b];
+    const bCol = GM_BETRIEB_COLORS[b];
     toolbar.appendChild(el('span', {
       style: {
         padding: '2px 6px', borderRadius: '4px', fontSize: '8px', fontWeight: 600,
@@ -1236,17 +1221,17 @@ function renderAbrechnung() {
     className: 'gm-input', placeholder: 'Name, Pers.Nr, Betrieb...',
     id: 'abr-search-input',
     style: { width: '180px', fontSize: '10px', padding: '5px 8px', border: 'none', outline: 'none', background: 'transparent' },
-    value: state.abrSearch,
-    onInput: (e) => { state.abrSearch = e.target.value; renderApp(); },
-    onKeyDown: (e) => { if (e.key === 'Escape') { state.abrSearch = ''; renderApp(); } }
+    value: gmState.abrSearch,
+    onInput: (e) => { gmState.abrSearch = e.target.value; gmRenderCurrentTab(); },
+    onKeyDown: (e) => { if (e.key === 'Escape') { gmState.abrSearch = ''; gmRenderCurrentTab(); } }
   });
   searchGroup.appendChild(searchInput);
 
   // Clear button (×)
-  if (state.abrSearch) {
+  if (gmState.abrSearch) {
     searchGroup.appendChild(el('button', {
       style: { border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '12px', color: 'var(--tx3)', padding: '0 4px' },
-      onClick: () => { state.abrSearch = ''; renderApp(); }
+      onClick: () => { gmState.abrSearch = ''; gmRenderCurrentTab(); }
     }, '\u2715'));
   }
 
@@ -1262,27 +1247,27 @@ function renderAbrechnung() {
   filterRow.appendChild(searchGroup);
 
   // Ü-Status filter
-  if (!state.abrUeStatusFilter) state.abrUeStatusFilter = 'Alle';
+  if (!gmState.abrUeStatusFilter) gmState.abrUeStatusFilter = 'Alle';
   const ueStatusSel = el('select', {
     className: 'gm-select', style: { fontSize: '9px' },
-    onChange: (e) => { state.abrUeStatusFilter = e.target.value; renderApp(); }
+    onChange: (e) => { gmState.abrUeStatusFilter = e.target.value; gmRenderCurrentTab(); }
   });
   [{ v: 'Alle', l: '\u00dc-Status: Alle' }, { v: 'offen', l: '\u25cb Offen' }, { v: 'dauerauftrag', l: '\ud83d\udd04 Dauerauftrag' }, { v: 'ueberwiesen', l: '\u2705 \u00dcberwiesen' }].forEach(o => {
     const opt = el('option', { value: o.v }, o.l);
-    if (o.v === state.abrUeStatusFilter) opt.selected = true;
+    if (o.v === gmState.abrUeStatusFilter) opt.selected = true;
     ueStatusSel.appendChild(opt);
   });
   filterRow.appendChild(ueStatusSel);
 
   // B-Status filter
-  if (!state.abrBarStatusFilter) state.abrBarStatusFilter = 'Alle';
+  if (!gmState.abrBarStatusFilter) gmState.abrBarStatusFilter = 'Alle';
   const barStatusSel = el('select', {
     className: 'gm-select', style: { fontSize: '9px' },
-    onChange: (e) => { state.abrBarStatusFilter = e.target.value; renderApp(); }
+    onChange: (e) => { gmState.abrBarStatusFilter = e.target.value; gmRenderCurrentTab(); }
   });
   [{ v: 'Alle', l: 'B-Status: Alle' }, { v: 'offen', l: '\u25cb Offen' }, { v: 'vorbereitet', l: '\ud83d\udce6 Vorbereitet' }, { v: 'gezahlt', l: '\ud83d\udcb5 Gezahlt' }].forEach(o => {
     const opt = el('option', { value: o.v }, o.l);
-    if (o.v === state.abrBarStatusFilter) opt.selected = true;
+    if (o.v === gmState.abrBarStatusFilter) opt.selected = true;
     barStatusSel.appendChild(opt);
   });
   filterRow.appendChild(barStatusSel);
@@ -1290,12 +1275,12 @@ function renderAbrechnung() {
   // Alle Typen filter
   const typSel = el('select', {
     className: 'gm-select', style: { fontSize: '9px' },
-    onChange: (e) => { state.abrTypFilter = e.target.value; renderApp(); }
+    onChange: (e) => { gmState.abrTypFilter = e.target.value; gmRenderCurrentTab(); }
   });
-  const typen = ['Alle Typen', ...new Set(state.mitarbeiterData.map(m => m.stamm?.typ).filter(Boolean))];
+  const typen = ['Alle Typen', ...new Set(gmState.mitarbeiterData.map(m => m.stamm?.typ).filter(Boolean))];
   typen.forEach(t => {
     const opt = el('option', { value: t }, t);
-    if (t === state.abrTypFilter) opt.selected = true;
+    if (t === gmState.abrTypFilter) opt.selected = true;
     typSel.appendChild(opt);
   });
   filterRow.appendChild(typSel);
@@ -1317,10 +1302,10 @@ function renderAbrechnung() {
   container.appendChild(filterRow);
 
   // ── Filter data ──
-  let filtered = state.betriebFilter === 'Alle' ? [...data] : data.filter(d => d.betrieb === state.betriebFilter);
+  let filtered = gmState.betriebFilter === 'Alle' ? [...data] : data.filter(d => d.betrieb === gmState.betriebFilter);
 
-  if (state.abrSearch) {
-    const q = state.abrSearch.toLowerCase();
+  if (gmState.abrSearch) {
+    const q = gmState.abrSearch.toLowerCase();
     filtered = filtered.filter(d =>
       d.name.toLowerCase().includes(q) ||
       String(d.persNr).includes(q) ||
@@ -1330,22 +1315,22 @@ function renderAbrechnung() {
     );
   }
 
-  if (state.abrUeStatusFilter && state.abrUeStatusFilter !== 'Alle') {
-    filtered = filtered.filter(d => d.ue_status === state.abrUeStatusFilter);
+  if (gmState.abrUeStatusFilter && gmState.abrUeStatusFilter !== 'Alle') {
+    filtered = filtered.filter(d => d.ue_status === gmState.abrUeStatusFilter);
   }
 
-  if (state.abrBarStatusFilter && state.abrBarStatusFilter !== 'Alle') {
-    filtered = filtered.filter(d => d.bar_status === state.abrBarStatusFilter);
+  if (gmState.abrBarStatusFilter && gmState.abrBarStatusFilter !== 'Alle') {
+    filtered = filtered.filter(d => d.bar_status === gmState.abrBarStatusFilter);
   }
 
-  if (state.abrTypFilter !== 'Alle Typen') {
+  if (gmState.abrTypFilter !== 'Alle Typen') {
     filtered = filtered.filter(d => {
-      const ma = state.mitarbeiterData.find(m => m.persNr === d.persNr && m.betrieb === d.betrieb);
-      return ma?.stamm?.typ === state.abrTypFilter;
+      const ma = gmState.mitarbeiterData.find(m => m.persNr === d.persNr && m.betrieb === d.betrieb);
+      return ma?.stamm?.typ === gmState.abrTypFilter;
     });
   }
 
-  if (!state.abrSort) state.abrSort = { col: 'name', dir: 'asc' };
+  if (!gmState.abrSort) gmState.abrSort = { col: 'name', dir: 'asc' };
 
   // Sortable columns config
   const sortCols = [
@@ -1370,8 +1355,8 @@ function renderAbrechnung() {
   const thead = el('thead');
   const hr = el('tr');
   sortCols.forEach(col => {
-    const isActive = state.abrSort.col === col.key;
-    const arrow = isActive ? (state.abrSort.dir === 'asc' ? ' \u25b2' : ' \u25bc') : (col.sortable ? ' \u2195' : '');
+    const isActive = gmState.abrSort.col === col.key;
+    const arrow = isActive ? (gmState.abrSort.dir === 'asc' ? ' \u25b2' : ' \u25bc') : (col.sortable ? ' \u2195' : '');
     hr.appendChild(el('th', {
       style: {
         cursor: col.sortable ? 'pointer' : 'default',
@@ -1380,12 +1365,12 @@ function renderAbrechnung() {
         whiteSpace: 'nowrap'
       },
       onClick: col.sortable ? () => {
-        if (state.abrSort.col === col.key) {
-          state.abrSort.dir = state.abrSort.dir === 'asc' ? 'desc' : 'asc';
+        if (gmState.abrSort.col === col.key) {
+          gmState.abrSort.dir = gmState.abrSort.dir === 'asc' ? 'desc' : 'asc';
         } else {
-          state.abrSort = { col: col.key, dir: 'asc' };
+          gmState.abrSort = { col: col.key, dir: 'asc' };
         }
-        renderApp();
+        gmRenderCurrentTab();
       } : undefined
     }, col.label + arrow));
   });
@@ -1393,11 +1378,11 @@ function renderAbrechnung() {
   table.appendChild(thead);
 
   const tbody = el('tbody');
-  const statusCfg = getStatusConfig();
-  const typFarben = getTypFarben();
+  const statusCfg = gmGetStatusConfig();
+  const typFarben = gmGetTypFarben();
 
   // Sort filtered data
-  const sc = state.abrSort;
+  const sc = gmState.abrSort;
   filtered.sort((a, b) => {
     let va, vb;
     if (sc.col === 'summe') {
@@ -1422,14 +1407,14 @@ function renderAbrechnung() {
   totalTr.appendChild(el('td', {}));
   totalTr.appendChild(el('td', { style: { fontSize: '10px' } }, `${filtered.length} MA`));
   totalTr.appendChild(el('td', {}));
-  totalTr.appendChild(el('td', { className: 'mono right' }, formatEUR(filtered.reduce((s, d) => s + d.gehalt, 0))));
-  totalTr.appendChild(el('td', { className: 'mono right' }, formatEUR(filtered.reduce((s, d) => s + d.brutto, 0))));
-  totalTr.appendChild(el('td', { className: 'mono right' }, formatEUR(filtered.reduce((s, d) => s + d.netto, 0))));
-  totalTr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--ac)' } }, formatEUR(filtered.reduce((s, d) => s + d.ueberweisung, 0))));
+  totalTr.appendChild(el('td', { className: 'mono right' }, gmFormatEUR(filtered.reduce((s, d) => s + d.gehalt, 0))));
+  totalTr.appendChild(el('td', { className: 'mono right' }, gmFormatEUR(filtered.reduce((s, d) => s + d.brutto, 0))));
+  totalTr.appendChild(el('td', { className: 'mono right' }, gmFormatEUR(filtered.reduce((s, d) => s + d.netto, 0))));
+  totalTr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--ac)' } }, gmFormatEUR(filtered.reduce((s, d) => s + d.ueberweisung, 0))));
   totalTr.appendChild(el('td', { style: { textAlign: 'center', fontSize: '9px', color: 'var(--tx3)' } }, '\u2014'));
-  totalTr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--wn)' } }, formatEUR(filtered.reduce((s, d) => s + d.bar_tg, 0))));
+  totalTr.appendChild(el('td', { className: 'mono right', style: { color: 'var(--wn)' } }, gmFormatEUR(filtered.reduce((s, d) => s + d.bar_tg, 0))));
   totalTr.appendChild(el('td', { style: { textAlign: 'center', fontSize: '9px', color: 'var(--tx3)' } }, '\u2014'));
-  totalTr.appendChild(el('td', { className: 'mono right' }, formatEUR(filtered.reduce((s, d) => s + d.ueberweisung + d.bar_tg, 0))));
+  totalTr.appendChild(el('td', { className: 'mono right' }, gmFormatEUR(filtered.reduce((s, d) => s + d.ueberweisung + d.bar_tg, 0))));
   totalTr.appendChild(el('td', {}));
   tbody.appendChild(totalTr);
 
@@ -1441,7 +1426,7 @@ function renderAbrechnung() {
     // Name + type badge
     const nameCell = el('td', { style: { fontWeight: 600 } });
     nameCell.appendChild(document.createTextNode(d.name + ' '));
-    const ma = state.mitarbeiterData.find(m => m.persNr === d.persNr && m.betrieb === d.betrieb);
+    const ma = gmState.mitarbeiterData.find(m => m.persNr === d.persNr && m.betrieb === d.betrieb);
     if (ma?.stamm?.typ) {
       nameCell.appendChild(el('span', {
         className: 'gm-badge',
@@ -1454,9 +1439,9 @@ function renderAbrechnung() {
       el('span', { className: 'gm-badge gm-badge-ac', style: { fontSize: '8px' } }, d.betrieb)
     ));
 
-    tr.appendChild(el('td', { className: 'mono right' }, formatEUR(d.gehalt)));
-    tr.appendChild(el('td', { className: 'mono right bold' }, formatEUR(d.brutto)));
-    tr.appendChild(el('td', { className: 'mono right' }, formatEUR(d.netto)));
+    tr.appendChild(el('td', { className: 'mono right' }, gmFormatEUR(d.gehalt)));
+    tr.appendChild(el('td', { className: 'mono right bold' }, gmFormatEUR(d.brutto)));
+    tr.appendChild(el('td', { className: 'mono right' }, gmFormatEUR(d.netto)));
 
     // \u00dcberweisung with editable input + bank pill
     const ueCell = el('td', { style: { position: 'relative' } });
@@ -1473,10 +1458,10 @@ function renderAbrechnung() {
       onBlur: async (e) => {
         const newVal = parseFloat(e.target.value) || 0;
         if (newVal !== d.ueberweisung) {
-          await supabase.from('gehaelter').update({ ueberweisung: newVal })
-            .eq('pers_nr', d.persNr).eq('betrieb', d.betrieb).eq('monat', state.currentMonat);
-          state.gehaltData = await loadGehaltData(state.currentMonat);
-          renderApp();
+          await sbGehalt.from('gehaelter').update({ ueberweisung: newVal })
+            .eq('pers_nr', d.persNr).eq('betrieb', d.betrieb).eq('monat', gmState.currentMonat);
+          gmState.gehaltData = await gmLoadGehaltData(gmState.currentMonat);
+          gmRenderCurrentTab();
         }
       }
     });
@@ -1526,10 +1511,10 @@ function renderAbrechnung() {
       onBlur: async (e) => {
         const newVal = parseFloat(e.target.value) || 0;
         if (newVal !== d.bar_tg) {
-          await supabase.from('gehaelter').update({ bar_tg: newVal })
-            .eq('pers_nr', d.persNr).eq('betrieb', d.betrieb).eq('monat', state.currentMonat);
-          state.gehaltData = await loadGehaltData(state.currentMonat);
-          renderApp();
+          await sbGehalt.from('gehaelter').update({ bar_tg: newVal })
+            .eq('pers_nr', d.persNr).eq('betrieb', d.betrieb).eq('monat', gmState.currentMonat);
+          gmState.gehaltData = await gmLoadGehaltData(gmState.currentMonat);
+          gmRenderCurrentTab();
         }
       }
     });
@@ -1549,7 +1534,7 @@ function renderAbrechnung() {
     barStatusCell.appendChild(barStatusWrap);
     tr.appendChild(barStatusCell);
 
-    tr.appendChild(el('td', { className: 'mono right bold' }, formatEUR(d.ueberweisung + d.bar_tg)));
+    tr.appendChild(el('td', { className: 'mono right bold' }, gmFormatEUR(d.ueberweisung + d.bar_tg)));
     tr.appendChild(el('td', { style: { fontSize: '10px', color: 'var(--tx2)', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis' } }, d.notiz || '\u2014'));
 
     tbody.appendChild(tr);
@@ -1571,18 +1556,18 @@ function renderMitarbeiterTab() {
   const headerRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px', flexWrap: 'wrap' } });
 
   headerRow.appendChild(el('div', { className: 'gm-title', style: { marginBottom: 0 } },
-    `👥 Mitarbeiter — ${state.mitarbeiterData.length} aktiv`
+    `👥 Mitarbeiter — ${gmState.mitarbeiterData.length} aktiv`
   ));
 
   // Filter
   const filterRow = el('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } });
   const betriebSel = el('select', {
     className: 'gm-select',
-    onChange: (e) => { state.betriebFilter = e.target.value; renderApp(); }
+    onChange: (e) => { gmState.betriebFilter = e.target.value; gmRenderCurrentTab(); }
   });
-  ['Alle', ...BETRIEBE].forEach(b => {
+  ['Alle', ...GM_BETRIEBE].forEach(b => {
     const opt = el('option', { value: b }, b);
-    if (b === state.betriebFilter) opt.selected = true;
+    if (b === gmState.betriebFilter) opt.selected = true;
     betriebSel.appendChild(opt);
   });
   filterRow.appendChild(betriebSel);
@@ -1590,12 +1575,12 @@ function renderMitarbeiterTab() {
   container.appendChild(headerRow);
 
   // Filter
-  const filtered = state.betriebFilter === 'Alle'
-    ? state.mitarbeiterData
-    : state.mitarbeiterData.filter(m => m.betrieb === state.betriebFilter);
+  const filtered = gmState.betriebFilter === 'Alle'
+    ? gmState.mitarbeiterData
+    : gmState.mitarbeiterData.filter(m => m.betrieb === gmState.betriebFilter);
 
   // KPIs
-  const typFarben = getTypFarben();
+  const typFarben = gmGetTypFarben();
   const typCounts = {};
   filtered.forEach(m => {
     const t = m.stamm?.typ || 'Unbekannt';
@@ -1645,7 +1630,7 @@ function renderMitarbeiterTab() {
     ));
 
     tr.appendChild(el('td', { style: { fontSize: '10px' } }, ma.eintritt || '—'));
-    tr.appendChild(el('td', { className: 'mono right' }, ma.stamm?.eurStd ? formatEUR(ma.stamm.eurStd) : '—'));
+    tr.appendChild(el('td', { className: 'mono right' }, ma.stamm?.eurStd ? gmFormatEUR(ma.stamm.eurStd) : '—'));
     tr.appendChild(el('td', { className: 'mono right' }, ma.stamm?.stdMonat ? String(ma.stamm.stdMonat) : '—'));
     tr.appendChild(el('td', { style: { fontSize: '9px', fontFamily: 'var(--mono)' } }, ma.stamm?.iban ? '****' + ma.stamm.iban.slice(-4) : '—'));
     tr.appendChild(el('td', { style: { fontSize: '10px' } }, ma.stamm?.krankenkasse || '—'));
@@ -1664,7 +1649,7 @@ function renderMitarbeiterTab() {
 //  BANKEN
 // ════════════════════════════════════════════
 function renderBanken() {
-  const data = state.gehaltData;
+  const data = gmState.gehaltData;
   const container = el('div', { className: 'anim-up' });
 
   // ── Betrieb Filter Row ──
@@ -1676,21 +1661,21 @@ function renderBanken() {
     className: 'gm-select',
     style: { minWidth: '100px' },
     onChange: (e) => {
-      state.betriebFilter = e.target.value;
-      renderApp();
+      gmState.betriebFilter = e.target.value;
+      gmRenderCurrentTab();
     }
   });
-  ['Alle', ...BETRIEBE].forEach(b => {
+  ['Alle', ...GM_BETRIEBE].forEach(b => {
     const opt = el('option', { value: b }, b === 'Alle' ? 'Alle ▾' : b);
-    if (b === state.betriebFilter) opt.selected = true;
+    if (b === gmState.betriebFilter) opt.selected = true;
     filterSelect.appendChild(opt);
   });
   filterRow.appendChild(filterSelect);
-  filterRow.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--tx3)' } }, state.currentMonat));
+  filterRow.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--tx3)' } }, gmState.currentMonat));
   container.appendChild(filterRow);
 
   // Filter data
-  const filtered = state.betriebFilter === 'Alle' ? data : data.filter(d => d.betrieb === state.betriebFilter);
+  const filtered = gmState.betriebFilter === 'Alle' ? data : data.filter(d => d.betrieb === gmState.betriebFilter);
 
   // ── 4 KPI Cards ──
   const ueData = filtered.filter(d => d.ueberweisung > 0);
@@ -1705,10 +1690,10 @@ function renderBanken() {
   const gesamtAuszahlung = ueTotal + barTotal;
 
   container.appendChild(renderKPIRow([
-    { label: 'Überweisungen', value: formatEUR(ueTotal), sub: `${ueData.length} MA`, color: 'var(--ac)' },
-    { label: 'Bar / TG Offen', value: formatEUR(barTotal), sub: `${barData.length} MA`, color: 'var(--wn)' },
-    { label: 'Offen', value: formatEUR(gesamtOffen), sub: `${ueOffen.length + barOffen.length} MA`, color: 'var(--no)' },
-    { label: 'Gesamt Auszahlung', value: formatEUR(gesamtAuszahlung), color: '#a78bfa' },
+    { label: 'Überweisungen', value: gmFormatEUR(ueTotal), sub: `${ueData.length} MA`, color: 'var(--ac)' },
+    { label: 'Bar / TG Offen', value: gmFormatEUR(barTotal), sub: `${barData.length} MA`, color: 'var(--wn)' },
+    { label: 'Offen', value: gmFormatEUR(gesamtOffen), sub: `${ueOffen.length + barOffen.length} MA`, color: 'var(--no)' },
+    { label: 'Gesamt Auszahlung', value: gmFormatEUR(gesamtAuszahlung), color: '#a78bfa' },
   ]));
 
   // ── Group by Bank ──
@@ -1762,7 +1747,7 @@ function renderBanken() {
     const headerRight = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
     headerRight.appendChild(el('span', {
       style: { fontFamily: 'var(--mono)', fontSize: '14px', fontWeight: 700, color: 'var(--ac)' }
-    }, formatEUR(bankData.total)));
+    }, gmFormatEUR(bankData.total)));
     headerRight.appendChild(el('span', {
       className: 'gm-arrow',
       style: { fontSize: '11px', color: 'var(--tx3)', transition: 'transform 0.15s', transform: 'rotate(0deg)' }
@@ -1800,7 +1785,7 @@ function renderBanken() {
       tr.appendChild(el('td', { style: { fontWeight: 600 } }, d.name));
 
       // Betrieb badge
-      const betriebColor = BETRIEB_COLORS[d.betrieb] || 'var(--ac)';
+      const betriebColor = GM_BETRIEB_COLORS[d.betrieb] || 'var(--ac)';
       tr.appendChild(el('td', {},
         el('span', {
           style: {
@@ -1815,7 +1800,7 @@ function renderBanken() {
       tr.appendChild(el('td', {
         className: 'mono right',
         style: { fontWeight: 700, color: 'var(--ac)' }
-      }, formatEUR(d.ueberweisung)));
+      }, gmFormatEUR(d.ueberweisung)));
 
       // Status badge
       const statusCfg = getUeStatusConfig(d.ue_status);
@@ -1862,23 +1847,23 @@ function getUeStatusConfig(status) {
 //  HRM TAB — Stammdaten / Personalverwaltung
 // ════════════════════════════════════════════
 function renderHRM() {
-  const data = state.gehaltData;
-  const allMA = state.mitarbeiterData;
+  const data = gmState.gehaltData;
+  const allMA = gmState.mitarbeiterData;
   const container = el('div', { className: 'anim-up' });
 
   // ── Title ──
   const titleRow = el('div', { style: { marginBottom: '6px' } });
   titleRow.appendChild(el('div', { style: { fontSize: '16px', fontWeight: 700 } }, '📋 Personal & Löhne'));
-  titleRow.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--tx3)' } }, `${state.currentMonat} · ${data.length} Mitarbeiter`));
+  titleRow.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--tx3)' } }, `${gmState.currentMonat} · ${data.length} Mitarbeiter`));
   container.appendChild(titleRow);
 
   // ── Sub-tabs: Intern / Steuerberater ──
-  if (!state.hrmSubTab) state.hrmSubTab = 'intern';
+  if (!gmState.hrmSubTab) gmState.hrmSubTab = 'intern';
   const tabRow = el('div', { style: { display: 'flex', gap: '0', borderBottom: '2px solid var(--bd)', marginBottom: '14px' } });
 
   ['intern', 'steuerberater'].forEach(t => {
     const label = t === 'intern' ? 'Intern' : 'Steuerberater';
-    const active = state.hrmSubTab === t;
+    const active = gmState.hrmSubTab === t;
     tabRow.appendChild(el('button', {
       style: {
         padding: '8px 16px', border: 'none', cursor: 'pointer',
@@ -1887,7 +1872,7 @@ function renderHRM() {
         borderBottom: active ? '2px solid var(--ac)' : '2px solid transparent',
         background: 'transparent', marginBottom: '-2px'
       },
-      onClick: () => { state.hrmSubTab = t; renderApp(); }
+      onClick: () => { gmState.hrmSubTab = t; gmRenderCurrentTab(); }
     }, label));
   });
   container.appendChild(tabRow);
@@ -1897,11 +1882,11 @@ function renderHRM() {
     style: { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' }
   });
 
-  if (!state.hrmBetriebFilter) state.hrmBetriebFilter = 'Alle';
+  if (!gmState.hrmBetriebFilter) gmState.hrmBetriebFilter = 'Alle';
 
-  ['Alle', ...BETRIEBE].forEach(b => {
+  ['Alle', ...GM_BETRIEBE].forEach(b => {
     const count = b === 'Alle' ? data.length : data.filter(d => d.betrieb === b).length;
-    const active = state.hrmBetriebFilter === b;
+    const active = gmState.hrmBetriebFilter === b;
     filterRow.appendChild(el('button', {
       style: {
         padding: '4px 10px', borderRadius: '14px', fontSize: '10px', fontWeight: 600,
@@ -1910,7 +1895,7 @@ function renderHRM() {
         color: active ? 'var(--ac)' : 'var(--tx2)',
         cursor: 'pointer', fontFamily: 'var(--font)'
       },
-      onClick: () => { state.hrmBetriebFilter = b; renderApp(); }
+      onClick: () => { gmState.hrmBetriebFilter = b; gmRenderCurrentTab(); }
     }, `${b} (${count})`));
   });
 
@@ -1923,19 +1908,19 @@ function renderHRM() {
     type: 'text',
     placeholder: 'Name oder PersNr..',
     style: { width: '160px', fontSize: '10px' },
-    onInput: (e) => { state.hrmSearch = e.target.value; renderApp(); }
+    onInput: (e) => { gmState.hrmSearch = e.target.value; gmRenderCurrentTab(); }
   });
-  if (state.hrmSearch) search.value = state.hrmSearch;
+  if (gmState.hrmSearch) search.value = gmState.hrmSearch;
   filterRow.appendChild(search);
   container.appendChild(filterRow);
 
   // Filter data
   let filtered = [...data];
-  if (state.hrmBetriebFilter !== 'Alle') {
-    filtered = filtered.filter(d => d.betrieb === state.hrmBetriebFilter);
+  if (gmState.hrmBetriebFilter !== 'Alle') {
+    filtered = filtered.filter(d => d.betrieb === gmState.hrmBetriebFilter);
   }
-  if (state.hrmSearch) {
-    const q = state.hrmSearch.toLowerCase();
+  if (gmState.hrmSearch) {
+    const q = gmState.hrmSearch.toLowerCase();
     filtered = filtered.filter(d => d.name?.toLowerCase().includes(q) || String(d.persNr).includes(q));
   }
 
@@ -1951,13 +1936,13 @@ function renderHRM() {
 
   // Überw. Offen card
   kpiGrid.appendChild(renderHRMKpiCard(
-    '🏦 Überw. Offen', formatEUR(ueOffenAmt), 'var(--ac)',
-    `von ${formatEUR(ueGesamt)} gesamt`
+    '🏦 Überw. Offen', gmFormatEUR(ueOffenAmt), 'var(--ac)',
+    `von ${gmFormatEUR(ueGesamt)} gesamt`
   ));
   // Bar Offen card
   kpiGrid.appendChild(renderHRMKpiCard(
-    '💵 Bar Offen', formatEUR(barOffenAmt), 'var(--no)',
-    `von ${formatEUR(barGesamt)} gesamt`
+    '💵 Bar Offen', gmFormatEUR(barOffenAmt), 'var(--no)',
+    `von ${gmFormatEUR(barGesamt)} gesamt`
   ));
   container.appendChild(kpiGrid);
 
@@ -1965,7 +1950,7 @@ function renderHRM() {
   container.appendChild(renderPOSKasse(filtered));
 
   // ── Table ──
-  if (state.hrmSubTab === 'intern') {
+  if (gmState.hrmSubTab === 'intern') {
     container.appendChild(renderHRMInternTable(filtered));
   } else {
     container.appendChild(renderHRMSteuerberaterTable(filtered));
@@ -2017,12 +2002,12 @@ function renderPOSKasse(data) {
   }, '💵 POS Kasse (Bar)'));
   barCard.appendChild(el('div', {
     style: { fontSize: '16px', fontWeight: 700, fontFamily: 'var(--mono)', marginTop: '4px' }
-  }, formatEUR(barPaid)));
-  barCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--tx3)' } }, `Ziel: ${formatEUR(barTotal)} Bar-Löhne`));
+  }, gmFormatEUR(barPaid)));
+  barCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--tx3)' } }, `Ziel: ${gmFormatEUR(barTotal)} Bar-Löhne`));
   if (barRemaining > 0) {
     barCard.appendChild(el('div', {
       style: { fontSize: '9px', color: 'var(--no)', marginTop: '4px', fontWeight: 600 }
-    }, `❌ Es fehlen noch ${formatEUR(barRemaining)}`));
+    }, `❌ Es fehlen noch ${gmFormatEUR(barRemaining)}`));
   } else {
     barCard.appendChild(el('div', {
       style: { fontSize: '9px', color: 'var(--ok)', marginTop: '4px', fontWeight: 600 }
@@ -2042,12 +2027,12 @@ function renderPOSKasse(data) {
   }, '🏦 POS Kasse (Bank)'));
   bankCard.appendChild(el('div', {
     style: { fontSize: '16px', fontWeight: 700, fontFamily: 'var(--mono)', marginTop: '4px' }
-  }, formatEUR(uePaid)));
-  bankCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--tx3)' } }, `Ziel: ${formatEUR(ueTotal)} Überweisungen`));
+  }, gmFormatEUR(uePaid)));
+  bankCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--tx3)' } }, `Ziel: ${gmFormatEUR(ueTotal)} Überweisungen`));
   if (ueRemaining > 0) {
     bankCard.appendChild(el('div', {
       style: { fontSize: '9px', color: 'var(--no)', marginTop: '4px', fontWeight: 600 }
-    }, `❌ Es fehlen noch ${formatEUR(ueRemaining)}`));
+    }, `❌ Es fehlen noch ${gmFormatEUR(ueRemaining)}`));
   } else {
     bankCard.appendChild(el('div', {
       style: { fontSize: '9px', color: 'var(--ok)', marginTop: '4px', fontWeight: 600 }
@@ -2086,7 +2071,7 @@ function renderHRMInternTable(data) {
     const firstInitial = (nameParts[1] || '').trim().split(' ').map(n => n[0]).join('. ');
     tr.appendChild(el('td', { style: { fontWeight: 600 } }, `${firstInitial ? firstInitial + '. ' : ''}${lastName}`));
 
-    const bColor = BETRIEB_COLORS[d.betrieb] || 'var(--ac)';
+    const bColor = GM_BETRIEB_COLORS[d.betrieb] || 'var(--ac)';
     tr.appendChild(el('td', {}, el('span', {
       style: { padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 600, background: bColor + '18', color: bColor }
     }, d.betrieb)));
@@ -2107,7 +2092,7 @@ function renderHRMInternTable(data) {
         onClick: (e) => { e.stopPropagation(); showStatusDropdown(e.currentTarget.parentElement, d, 'ue'); }
       });
       statusBtn.appendChild(el('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: ueCol, display: 'inline-block' } }));
-      statusBtn.appendChild(document.createTextNode(' ' + formatEUR(d.ueberweisung) + ' ' + getPaymentStatusIcon(d.ue_status)));
+      statusBtn.appendChild(document.createTextNode(' ' + gmFormatEUR(d.ueberweisung) + ' ' + getPaymentStatusIcon(d.ue_status)));
       ueWrap.appendChild(statusBtn);
 
       if (d.ue_datum) ueWrap.appendChild(el('span', { style: { fontSize: '8px', color: 'var(--tx3)' } }, d.ue_datum));
@@ -2143,7 +2128,7 @@ function renderHRMInternTable(data) {
         onClick: (e) => { e.stopPropagation(); showStatusDropdown(e.currentTarget.parentElement, d, 'bar'); }
       });
       barBtn.appendChild(el('span', { style: { width: '6px', height: '6px', borderRadius: '50%', background: barCol, display: 'inline-block' } }));
-      barBtn.appendChild(document.createTextNode(' ' + formatEUR(d.bar_tg) + ' ' + getBarStatusIcon(d.bar_status)));
+      barBtn.appendChild(document.createTextNode(' ' + gmFormatEUR(d.bar_tg) + ' ' + getBarStatusIcon(d.bar_status)));
       barWrap.appendChild(barBtn);
 
       if (d.bar_datum) barWrap.appendChild(el('span', { style: { fontSize: '8px', color: 'var(--tx3)' } }, d.bar_datum));
@@ -2271,17 +2256,17 @@ async function updatePaymentStatus(record, type, newStatus) {
   if ((type === 'ue' && newStatus === 'ueberwiesen') || (type === 'bar' && newStatus === 'gezahlt')) {
     update[dateField] = dateStr;
   }
-  const { error } = await supabase.from('gehaelter').update(update)
-    .eq('pers_nr', record.persNr).eq('betrieb', record.betrieb).eq('monat', state.currentMonat);
+  const { error } = await sbGehalt.from('gehaelter').update(update)
+    .eq('pers_nr', record.persNr).eq('betrieb', record.betrieb).eq('monat', gmState.currentMonat);
   if (error) { showToast('\u274c Fehler: ' + error.message); }
-  else { showToast(`\u2705 ${record.name}: ${newStatus}`); state.gehaltData = await loadGehaltData(state.currentMonat); renderApp(); }
+  else { showToast(`\u2705 ${record.name}: ${newStatus}`); gmState.gehaltData = await gmLoadGehaltData(gmState.currentMonat); gmRenderCurrentTab(); }
 }
 
 async function updateBank(record, newBank) {
-  const { error } = await supabase.from('gehaelter').update({ ue_bank: newBank })
-    .eq('pers_nr', record.persNr).eq('betrieb', record.betrieb).eq('monat', state.currentMonat);
+  const { error } = await sbGehalt.from('gehaelter').update({ ue_bank: newBank })
+    .eq('pers_nr', record.persNr).eq('betrieb', record.betrieb).eq('monat', gmState.currentMonat);
   if (error) { showToast('\u274c Fehler: ' + error.message); }
-  else { showToast(`\u2705 Bank \u2192 ${newBank || 'entfernt'}`); state.gehaltData = await loadGehaltData(state.currentMonat); renderApp(); }
+  else { showToast(`\u2705 Bank \u2192 ${newBank || 'entfernt'}`); gmState.gehaltData = await gmLoadGehaltData(gmState.currentMonat); gmRenderCurrentTab(); }
 }
 
 function renderHRMSteuerberaterTable(data) {
@@ -2315,19 +2300,19 @@ function renderHRMSteuerberaterTable(data) {
 
     tr.appendChild(el('td', { style: { fontWeight: 600 } }, d.name || '—'));
 
-    const bColor = BETRIEB_COLORS[d.betrieb] || 'var(--ac)';
+    const bColor = GM_BETRIEB_COLORS[d.betrieb] || 'var(--ac)';
     tr.appendChild(el('td', {},
       el('span', {
         style: { padding: '2px 8px', borderRadius: '4px', fontSize: '9px', fontWeight: 600, background: bColor + '18', color: bColor }
       }, d.betrieb)
     ));
 
-    tr.appendChild(el('td', { className: 'mono right' }, formatEUR(d.gehalt || 0)));
-    tr.appendChild(el('td', { className: 'mono right bold' }, formatEUR(d.brutto || 0)));
-    tr.appendChild(el('td', { className: 'mono right' }, formatEUR(d.netto || 0)));
+    tr.appendChild(el('td', { className: 'mono right' }, gmFormatEUR(d.gehalt || 0)));
+    tr.appendChild(el('td', { className: 'mono right bold' }, gmFormatEUR(d.brutto || 0)));
+    tr.appendChild(el('td', { className: 'mono right' }, gmFormatEUR(d.netto || 0)));
 
     const auszahlung = (d.ueberweisung || 0) + (d.bar_tg || 0);
-    tr.appendChild(el('td', { className: 'mono right bold', style: { color: 'var(--ac)' } }, formatEUR(auszahlung)));
+    tr.appendChild(el('td', { className: 'mono right bold', style: { color: 'var(--ac)' } }, gmFormatEUR(auszahlung)));
 
     tbody.appendChild(tr);
   });
@@ -2383,7 +2368,7 @@ function getTypColor(typ) {
 function renderEinstellungen() {
   const container = el('div', { className: 'anim-up' });
 
-  if (!state.settingsTab) state.settingsTab = 'import';
+  if (!gmState.settingsTab) gmState.settingsTab = 'import';
 
   // Sub-tabs
   const tabRow = el('div', { style: { display: 'flex', gap: '0', borderBottom: '2px solid var(--bd)', marginBottom: '16px' } });
@@ -2392,7 +2377,7 @@ function renderEinstellungen() {
     { key: 'benutzer', label: '👤 Benutzer', color: 'var(--wn)' },
     { key: 'sicherung', label: '🛡️ Sicherung', color: 'var(--ok)' },
   ].forEach(t => {
-    const active = state.settingsTab === t.key;
+    const active = gmState.settingsTab === t.key;
     tabRow.appendChild(el('button', {
       style: {
         padding: '8px 16px', border: 'none', cursor: 'pointer',
@@ -2401,12 +2386,12 @@ function renderEinstellungen() {
         borderBottom: active ? `2px solid ${t.color}` : '2px solid transparent',
         background: 'transparent', marginBottom: '-2px'
       },
-      onClick: () => { state.settingsTab = t.key; renderApp(); }
+      onClick: () => { gmState.settingsTab = t.key; gmRenderCurrentTab(); }
     }, t.label));
   });
   container.appendChild(tabRow);
 
-  switch (state.settingsTab) {
+  switch (gmState.settingsTab) {
     case 'import': container.appendChild(renderSettingsImport()); break;
     case 'benutzer': container.appendChild(renderSettingsBenutzer()); break;
     case 'sicherung': container.appendChild(renderSettingsSicherung()); break;
@@ -2464,7 +2449,7 @@ function renderSettingsImport() {
 // ── Benutzer Tab ──
 function renderSettingsBenutzer() {
   const section = el('div');
-  const users = state.usersData || [];
+  const users = gmState.usersData || [];
 
   // Header with Add button
   const headerRow = el('div', {
@@ -2524,7 +2509,7 @@ function renderSettingsBenutzer() {
     } else {
       const sRow = el('div', { style: { display: 'flex', gap: '3px', flexWrap: 'wrap' } });
       standorte.forEach(s => {
-        const c = BETRIEB_COLORS[s] || 'var(--ac)';
+        const c = GM_BETRIEB_COLORS[s] || 'var(--ac)';
         sRow.appendChild(el('span', {
           style: { padding: '1px 5px', borderRadius: '3px', fontSize: '8px', fontWeight: 600, background: c + '18', color: c }
         }, s));
@@ -2658,9 +2643,9 @@ function openUserModal(user) {
   }, 'STANDORTE'));
   const standortRow = el('div', { style: { display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' } });
 
-  BETRIEBE.forEach(b => {
+  GM_BETRIEBE.forEach(b => {
     const isActive = editUser.standorte.includes(b);
-    const c = BETRIEB_COLORS[b];
+    const c = GM_BETRIEB_COLORS[b];
     const btn = el('button', {
       style: {
         padding: '4px 12px', borderRadius: '6px', fontSize: '10px', fontWeight: 600,
@@ -2940,9 +2925,9 @@ function openRechteModal(user) {
   footer.appendChild(el('button', {
     className: 'gm-btn gm-btn-primary',
     onClick: async () => {
-      const { error } = await supabase.from('users').update({ perms: editPerms }).eq('id', user.id);
+      const { error } = await sbGehalt.from('users').update({ perms: editPerms }).eq('id', user.id);
       if (error) { showToast('\u274c Fehler: ' + error.message); }
-      else { showToast('\u2705 Rechte gespeichert'); state.usersData = await loadUsersData(); renderApp(); }
+      else { showToast('\u2705 Rechte gespeichert'); gmState.usersData = await gmLoadUsersData(); gmRenderCurrentTab(); }
       overlay.remove();
     }
   }, 'Speichern'));
@@ -2970,10 +2955,10 @@ async function saveUser(userData, isNew) {
 
   let error;
   if (isNew) {
-    const res = await supabase.from('users').insert([payload]);
+    const res = await sbGehalt.from('users').insert([payload]);
     error = res.error;
   } else {
-    const res = await supabase.from('users').update(payload).eq('id', userData.id);
+    const res = await sbGehalt.from('users').update(payload).eq('id', userData.id);
     error = res.error;
   }
 
@@ -2982,20 +2967,20 @@ async function saveUser(userData, isNew) {
     showToast('❌ Fehler beim Speichern: ' + error.message);
   } else {
     showToast('✅ Benutzer gespeichert');
-    state.usersData = await loadUsersData();
-    renderApp();
+    gmState.usersData = await gmLoadUsersData();
+    gmRenderCurrentTab();
   }
 }
 
 async function deleteUser(userId) {
   if (!confirm('Benutzer wirklich löschen?')) return;
-  const { error } = await supabase.from('users').delete().eq('id', userId);
+  const { error } = await sbGehalt.from('users').delete().eq('id', userId);
   if (error) {
     showToast('❌ Fehler: ' + error.message);
   } else {
     showToast('🗑️ Benutzer gelöscht');
-    state.usersData = await loadUsersData();
-    renderApp();
+    gmState.usersData = await gmLoadUsersData();
+    gmRenderCurrentTab();
   }
 }
 
@@ -3037,9 +3022,9 @@ function renderSettingsSicherung() {
   section.appendChild(actionRow);
 
   // KPI Cards
-  const data = state.gehaltData || [];
-  const ma = state.mitarbeiterData || [];
-  const users = state.usersData || [];
+  const data = gmState.gehaltData || [];
+  const ma = gmState.mitarbeiterData || [];
+  const users = gmState.usersData || [];
 
   section.appendChild(renderKPIRow([
     { label: 'Lohndaten', value: String(data.length), color: 'var(--ac)' },
@@ -3063,7 +3048,7 @@ function renderSettingsSicherung() {
   const monatSel = el('select', { className: 'gm-select', style: { minWidth: '140px' } });
   const defOpt = el('option', {}, '— Monat wählen —');
   monatSel.appendChild(defOpt);
-  (state.monate || []).forEach(m => {
+  (gmState.monate || []).forEach(m => {
     monatSel.appendChild(el('option', { value: m }, m));
   });
   loeschRow.appendChild(monatSel);
@@ -3073,7 +3058,7 @@ function renderSettingsSicherung() {
 
   const betriebSel = el('select', { className: 'gm-select', style: { minWidth: '120px' } });
   betriebSel.appendChild(el('option', { value: 'Alle Betriebe' }, 'Alle Betriebe'));
-  BETRIEBE.forEach(b => betriebSel.appendChild(el('option', { value: b }, b)));
+  GM_BETRIEBE.forEach(b => betriebSel.appendChild(el('option', { value: b }, b)));
   loeschRow.appendChild(betriebSel);
 
   loeschCard.appendChild(loeschRow);
@@ -3120,5 +3105,77 @@ function getRolleConfig(rolle) {
   }
 }
 
-// ── INIT ──
-document.addEventListener('DOMContentLoaded', initApp);
+// ═══════════════════════════════════════════════════════════
+//  PUBLIC API — Used by OKYU HRM app-core.js
+// ═══════════════════════════════════════════════════════════
+
+/** Initialize gehalt module — load data from sbGehalt database */
+async function initGehaltModule() {
+  console.log('[GehaltsManager] Initializing module...');
+  gmState.monate = await gmLoadMonate();
+  gmState.currentMonat = gmState.monate[0] || 'Mär 2026';
+  gmState.mitarbeiterData = await gmLoadMitarbeiterData();
+  gmState.gehaltData = await gmLoadGehaltData(gmState.currentMonat);
+  gmState.loading = false;
+  console.log('[GehaltsManager] Ready:', gmState.monate.length, 'months,', gmState.mitarbeiterData.length, 'employees');
+}
+
+/** Render a specific gehalt tab into a container element */
+function renderGehaltTab(tabId, container) {
+  if (!container) return;
+  container.innerHTML = '';
+  gmState.currentTab = tabId;
+
+  // Month selector bar at top
+  const monthBar = el('div', {
+    style: { display:'flex', alignItems:'center', gap:'10px', marginBottom:'16px', padding:'8px 0', borderBottom:'1px solid var(--border)' }
+  });
+  monthBar.appendChild(el('span', { className:'ms', style:{fontSize:'20px'} }, 'calendar_month'));
+  monthBar.appendChild(el('span', { style:{fontWeight:600,fontSize:'.9rem'} }, 'Abrechnungszeitraum'));
+  const mSel = el('select', {
+    className: 'form-select',
+    style: { fontSize:'.85rem', minWidth:'140px' },
+    onChange: async (e) => {
+      gmState.currentMonat = e.target.value;
+      gmState.gehaltData = await gmLoadGehaltData(gmState.currentMonat);
+      renderGehaltTab(tabId, container);
+    }
+  });
+  gmState.monate.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    if (m === gmState.currentMonat) opt.selected = true;
+    mSel.appendChild(opt);
+  });
+  monthBar.appendChild(mSel);
+  monthBar.appendChild(el('span', { style:{marginLeft:'auto',fontSize:'.78rem',color:'var(--text-muted)'} },
+    `${gmState.gehaltData.length} Mitarbeiter · ${gmState.mitarbeiterData.length} aktiv`));
+  container.appendChild(monthBar);
+
+  // Content wrapper with GehaltsManager styling
+  const wrap = el('div', { className: 'gm-body' });
+
+  if (gmState.loading) {
+    wrap.appendChild(renderLoading());
+  } else {
+    switch (tabId) {
+      case 'gehalt_dash':   wrap.appendChild(renderDashboard()); break;
+      case 'gehalt_abr':    wrap.appendChild(renderAbrechnung()); break;
+      case 'gehalt_ma':     wrap.appendChild(renderMitarbeiterTab()); break;
+      case 'gehalt_banken': wrap.appendChild(renderBanken()); break;
+      case 'gehalt_hrm':    wrap.appendChild(renderHRM()); break;
+      case 'gehalt_smart':  wrap.appendChild(renderPlaceholder('smart')); break;
+      default:              wrap.appendChild(renderDashboard()); break;
+    }
+  }
+  container.appendChild(wrap);
+}
+
+/** Re-render current tab (called internally by event handlers) */
+function gmRenderCurrentTab() {
+  const container = document.querySelector(`[data-gehalt-container]`);
+  if (container) {
+    renderGehaltTab(gmState.currentTab, container);
+  }
+}
+

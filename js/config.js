@@ -27,7 +27,13 @@ const PAGE_TITLES = {
   checklists: 'Checklisten',
   ausbildung: 'Ausbildung',
   qr_generator: 'QR Check-in',
-  locations: 'Standorte'
+  locations: 'Standorte',
+  gehalt_dash: 'Gehalt Dashboard',
+  gehalt_abr: 'Gehaltsabrechnung',
+  gehalt_ma: 'Mitarbeiter (Gehalt)',
+  gehalt_banken: 'Banken & Zahlungen',
+  gehalt_hrm: 'HRM Intern',
+  gehalt_smart: 'Smart Money'
 };
 
 // Shift templates
