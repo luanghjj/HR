@@ -1,166 +1,217 @@
 <!DOCTYPE html>
-<html lang="de">
+<html class="dark" lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>OKYU Terminal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        primary: "#2036bd",
+        "primary-container": "#3e52d5",
+        "on-primary": "#ffffff",
+        "on-primary-container": "#d7daff",
+        secondary: "#4857af",
+        "secondary-container": "#919ffd",
+        surface: "#f7f9fb",
+        "surface-container": "#eceef0",
+      },
+      fontFamily: {
+        headline: ["Manrope"],
+        body: ["Inter"],
+        label: ["Inter"],
+      },
+    },
+  },
+}
+</script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  * { margin:0; padding:0; box-sizing:border-box; }
-  :root {
-    --bg: #0c0e14; --bg-card: #14171f; --bg-card-hover: #1a1e2a;
-    --border: #1e2230; --accent: #6c5ce7; --accent-light: #a29bfe;
-    --green: #00b894; --red: #e17055; --yellow: #fdcb6e; --blue: #74b9ff;
-    --text: #eee; --text-muted: #8892a4;
-  }
-  body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+body { background-color: #0B0F19; color: #eceef0; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.neon-glow { text-shadow: 0 0 20px rgba(62, 82, 213, 0.6); }
+.neon-green { text-shadow: 0 0 20px rgba(16, 185, 129, 0.6); }
+.neon-rose { text-shadow: 0 0 20px rgba(244, 63, 94, 0.5); }
 
-  /* ─── LOCATION PICKER ─── */
-  .picker { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; gap:24px; padding:24px; }
-  .picker h1 { font-size:2.5rem; font-weight:800; letter-spacing:4px; color:var(--accent-light); }
-  .picker p { color:var(--text-muted); font-size:.95rem; margin-bottom:12px; }
-  .loc-cards { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; }
-  .loc-card {
-    width:220px; padding:32px 24px; background:var(--bg-card); border:1px solid var(--border);
-    border-radius:16px; text-align:center; cursor:pointer; transition:all .3s;
-  }
-  .loc-card:hover { transform:translateY(-4px); border-color:var(--accent); background:var(--bg-card-hover); box-shadow:0 8px 32px rgba(108,92,231,.2); }
-  .loc-card .icon { font-size:3rem; margin-bottom:12px; }
-  .loc-card .name { font-size:1.15rem; font-weight:700; margin-bottom:4px; }
-  .loc-card .city { font-size:.82rem; color:var(--text-muted); }
+/* Location Picker */
+.picker-overlay {
+  background: radial-gradient(ellipse at 50% 0%, rgba(62,82,213,0.08) 0%, transparent 60%);
+}
+.loc-card-hover:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 40px rgba(62,82,213,0.15);
+  border-color: rgba(99,102,241,.4);
+}
 
-  /* ─── DASHBOARD ─── */
-  .dashboard { display:none; padding:20px; max-width:1200px; margin:0 auto; }
-  .dash-header {
-    display:flex; align-items:center; justify-content:space-between;
-    padding:16px 24px; background:var(--bg-card); border:1px solid var(--border);
-    border-radius:12px; margin-bottom:20px;
-  }
-  .dash-header .left { display:flex; align-items:center; gap:12px; }
-  .dash-header .loc-name { font-size:1.2rem; font-weight:700; }
-  .dash-header .loc-badge { padding:4px 12px; border-radius:20px; background:var(--accent); font-size:.75rem; font-weight:600; }
-  .dash-header .right { display:flex; align-items:center; gap:12px; }
-  .dash-header .clock { font-size:1.4rem; font-weight:700; font-variant-numeric:tabular-nums; }
-  .dash-header .refresh { font-size:.75rem; color:var(--text-muted); }
-  .back-btn { background:none; border:1px solid var(--border); color:var(--text-muted); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:.82rem; transition:all .2s; }
-  .back-btn:hover { border-color:var(--accent); color:var(--text); }
+/* Employee cards */
+.emp-row { transition: all .2s; }
+.emp-row:hover { background: rgba(255,255,255,0.04); }
 
-  /* ─── TABS ─── */
-  .tabs { display:flex; gap:0; margin-bottom:20px; border-radius:10px; overflow:hidden; border:1px solid var(--border); }
-  .tab-btn { flex:1; padding:10px; text-align:center; font-size:.85rem; font-weight:600; cursor:pointer; border:none; background:var(--bg-card); color:var(--text-muted); transition:all .2s; }
-  .tab-btn.active { background:var(--accent); color:#fff; }
+/* Checklist */
+.cl-item-done { opacity: .45; }
+.cl-item-done .cl-text-content { text-decoration: line-through; }
 
-  /* ─── STATS ROW ─── */
-  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:20px; }
-  .stat-card { padding:16px; background:var(--bg-card); border:1px solid var(--border); border-radius:12px; text-align:center; }
-  .stat-card .num { font-size:2rem; font-weight:800; }
-  .stat-card .label { font-size:.75rem; color:var(--text-muted); margin-top:4px; }
-
-  /* ─── EMPLOYEE GRID ─── */
-  .emp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
-  .emp-card {
-    display:flex; align-items:center; gap:12px; padding:14px 16px;
-    background:var(--bg-card); border:1px solid var(--border); border-radius:12px;
-    transition:all .2s;
-  }
-  .emp-card.checked-in { border-color:var(--green); background:rgba(0,184,148,.06); }
-  .emp-card.not-in { opacity:.5; }
-  .emp-avatar {
-    width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-weight:700; font-size:.85rem; flex-shrink:0;
-  }
-  .emp-card.checked-in .emp-avatar { background:var(--green); color:#fff; }
-  .emp-card.not-in .emp-avatar { background:var(--border); color:var(--text-muted); }
-  .emp-info .emp-name { font-size:.9rem; font-weight:600; }
-  .emp-info .emp-pos { font-size:.75rem; color:var(--text-muted); }
-  .emp-info .emp-time { font-size:.72rem; color:var(--green); font-weight:600; margin-top:2px; }
-  .emp-card.not-in .emp-info .emp-time { color:var(--text-muted); }
-
-  /* ─── CHECKLIST ─── */
-  .checklist-panel { display:none; }
-  .cl-section { margin-bottom:20px; }
-  .cl-title { font-size:1rem; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
-  .cl-title .badge { padding:2px 10px; border-radius:12px; font-size:.72rem; font-weight:600; }
-  .cl-item {
-    display:flex; align-items:center; gap:12px; padding:12px 16px;
-    background:var(--bg-card); border:1px solid var(--border); border-radius:10px;
-    margin-bottom:6px; cursor:pointer; transition:all .2s;
-  }
-  .cl-item:hover { border-color:var(--accent); }
-  .cl-item.done { opacity:.5; text-decoration:line-through; }
-  .cl-check { width:22px; height:22px; border:2px solid var(--border); border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-  .cl-item.done .cl-check { background:var(--green); border-color:var(--green); }
-  .cl-item.done .cl-check::after { content:'✓'; color:#fff; font-size:.8rem; }
-  .cl-text { font-size:.88rem; }
-  .cl-text .prio { font-size:.7rem; padding:2px 6px; border-radius:4px; margin-left:6px; }
-  .prio.high { background:rgba(225,112,85,.2); color:var(--red); }
-  .prio.med { background:rgba(253,203,110,.2); color:var(--yellow); }
-
-  /* ─── EMPTY ─── */
-  .empty { text-align:center; padding:60px 20px; color:var(--text-muted); }
-  .empty .icon { font-size:3rem; margin-bottom:12px; }
-
-  /* ─── PULSE ANIMATION ─── */
-  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
-  .live-dot { width:8px; height:8px; border-radius:50%; background:var(--green); display:inline-block; animation:pulse 2s infinite; margin-right:6px; }
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 </style>
 </head>
-<body>
 
-<!-- LOCATION PICKER -->
-<div class="picker" id="picker">
-  <h1>OKYU</h1>
-  <p>Terminal — Standort auswählen</p>
-  <div class="loc-cards">
-    <div class="loc-card" onclick="selectLocation('origami')">
-      <div class="icon">🍣</div>
-      <div class="name">Origami</div>
-      <div class="city">Göppingen</div>
+<body class="font-body selection:bg-primary/30 selection:text-white">
+
+<!-- ═══ LOCATION PICKER ═══ -->
+<div id="picker" class="picker-overlay min-h-screen flex flex-col items-center justify-center gap-8 px-6">
+  <div class="text-center mb-4">
+    <h1 class="text-4xl md:text-5xl font-headline font-extrabold tracking-tighter text-white mb-2">OKYU</h1>
+    <p class="text-slate-400 font-label text-sm uppercase tracking-[.2em]">Check-In Terminal</p>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl w-full">
+    <div onclick="selectLocation('origami')" class="glass-card rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 loc-card-hover group">
+      <div class="text-5xl mb-4 group-hover:scale-110 transition-transform">🍣</div>
+      <div class="font-headline font-bold text-lg text-white mb-1">Origami</div>
+      <div class="text-xs text-slate-500 font-label uppercase tracking-widest">Göppingen</div>
     </div>
-    <div class="loc-card" onclick="selectLocation('enso')">
-      <div class="icon">🔥</div>
-      <div class="name">Enso</div>
-      <div class="city">Stuttgart</div>
+    <div onclick="selectLocation('enso')" class="glass-card rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 loc-card-hover group">
+      <div class="text-5xl mb-4 group-hover:scale-110 transition-transform">🔥</div>
+      <div class="font-headline font-bold text-lg text-white mb-1">Enso</div>
+      <div class="text-xs text-slate-500 font-label uppercase tracking-widest">Stuttgart</div>
     </div>
-    <div class="loc-card" onclick="selectLocation('okyu_central')">
-      <div class="icon">🏢</div>
-      <div class="name">OKYU Zentrale</div>
-      <div class="city">Stuttgart</div>
+    <div onclick="selectLocation('okyu_central')" class="glass-card rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 loc-card-hover group">
+      <div class="text-5xl mb-4 group-hover:scale-110 transition-transform">🏢</div>
+      <div class="font-headline font-bold text-lg text-white mb-1">OKYU Zentrale</div>
+      <div class="text-xs text-slate-500 font-label uppercase tracking-widest">Stuttgart</div>
     </div>
   </div>
+
+  <p class="text-slate-600 text-xs mt-4 font-label tracking-wider">Standort wählen um das Terminal zu starten</p>
 </div>
 
-<!-- DASHBOARD -->
-<div class="dashboard" id="dashboard">
-  <div class="dash-header">
-    <div class="left">
-      <button class="back-btn" onclick="goBack()">← Zurück</button>
-      <span class="loc-name" id="locName"></span>
-      <span class="loc-badge"><span class="live-dot"></span>LIVE</span>
+<!-- ═══ DASHBOARD ═══ -->
+<div id="dashboard" class="hidden">
+
+  <!-- Top Nav -->
+  <header class="fixed top-0 left-0 w-full z-50 bg-slate-950/80 backdrop-blur-xl shadow-2xl shadow-indigo-500/10">
+    <div class="flex justify-between items-center w-full px-8 py-4 max-w-[1920px] mx-auto">
+      <div class="flex items-center gap-8">
+        <span class="text-xl font-black tracking-tighter text-indigo-500 font-headline">Check-In Terminal</span>
+        <nav class="hidden md:flex items-center space-x-6" id="navTabs">
+          <a onclick="switchTab('checkin')" class="nav-tab active-tab text-indigo-400 border-b-2 border-indigo-400 pb-1 font-headline font-bold tracking-tight cursor-pointer">Dashboard</a>
+          <a onclick="switchTab('checklist')" class="nav-tab text-slate-400 hover:text-indigo-500 transition-colors font-headline font-bold tracking-tight cursor-pointer border-b-2 border-transparent pb-1">Checklisten</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-slate-500 font-label text-xs tracking-widest hidden sm:block" id="refreshInfo">Auto-Refresh: 30s</span>
+        <span class="text-lg font-headline font-light tracking-widest text-indigo-400" id="clock">--:--:--</span>
+        <button onclick="goBack()" class="text-slate-400 hover:text-white transition-colors" title="Standort wechseln">
+          <span class="material-symbols-outlined">swap_horiz</span>
+        </button>
+      </div>
     </div>
-    <div class="right">
-      <span class="refresh" id="refreshInfo">Auto-Refresh: 30s</span>
-      <span class="clock" id="clock"></span>
+  </header>
+
+  <!-- Side Nav (desktop) -->
+  <aside class="h-screen w-64 fixed left-0 top-0 pt-20 bg-slate-900 z-40 hidden md:block">
+    <div class="flex flex-col h-full p-6 space-y-2">
+      <div class="mb-8 px-4">
+        <h3 class="font-label text-sm font-medium uppercase tracking-widest text-indigo-400">Terminal v1.0</h3>
+        <p class="text-[10px] text-slate-500 tracking-tight">All Systems Nominal</p>
+      </div>
+      <nav class="space-y-2 flex-grow">
+        <div onclick="switchTab('checkin')" class="sidebar-item flex items-center gap-3 bg-indigo-500/10 text-indigo-400 rounded-lg px-4 py-3 cursor-pointer group" data-tab="checkin">
+          <span class="material-symbols-outlined transition-transform duration-200 group-hover:translate-x-1">login</span>
+          <span class="font-label text-sm font-medium uppercase tracking-widest">Check-In</span>
+        </div>
+        <div onclick="switchTab('checklist')" class="sidebar-item flex items-center gap-3 text-slate-400 px-4 py-3 cursor-pointer group" data-tab="checklist">
+          <span class="material-symbols-outlined transition-transform duration-200 group-hover:translate-x-1">fact_check</span>
+          <span class="font-label text-sm font-medium uppercase tracking-widest">Checklist</span>
+        </div>
+      </nav>
+      <div class="pt-4 border-t border-slate-800">
+        <div onclick="goBack()" class="flex items-center gap-3 text-slate-400 px-4 py-3 cursor-pointer group">
+          <span class="material-symbols-outlined transition-transform duration-200 group-hover:translate-x-1">logout</span>
+          <span class="font-label text-sm font-medium uppercase tracking-widest">Zurück</span>
+        </div>
+      </div>
     </div>
-  </div>
+  </aside>
 
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('checkin')">📍 Check-In Status</button>
-    <button class="tab-btn" onclick="switchTab('checklist')">📋 Checklisten</button>
-  </div>
+  <!-- Main Content -->
+  <main class="md:ml-64 pt-24 min-h-screen px-6 md:px-8 pb-24 md:pb-12">
 
-  <!-- CHECK-IN TAB -->
-  <div id="tabCheckin">
-    <div class="stats" id="stats"></div>
-    <div class="emp-grid" id="empGrid"></div>
-  </div>
+    <!-- Location Header -->
+    <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-3 mb-2">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> LIVE
+          </span>
+          <span class="text-slate-500 font-label text-xs tracking-widest">TERMINAL 01</span>
+        </div>
+        <h1 class="text-3xl md:text-5xl font-headline font-extrabold tracking-tighter text-white" id="locTitle">—</h1>
+      </div>
+    </div>
 
-  <!-- CHECKLIST TAB -->
-  <div class="checklist-panel" id="tabChecklist"></div>
+    <!-- ═══ CHECK-IN TAB ═══ -->
+    <div id="tabCheckin">
+      <!-- Stats Bento Grid -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10" id="statsGrid">
+        <!-- filled by JS -->
+      </div>
+
+      <!-- Employee List -->
+      <div class="space-y-8">
+        <div class="flex items-center justify-between">
+          <h2 class="font-headline font-bold text-lg text-white tracking-tight">Mitarbeiter Status</h2>
+          <span class="text-[10px] text-slate-500 font-label uppercase tracking-widest" id="empCount">—</span>
+        </div>
+        <div id="empList" class="space-y-0">
+          <!-- filled by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CHECKLIST TAB ═══ -->
+    <div id="tabChecklist" class="hidden">
+      <!-- filled by JS -->
+    </div>
+
+  </main>
+
+  <!-- Mobile Bottom Nav -->
+  <nav class="md:hidden fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-xl border-t border-white/5 z-50">
+    <div class="flex justify-around items-center h-16">
+      <a onclick="switchTab('checkin')" class="mob-tab flex flex-col items-center text-indigo-500 cursor-pointer" data-tab="checkin">
+        <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">login</span>
+        <span class="text-[10px] font-label uppercase tracking-tighter">Status</span>
+      </a>
+      <a onclick="switchTab('checklist')" class="mob-tab flex flex-col items-center text-slate-500 cursor-pointer" data-tab="checklist">
+        <span class="material-symbols-outlined">fact_check</span>
+        <span class="text-[10px] font-label uppercase tracking-tighter">Check</span>
+      </a>
+      <a onclick="goBack()" class="flex flex-col items-center text-slate-500 cursor-pointer">
+        <span class="material-symbols-outlined">swap_horiz</span>
+        <span class="text-[10px] font-label uppercase tracking-tighter">Standort</span>
+      </a>
+    </div>
+  </nav>
 </div>
 
+<!-- ═══════════════════════════════════════════ -->
+<!-- LOGIC -->
+<!-- ═══════════════════════════════════════════ -->
 <script>
 const SB_URL = 'https://zkxsyipyjqikqxswpbks.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpreHN5aXB5anFpa3F4c3dwYmtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM5NTUzMDQsImV4cCI6MjA1OTUzMTMwNH0.GDP0R-OsvVcFBx-N-jfVjZAPmpb_JOQ4LPGiBcs9MIw';
@@ -168,6 +219,7 @@ const sb = supabase.createClient(SB_URL, SB_KEY);
 
 let currentLoc = null;
 let refreshInterval = null;
+let clockInterval = null;
 
 const LOC_NAMES = {
   origami: 'Origami Sushi & Asian Cuisine',
@@ -177,19 +229,19 @@ const LOC_NAMES = {
 
 // ─── CLOCK ───
 function updateClock() {
-  const now = new Date();
-  document.getElementById('clock').textContent = now.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const el = document.getElementById('clock');
+  if (el) el.textContent = new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }
 
 // ─── SELECT LOCATION ───
 function selectLocation(loc) {
   currentLoc = loc;
-  document.getElementById('picker').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'block';
-  document.getElementById('locName').textContent = LOC_NAMES[loc] || loc;
+  document.getElementById('picker').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  document.getElementById('locTitle').textContent = LOC_NAMES[loc] || loc;
 
   updateClock();
-  setInterval(updateClock, 1000);
+  clockInterval = setInterval(updateClock, 1000);
 
   loadData();
   refreshInterval = setInterval(loadData, 30000);
@@ -197,8 +249,9 @@ function selectLocation(loc) {
 
 function goBack() {
   if (refreshInterval) clearInterval(refreshInterval);
-  document.getElementById('dashboard').style.display = 'none';
-  document.getElementById('picker').style.display = 'flex';
+  if (clockInterval) clearInterval(clockInterval);
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('picker').classList.remove('hidden');
   currentLoc = null;
 }
 
@@ -206,15 +259,10 @@ function goBack() {
 async function loadData() {
   const today = new Date().toISOString().slice(0, 10);
 
-  // Get employees for this location
-  const { data: emps } = await sb.from('employees')
-    .select('*')
-    .eq('location', currentLoc)
-    .eq('status', 'active');
+  const { data: emps } = await sb.from('employees').select('*')
+    .eq('location', currentLoc).eq('status', 'active');
 
-  // Get today's time records for this location
-  const { data: records } = await sb.from('time_records')
-    .select('*')
+  const { data: records } = await sb.from('time_records').select('*')
     .eq('location', currentLoc)
     .gte('check_in', today + 'T00:00:00')
     .lte('check_in', today + 'T23:59:59');
@@ -228,25 +276,25 @@ function renderCheckin(emps, records) {
   const checkedInIds = new Set();
   const recordMap = {};
   records.forEach(r => {
-    if (!r.check_out) {
-      checkedInIds.add(r.emp_id);
-      recordMap[r.emp_id] = r;
-    }
+    if (!r.check_out) { checkedInIds.add(r.emp_id); recordMap[r.emp_id] = r; }
   });
 
-  const totalActive = emps.length;
+  const total = emps.length;
   const totalIn = emps.filter(e => checkedInIds.has(e.id)).length;
+  const totalOut = total - totalIn;
   const totalLate = records.filter(r => r.is_late).length;
 
   // Stats
-  document.getElementById('stats').innerHTML = `
-    <div class="stat-card"><div class="num" style="color:var(--blue)">${totalActive}</div><div class="label">Mitarbeiter</div></div>
-    <div class="stat-card"><div class="num" style="color:var(--green)">${totalIn}</div><div class="label">Eingecheckt</div></div>
-    <div class="stat-card"><div class="num" style="color:var(--text-muted)">${totalActive - totalIn}</div><div class="label">Nicht da</div></div>
-    <div class="stat-card"><div class="num" style="color:var(--red)">${totalLate}</div><div class="label">Verspätet</div></div>
+  document.getElementById('statsGrid').innerHTML = `
+    ${statCard('badge', 'indigo', total, 'Mitarbeiter', 'Total Staff')}
+    ${statCard('login', 'emerald', totalIn, 'Eingecheckt', 'On Duty')}
+    ${statCard('home', 'slate', totalOut, 'Nicht da', 'Away', true)}
+    ${statCard('schedule', 'rose', totalLate, 'Verspätet', 'Late Arrival')}
   `;
 
-  // Sort: checked-in first
+  document.getElementById('empCount').textContent = `${totalIn} / ${total} aktiv`;
+
+  // Employee list
   const sorted = [...emps].sort((a, b) => {
     const aIn = checkedInIds.has(a.id) ? 0 : 1;
     const bIn = checkedInIds.has(b.id) ? 0 : 1;
@@ -254,35 +302,109 @@ function renderCheckin(emps, records) {
   });
 
   if (sorted.length === 0) {
-    document.getElementById('empGrid').innerHTML = '<div class="empty"><div class="icon">🏠</div><p>Keine Mitarbeiter an diesem Standort</p></div>';
+    document.getElementById('empList').innerHTML = renderEmptyState('house', 'Keine Mitarbeiter', 'Keine aktiven Mitarbeiter an diesem Standort gefunden.');
     return;
   }
 
-  document.getElementById('empGrid').innerHTML = sorted.map(e => {
-    const isIn = checkedInIds.has(e.id);
-    const rec = recordMap[e.id];
-    const timeStr = isIn
-      ? '✅ Seit ' + new Date(rec.check_in).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' })
-      : '— Nicht eingecheckt';
+  if (totalIn === 0) {
+    document.getElementById('empList').innerHTML = renderEmptyState('house', 'Alle Mitarbeiter sind zu Hause', 'Es sind derzeit keine Mitarbeiter eingecheckt. Sobald jemand seine Schicht beginnt, erscheint der Status hier in Echtzeit.');
+    return;
+  }
 
-    return `<div class="emp-card ${isIn ? 'checked-in' : 'not-in'}">
-      <div class="emp-avatar">${e.avatar || '??'}</div>
-      <div class="emp-info">
-        <div class="emp-name">${e.name}</div>
-        <div class="emp-pos">${e.position} · ${e.dept}</div>
-        <div class="emp-time">${timeStr}${rec?.is_late ? ' ⚠️' : ''}</div>
+  document.getElementById('empList').innerHTML = `
+    <div class="glass-card rounded-2xl overflow-hidden divide-y divide-white/5">
+      ${sorted.map(e => {
+        const isIn = checkedInIds.has(e.id);
+        const rec = recordMap[e.id];
+        const timeStr = isIn ? new Date(rec.check_in).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }) : null;
+        return `<div class="emp-row flex items-center gap-4 px-6 py-4">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${isIn ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-500'}">
+            ${e.avatar || '??'}
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-headline font-semibold text-sm ${isIn ? 'text-white' : 'text-slate-500'} truncate">${e.name}</div>
+            <div class="text-[11px] text-slate-500 font-label">${e.position} · ${e.dept}</div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            ${isIn ? `
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[11px] font-bold font-label">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Seit ${timeStr}
+              </span>
+              ${rec?.is_late ? '<span class="ml-2 text-rose-400 text-xs font-bold">⚠️</span>' : ''}
+            ` : `
+              <span class="text-[11px] text-slate-600 font-label">Nicht da</span>
+            `}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function statCard(icon, color, num, label, sublabel, muted) {
+  const numStr = String(num).padStart(2, '0');
+  const neonClass = color === 'rose' ? 'neon-rose' : color === 'emerald' ? 'neon-green' : 'neon-glow';
+  const textColor = color === 'rose' && num > 0 ? `text-rose-400` : 'text-white';
+  return `
+    <div class="glass-card rounded-xl p-6 hover:bg-white/[0.05] transition-all cursor-default">
+      <div class="flex justify-between items-start mb-6 md:mb-8">
+        <span class="material-symbols-outlined text-${color}-400 p-2 rounded-lg bg-${color}-500/10">${icon}</span>
+        <span class="text-[10px] font-label font-bold text-${color}-300/40 tracking-widest uppercase">${sublabel}</span>
+      </div>
+      <div class="space-y-1">
+        <span class="text-4xl md:text-5xl font-headline font-black ${textColor} ${neonClass} block">${numStr}</span>
+        <span class="text-xs text-slate-400 font-label uppercase tracking-widest">${label}</span>
       </div>
     </div>`;
-  }).join('');
+}
+
+function renderEmptyState(icon, title, desc) {
+  return `
+    <div class="glass-card rounded-2xl flex flex-col items-center justify-center p-12 relative overflow-hidden min-h-[350px]">
+      <div class="absolute inset-0 bg-gradient-to-tr from-indigo-500/5 to-transparent pointer-events-none"></div>
+      <div class="relative z-10 text-center flex flex-col items-center">
+        <div class="w-28 h-28 mb-6 relative">
+          <div class="absolute inset-0 bg-indigo-500/10 blur-3xl rounded-full"></div>
+          <div class="relative flex items-center justify-center w-full h-full glass-card border-indigo-500/20 rounded-3xl">
+            <span class="material-symbols-outlined text-6xl text-indigo-400/80">${icon}</span>
+          </div>
+        </div>
+        <h2 class="text-xl font-headline font-bold text-white mb-3">${title}</h2>
+        <p class="text-slate-400 font-body max-w-sm mx-auto leading-relaxed text-sm">${desc}</p>
+      </div>
+    </div>`;
 }
 
 // ─── TABS ───
 function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    b.classList.toggle('active', (tab === 'checkin' && i === 0) || (tab === 'checklist' && i === 1));
+  document.getElementById('tabCheckin').classList.toggle('hidden', tab !== 'checkin');
+  document.getElementById('tabChecklist').classList.toggle('hidden', tab !== 'checklist');
+
+  // Nav tabs
+  document.querySelectorAll('.nav-tab').forEach((el, i) => {
+    const isActive = (tab === 'checkin' && i === 0) || (tab === 'checklist' && i === 1);
+    el.classList.toggle('text-indigo-400', isActive);
+    el.classList.toggle('border-indigo-400', isActive);
+    el.classList.toggle('active-tab', isActive);
+    el.classList.toggle('text-slate-400', !isActive);
+    el.classList.toggle('border-transparent', !isActive);
   });
-  document.getElementById('tabCheckin').style.display = tab === 'checkin' ? 'block' : 'none';
-  document.getElementById('tabChecklist').style.display = tab === 'checklist' ? 'block' : 'none';
+
+  // Sidebar
+  document.querySelectorAll('.sidebar-item').forEach(el => {
+    const isActive = el.dataset.tab === tab;
+    el.classList.toggle('bg-indigo-500/10', isActive);
+    el.classList.toggle('text-indigo-400', isActive);
+    el.classList.toggle('text-slate-400', !isActive);
+  });
+
+  // Mobile
+  document.querySelectorAll('.mob-tab').forEach(el => {
+    const isActive = el.dataset.tab === tab;
+    el.classList.toggle('text-indigo-500', isActive);
+    el.classList.toggle('text-slate-500', !isActive);
+  });
 
   if (tab === 'checklist') renderChecklists();
 }
@@ -295,17 +417,17 @@ const CHECKLISTS = {
       { text: 'Reis kochen & würzen', prio: 'high' },
       { text: 'Fisch aus Kühlraum holen', prio: 'high' },
       { text: 'Terasse Tische eindecken', prio: 'med' },
-      { text: 'Musik & Beleuchtung einschalten', prio: null },
+      { text: 'Musik & Beleuchtung einschalten' },
       { text: 'Reservierungen prüfen', prio: 'med' },
-      { text: 'Getränke auffüllen (Bar)', prio: null },
+      { text: 'Getränke auffüllen (Bar)' },
     ],
     'Schließung (22:30)': [
       { text: 'Küche komplett reinigen', prio: 'high' },
       { text: 'Sushi-Theke abbauen & kühlen', prio: 'high' },
       { text: 'Kasse abrechnen', prio: 'high' },
       { text: 'Müll rausbringen', prio: 'med' },
-      { text: 'Böden wischen', prio: null },
-      { text: 'Alle Geräte ausschalten', prio: null },
+      { text: 'Böden wischen' },
+      { text: 'Alle Geräte ausschalten' },
       { text: 'Türen & Fenster abschließen', prio: 'high' },
     ]
   },
@@ -315,38 +437,34 @@ const CHECKLISTS = {
       { text: 'Sushi-Bar vorbereiten', prio: 'high' },
       { text: 'Tische eindecken', prio: 'med' },
       { text: 'Reservierungen checken', prio: 'med' },
-      { text: 'Getränkekühlschrank prüfen', prio: null },
-      { text: 'Musik & Licht starten', prio: null },
+      { text: 'Getränkekühlschrank prüfen' },
+      { text: 'Musik & Licht starten' },
     ],
     'Schließung (23:00)': [
       { text: 'Grill reinigen', prio: 'high' },
       { text: 'Küche komplett reinigen', prio: 'high' },
       { text: 'Kasse abrechnen & Umsatz notieren', prio: 'high' },
       { text: 'Müll rausbringen', prio: 'med' },
-      { text: 'Böden wischen', prio: null },
+      { text: 'Böden wischen' },
       { text: 'Alles abschließen', prio: 'high' },
     ]
   },
   okyu_central: {
     'Morgens (09:00)': [
       { text: 'Mails & Nachrichten prüfen', prio: 'med' },
-      { text: 'Tages-Agenda durchgehen', prio: null },
+      { text: 'Tages-Agenda durchgehen' },
       { text: 'Lieferanten-Status prüfen', prio: 'med' },
     ],
     'Abends (17:00)': [
-      { text: 'Offene Aufgaben dokumentieren', prio: null },
+      { text: 'Offene Aufgaben dokumentieren' },
       { text: 'Morgen-Planung erstellen', prio: 'med' },
     ]
   }
 };
 
-// Store checklist state per day in localStorage
-function getChecklistKey() {
-  return `terminal_cl_${currentLoc}_${new Date().toISOString().slice(0,10)}`;
-}
-function getCheckedItems() {
-  try { return JSON.parse(localStorage.getItem(getChecklistKey()) || '{}'); } catch { return {}; }
-}
+function getChecklistKey() { return `terminal_cl_${currentLoc}_${new Date().toISOString().slice(0,10)}`; }
+function getCheckedItems() { try { return JSON.parse(localStorage.getItem(getChecklistKey()) || '{}'); } catch { return {}; } }
+
 function toggleChecklist(section, idx) {
   const checked = getCheckedItems();
   const key = section + '_' + idx;
@@ -358,38 +476,50 @@ function toggleChecklist(section, idx) {
 function renderChecklists() {
   const lists = CHECKLISTS[currentLoc] || {};
   const checked = getCheckedItems();
+  const container = document.getElementById('tabChecklist');
 
-  if (Object.keys(lists).length === 0) {
-    document.getElementById('tabChecklist').innerHTML = '<div class="empty"><div class="icon">📋</div><p>Keine Checklisten für diesen Standort</p></div>';
+  if (!Object.keys(lists).length) {
+    container.innerHTML = renderEmptyState('fact_check', 'Keine Checklisten', 'Für diesen Standort sind keine Checklisten konfiguriert.');
     return;
   }
 
   let html = '';
   for (const [section, items] of Object.entries(lists)) {
     const doneCount = items.filter((_, i) => checked[section + '_' + i]).length;
-    const badgeColor = doneCount === items.length ? 'var(--green)' : 'var(--yellow)';
+    const allDone = doneCount === items.length;
+    const pct = Math.round(doneCount / items.length * 100);
 
-    html += `<div class="cl-section">
-      <div class="cl-title">${section} <span class="badge" style="background:${badgeColor};color:#000">${doneCount}/${items.length}</span></div>`;
-
-    items.forEach((item, i) => {
-      const isDone = checked[section + '_' + i];
-      html += `<div class="cl-item ${isDone ? 'done' : ''}" onclick="toggleChecklist('${section}',${i})">
-        <div class="cl-check"></div>
-        <div class="cl-text">${item.text}${item.prio ? `<span class="prio ${item.prio}">${item.prio === 'high' ? '🔴 Wichtig' : '🟡 Mittel'}</span>` : ''}</div>
+    html += `
+      <div class="mb-8">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="material-symbols-outlined ${allDone ? 'text-emerald-400' : 'text-indigo-400'} text-xl">${allDone ? 'check_circle' : 'pending'}</span>
+          <h3 class="font-headline font-bold text-white text-lg tracking-tight">${section}</h3>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-label ${allDone ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/15 text-amber-400'}">${doneCount}/${items.length}</span>
+        </div>
+        <div class="w-full h-1 rounded-full bg-white/5 mb-4">
+          <div class="h-1 rounded-full transition-all duration-500 ${allDone ? 'bg-emerald-500' : 'bg-indigo-500'}" style="width:${pct}%"></div>
+        </div>
+        <div class="glass-card rounded-2xl overflow-hidden divide-y divide-white/5">
+          ${items.map((item, i) => {
+            const isDone = checked[section + '_' + i];
+            return `<div onclick="toggleChecklist('${section}',${i})" class="flex items-center gap-4 px-5 py-3.5 cursor-pointer emp-row ${isDone ? 'cl-item-done' : ''}">
+              <div class="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${isDone ? 'bg-emerald-500 border-emerald-500' : 'border-white/15'}">
+                ${isDone ? '<span class="text-white text-xs font-bold">✓</span>' : ''}
+              </div>
+              <div class="cl-text-content flex-1 text-sm font-body ${isDone ? 'text-slate-600' : 'text-slate-200'}">${item.text}</div>
+              ${item.prio ? `<span class="text-[10px] font-bold font-label px-2 py-0.5 rounded ${item.prio === 'high' ? 'bg-rose-500/15 text-rose-400' : 'bg-amber-500/15 text-amber-400'}">${item.prio === 'high' ? 'WICHTIG' : 'MITTEL'}</span>` : ''}
+            </div>`;
+          }).join('')}
+        </div>
       </div>`;
-    });
-    html += '</div>';
   }
 
-  document.getElementById('tabChecklist').innerHTML = html;
+  container.innerHTML = html;
 }
 
-// ─── URL PARAM SUPPORT ───
+// ─── URL PARAM ───
 const urlLoc = new URLSearchParams(window.location.search).get('loc');
-if (urlLoc && LOC_NAMES[urlLoc]) {
-  selectLocation(urlLoc);
-}
+if (urlLoc && LOC_NAMES[urlLoc]) selectLocation(urlLoc);
 </script>
 </body>
 </html>
