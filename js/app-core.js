@@ -500,29 +500,10 @@ function renderDashboard(){
     // Zeiterfassung card
     let zeitHtml = renderZeiterfassungCard(me, todayShift);
 
-    // Last check-ins history
-    const myRecords = TIME_RECORDS.filter(r => r.empId === me.id && r.checkOut).slice(0, 5);
-    let historyHtml = '';
-    if (myRecords.length > 0) {
-      historyHtml = `<div class="table-wrap" style="margin-bottom:20px"><div class="table-header"><span class="table-title">📊 Letzte Arbeitszeiten</span></div><div style="padding:12px">`;
-      myRecords.forEach(r => {
-        const cin = new Date(r.checkIn);
-        const hours = r.totalHours ? (Math.round(r.totalHours * 10) / 10) + 'h' : '—';
-        const lateBadge = r.isLate ? `<span style="color:var(--danger);font-size:.72rem"> ⏰+${r.lateMin}m</span>` : '';
-        historyHtml += `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
-          <div style="min-width:36px;text-align:center;font-weight:700;color:var(--accent);font-size:.82rem">${['So','Mo','Di','Mi','Do','Fr','Sa'][cin.getDay()]}</div>
-          <div style="flex:1;font-size:.85rem"><strong>${cin.toLocaleDateString('de-DE')}</strong> · ${cin.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}–${new Date(r.checkOut).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</div>
-          <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:.88rem">${hours}${lateBadge}</div>
-        </div>`;
-      });
-      historyHtml += '</div></div>';
-    }
-
     pg.innerHTML=`
       ${todayHtml}
       ${zeitHtml}
       ${upcomingHtml}
-      ${historyHtml}
       <div class="stats-row">
         <div class="stat-card" style="border-left:3px solid var(--success)"><div class="stat-icon">🏖️</div><div class="stat-label">Resturlaub</div><div class="stat-value">${vacRemain-planned}</div><div class="stat-change">von ${me.vacTotal} · ${planned} geplant</div></div>
         <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="stat-icon">🏥</div><div class="stat-label">Krankentage</div><div class="stat-value">${me.sickDays}</div><div class="stat-change">laufendes Jahr</div></div>
