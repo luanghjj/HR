@@ -2496,20 +2496,32 @@ function renderAccess(){
       <div style="padding:0 20px 16px">`;
     pending.forEach(u => {
       const isGoogle = u.regEmail?.includes('gmail') || u.bannerUrl;
-      pendingHtml += `<div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)">
-        <div class="emp-avatar" style="width:44px;height:44px;font-size:1rem">${u.avatar}</div>
+      const locOptions = LOCS.map(l => `<option value="${l.id}" ${u.location===l.id?'selected':''}>${l.name}</option>`).join('');
+      const deptOptions = [...new Set(DEPTS.map(d => d.name))].sort().map(d => `<option value="${d}" ${u.regDept===d?'selected':''}>${d}</option>`).join('');
+      pendingHtml += `<div style="display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)" id="pending-${u.id}">
+        <div class="emp-avatar" style="width:44px;height:44px;font-size:1rem;flex-shrink:0;margin-top:4px">${u.avatar}</div>
         <div style="flex:1">
-          <strong style="font-size:.95rem">${u.name}</strong>
-          ${isGoogle ? '<span style="font-size:.68rem;background:var(--bg-input);padding:1px 6px;border-radius:4px;color:var(--text-muted);margin-left:6px">Google</span>' : ''}
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;font-size:.78rem;color:var(--text-secondary)">
-            <span>📧 ${u.regEmail||'—'}</span>
-            <span>🎂 ${u.regBirthday?formatDateDE(u.regBirthday):'—'}</span>
-            <span>📍 ${getLocationName(u.location)}</span>
-            <span>🏷️ ${u.regDept||'—'}</span>
-            <span>💼 ${u.regPosition||'—'}</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <strong style="font-size:.95rem">${u.name}</strong>
+            ${isGoogle ? '<span style="font-size:.68rem;background:var(--bg-input);padding:1px 6px;border-radius:4px;color:var(--text-muted)">Google</span>' : ''}
+            <span style="font-size:.75rem;color:var(--text-muted)">📧 ${u.regEmail||'—'}</span>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center">
+            <div>
+              <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Standort</label>
+              <select class="form-select" id="pendLoc-${u.id}" style="font-size:.82rem;min-width:140px">${locOptions}</select>
+            </div>
+            <div>
+              <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Bereich</label>
+              <select class="form-select" id="pendDept-${u.id}" style="font-size:.82rem;min-width:120px">${deptOptions}</select>
+            </div>
+            <div>
+              <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Position</label>
+              <input class="form-input" id="pendPos-${u.id}" value="${u.regPosition||''}" placeholder="z.B. Kellner" style="font-size:.82rem;width:130px">
+            </div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;flex-shrink:0">
+        <div style="display:flex;gap:8px;flex-shrink:0;margin-top:12px">
           <button class="btn btn-sm btn-success" onclick="approveRegistration('${u.id}')" style="font-size:.8rem">✓ Genehmigen</button>
           <button class="btn btn-sm btn-danger" onclick="rejectRegistration('${u.id}')" style="font-size:.8rem">✕ Ablehnen</button>
         </div>
@@ -2649,17 +2661,24 @@ async function changeUserPosition(userId, newPos) {
 async function approveRegistration(userId) {
   const u = USERS.find(x => x.id === userId);
   if (!u) return;
-  if (!confirm(`${u.name} genehmigen und als Mitarbeiter anlegen?`)) return;
+
+  // Read admin-selected values from pending dropdowns
+  const selLoc = document.getElementById('pendLoc-' + userId)?.value || u.location;
+  const selDept = document.getElementById('pendDept-' + userId)?.value || u.regDept || 'Service';
+  const selPos = document.getElementById('pendPos-' + userId)?.value?.trim() || u.regPosition || 'Mitarbeiter';
+
+  if (!confirm(`${u.name} genehmigen?\n📍 ${getLocationName(selLoc)}\n🏷️ ${selDept}\n💼 ${selPos}`)) return;
 
   try {
     let empId = u.empId;
 
     if (empId) {
-      // Google user: employee already exists → just activate
+      // Google user: employee already exists → activate + update with admin-selected values
       const { error: empErr } = await sb.from('employees').update({
         status: 'active',
-        dept: u.regDept || 'Service',
-        position: u.regPosition || 'Mitarbeiter'
+        location: selLoc,
+        dept: selDept,
+        position: selPos
       }).eq('id', empId);
       if (empErr) { toast('Fehler: ' + empErr.message, 'err'); return; }
 
@@ -2667,16 +2686,17 @@ async function approveRegistration(userId) {
       const emp = EMPS.find(e => e.id === empId);
       if (emp) {
         emp.status = 'active';
-        emp.dept = u.regDept || emp.dept;
-        emp.position = u.regPosition || emp.position;
+        emp.location = selLoc;
+        emp.dept = selDept;
+        emp.position = selPos;
       }
     } else {
       // Manual registration: create new employee
       const newEmp = {
         name: u.name,
-        location: u.location,
-        dept: u.regDept || 'Service',
-        position: u.regPosition || 'Mitarbeiter',
+        location: selLoc,
+        dept: selDept,
+        position: selPos,
         status: 'active',
         start_date: isoDate(new Date()),
         avatar: u.avatar,
@@ -2698,9 +2718,9 @@ async function approveRegistration(userId) {
       EMPS.push({
         id: empData.id,
         name: u.name,
-        location: u.location,
-        dept: u.regDept || 'Service',
-        position: u.regPosition || 'Mitarbeiter',
+        location: selLoc,
+        dept: selDept,
+        position: selPos,
         status: 'active',
         start: isoDate(new Date()),
         avatar: u.avatar,
@@ -2712,15 +2732,17 @@ async function approveRegistration(userId) {
       });
     }
 
-    // Update user_profile: status='active', emp_id linked
+    // Update user_profile: status='active', location, emp_id linked
     const { error: profErr } = await sb.from('user_profiles').update({
       status: 'active',
+      location: selLoc,
       emp_id: empId
     }).eq('user_id', userId);
     if (profErr) { toast('Profil-Fehler: ' + profErr.message, 'err'); return; }
 
     // Update local user data
     u.status = 'active';
+    u.location = selLoc;
     u.empId = empId;
 
     addNotif('info', 'Neuer Mitarbeiter', `${u.name} wurde genehmigt und angelegt`);
