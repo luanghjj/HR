@@ -374,6 +374,33 @@ async function checkExistingSession() {
   return false;
 }
 
+// ═══ GOOGLE OAUTH LOGIN ═══
+async function doGoogleLogin() {
+  try {
+    const loginError = document.getElementById('loginError');
+    loginError.style.display = 'none';
+
+    // Determine redirect URL (Vercel production or localhost)
+    const redirectTo = window.location.origin + window.location.pathname;
+    console.log('[Auth] Google OAuth redirectTo:', redirectTo);
+
+    const { data, error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectTo
+      }
+    });
+
+    if (error) {
+      console.error('[Auth] Google OAuth error:', error);
+      loginError.textContent = 'Google-Anmeldung fehlgeschlagen: ' + error.message;
+      loginError.style.display = 'block';
+    }
+  } catch (e) {
+    console.error('[Auth] Google login error:', e);
+  }
+}
+
 // Enter key to login
 document.addEventListener('DOMContentLoaded', () => {
   const passField = document.getElementById('loginPass');
