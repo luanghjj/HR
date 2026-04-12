@@ -9,72 +9,94 @@ function toggleTheme(){const h=document.documentElement;const n=h.getAttribute('
 // Each tab is shown/hidden based on user permissions (from SuperAdmin or role defaults)
 function buildSidebar(){
   const isCustom = currentUser?._permMode === 'custom';
-  console.log('[Sidebar] Building with permissions:', {
-    role: currentUser?.role,
-    mode: currentUser?._permMode,
-    isCustom,
-    customPerms: currentUser?._customPerms
-  });
   const mi = (name) => `<span class="ms">${name}</span>`;
+  const collapsed = JSON.parse(localStorage.getItem('sidebarCollapsed') || '{}');
   let html='';
 
-  // ── ÜBERSICHT (always visible) ──
-  html+=`<div class="nav-section">Übersicht</div>`;
+  // Helper: section header + collapsible group
+  function sectionStart(key, label) {
+    const isCollapsed = collapsed[key] ? 'collapsed' : '';
+    html += `<div class="nav-section ${isCollapsed}" onclick="toggleNavSection('${key}',this)"><span>${label}</span><span class="ms nav-chevron">expand_more</span></div>`;
+    html += `<div class="nav-group ${isCollapsed}" data-section="${key}">`;
+  }
+  function sectionEnd() { html += '</div>'; }
+
+  // ── ÜBERSICHT (always visible, not collapsible) ──
   html+=`<div class="nav-item active" onclick="navigate('dashboard',this)">${mi('grid_view')} Dashboard</div>`;
 
   // ── PERSONAL ──
   const showMitarbeiter = can('seeAllEmployees');
   const showBereiche = can('seeDepartments');
   if(showMitarbeiter || showBereiche){
-    html+=`<div class="nav-section">Personal</div>`;
+    sectionStart('personal', 'Personal');
     if(showMitarbeiter) html+=`<div class="nav-item" onclick="navigate('employees',this)">${mi('people')} Mitarbeiter</div>`;
     if(showBereiche) html+=`<div class="nav-item" onclick="navigate('departments',this)">${mi('domain')} Bereiche</div>`;
+    sectionEnd();
   }
 
   // ── PLANUNG ──
-  // Custom mode: only show if permission is explicitly set
-  // Standard mode: mitarbeiter/azubi see own schedule/vacation/sick
   const showSchedule = isCustom ? can('seeAllSchedules') : (can('seeAllSchedules') || ['mitarbeiter','azubi'].includes(currentUser.role));
   const showVacation = isCustom ? can('seeAllVacations') || can('approveVacations') : true;
   const showSick = isCustom ? can('seeAllSick') : true;
   if(showSchedule || showVacation || showSick){
-    html+=`<div class="nav-section">Planung</div>`;
+    sectionStart('planung', 'Planung');
     if(showSchedule) html+=`<div class="nav-item" onclick="navigate('schedule',this)">${mi('calendar_month')} Arbeitsplan</div>`;
     if(showVacation) html+=`<div class="nav-item" onclick="navigate('vacation',this)">${mi('beach_access')} ${can('seeAllVacations')?'Urlaubsplan':'Mein Urlaub'}<span class="nav-badge" id="vacBadge" style="display:none">0</span></div>`;
     if(showSick) html+=`<div class="nav-item" onclick="navigate('sick',this)">${mi('medical_services')} ${can('seeAllSick')?'Krankmeldungen':'Meine Krankmeldungen'}<span class="nav-badge" id="sickBadge" style="display:none">0</span></div>`;
+    sectionEnd();
   }
 
   // ── DOKUMENTE ──
   const showDocs = isCustom ? can('seeAllDocs') : true;
   if(showDocs || !isCustom){
-    html+=`<div class="nav-section">Dokumente</div>`;
+    sectionStart('dokumente', 'Dokumente');
     html+=`<div class="nav-item" onclick="navigate('documents',this)">${mi('folder')} ${can('seeAllDocs')?'Unterlagen':'Meine Unterlagen'}</div>`;
     if(can('seeDepartments')) html+=`<div class="nav-item" onclick="navigate('checklists',this)">${mi('checklist')} Checklisten</div>`;
+    sectionEnd();
   }
 
   // ── AUSBILDUNG ──
   if(currentUser.role==='azubi' || can('editTraining')){
-    html+=`<div class="nav-section">Ausbildung</div>`;
+    sectionStart('ausbildung', 'Ausbildung');
     html+=`<div class="nav-item" onclick="navigate('ausbildung',this)">${mi('school')} ${currentUser.role==='azubi'?'Meine Ausbildung':'Ausbildung'}</div>`;
+    sectionEnd();
   }
 
   // ── AUSWERTUNG ──
   if(can('seeAllEmployees') || can('canExport')){
-    html+=`<div class="nav-section">Auswertung</div>`;
+    sectionStart('auswertung', 'Auswertung');
     if(can('seeAllEmployees')) html+=`<div class="nav-item" onclick="navigate('calendar',this)">${mi('event_note')} Personalkalender</div>`;
     if(can('seeAllEmployees') || can('canExport')) html+=`<div class="nav-item" onclick="navigate('reports',this)">${mi('analytics')} Berichte</div>`;
+    sectionEnd();
   }
 
   // ── SYSTEM (admin only) ──
   if(can('manageAccess')){
-    html+=`<div class="nav-section">System</div>`;
+    sectionStart('system', 'System');
     html+=`<div class="nav-item" onclick="navigate('access',this)">${mi('admin_panel_settings')} Zugangsverwaltung<span class="nav-badge" id="pendingBadge" style="display:none">0</span></div>`;
     html+=`<div class="nav-item" onclick="navigate('locations',this)">${mi('location_city')} Standorte</div>`;
     html+=`<div class="nav-item" onclick="navigate('qr_generator',this)">${mi('qr_code_2')} QR Check-in</div>`;
+    sectionEnd();
   }
   document.getElementById('sidebarNav').innerHTML=html;
   // Show pending registration count
   setTimeout(updatePendingBadge, 100);
+}
+
+function toggleNavSection(key, el) {
+  const group = document.querySelector(`.nav-group[data-section="${key}"]`);
+  if (!group) return;
+  const collapsed = JSON.parse(localStorage.getItem('sidebarCollapsed') || '{}');
+  if (group.classList.contains('collapsed')) {
+    group.classList.remove('collapsed');
+    el.classList.remove('collapsed');
+    delete collapsed[key];
+  } else {
+    group.classList.add('collapsed');
+    el.classList.add('collapsed');
+    collapsed[key] = true;
+  }
+  localStorage.setItem('sidebarCollapsed', JSON.stringify(collapsed));
 }
 
 function buildLocationSelect(){

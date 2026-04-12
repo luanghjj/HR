@@ -183,6 +183,33 @@
   text-transform: uppercase;
   letter-spacing: 1.5px;
   padding: 16px 12px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+.nav-section:hover {
+  color: var(--text-secondary);
+}
+.nav-section .nav-chevron {
+  font-size: 14px;
+  transition: transform 0.25s ease;
+  opacity: 0.5;
+}
+.nav-section.collapsed .nav-chevron {
+  transform: rotate(-90deg);
+}
+.nav-group {
+  max-height: 500px;
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.25s ease;
+  opacity: 1;
+}
+.nav-group.collapsed {
+  max-height: 0;
+  opacity: 0;
 }
 
 
