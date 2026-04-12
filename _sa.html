@@ -185,13 +185,19 @@ td input:focus,td select:focus{border-color:var(--accent);outline:none}
       <div class="nav-item" onclick="navTo('shifts',this)"><span class="ms">calendar_month</span> Schichten</div>
       <div class="nav-item" onclick="navTo('vacations',this)"><span class="ms">beach_access</span> Urlaub</div>
       <div class="nav-item" onclick="navTo('sick',this)"><span class="ms">local_hospital</span> Krank</div>
+      <div class="nav-item" onclick="navTo('departments',this)"><span class="ms">domain</span> Bereiche</div>
       <div class="nav-section">Zeiterfassung</div>
       <div class="nav-item" onclick="navTo('checkinout',this)"><span class="ms">fingerprint</span> Check-in / out</div>
       <div class="nav-item" onclick="navTo('monthly_real',this)"><span class="ms">bar_chart</span> Monatsübersicht</div>
+      <div class="nav-section">Ausbildung & Berichte</div>
+      <div class="nav-item" onclick="navTo('ausbildung',this)"><span class="ms">school</span> Ausbildung</div>
+      <div class="nav-item" onclick="navTo('calendar',this)"><span class="ms">event_note</span> Personalkalender</div>
+      <div class="nav-item" onclick="navTo('reports',this)"><span class="ms">analytics</span> Berichte</div>
       <div class="nav-section">System</div>
       <div class="nav-item" onclick="navTo('documents',this)"><span class="ms">folder</span> Dokumente</div>
       <div class="nav-item" onclick="navTo('checklists',this)"><span class="ms">checklist</span> Checklisten</div>
       <div class="nav-section">Verwaltung</div>
+      <div class="nav-item" onclick="navTo('access',this)"><span class="ms">lock</span> Zugangsverwaltung</div>
       <div class="nav-item" onclick="navTo('users',this)"><span class="ms">admin_panel_settings</span> Benutzer</div>
       <div class="sidebar-footer">
         <button onclick="toggleTheme()">🌓 Theme</button>
@@ -270,7 +276,7 @@ async function initApp(){
 }
 
 async function loadAllData(){
-  const [emps,shifts,vacs,sicks,timeRec,docs,checks,uprofs,uperms]=await Promise.all([
+  const [emps,shifts,vacs,sicks,timeRec,docs,checks,uprofs,uperms,azubi]=await Promise.all([
     sb.from('employees').select('*').order('id'),
     sb.from('shifts').select('*').order('shift_date',{ascending:false}),
     sb.from('vacations').select('*').order('id',{ascending:false}),
@@ -279,7 +285,8 @@ async function loadAllData(){
     sb.from('documents').select('*').order('id',{ascending:false}),
     sb.from('checklists').select('*').order('id',{ascending:false}),
     sb.from('user_profiles').select('*').order('id'),
-    sb.from('user_permissions').select('*').order('id')
+    sb.from('user_permissions').select('*').order('id'),
+    sb.from('azubi_bewertungen').select('*').order('id',{ascending:false})
   ]);
   DATA.employees=emps.data||[];
   DATA.shifts=shifts.data||[];
@@ -290,6 +297,7 @@ async function loadAllData(){
   DATA.checklists=checks.data||[];
   DATA.user_profiles=uprofs.data||[];
   DATA.user_permissions=uperms.data||[];
+  DATA.azubi_bewertungen=azubi.data||[];
 }
 
 // ═══ NAVIGATION ═══
@@ -306,13 +314,18 @@ function renderPage(page){
   const fn={
     dashboard:renderDashboard,
     employees:renderEmployees,
+    departments:renderDepartments,
     shifts:renderShifts,
     vacations:renderVacations,
     sick:renderSick,
     checkinout:renderCheckinOut,
     monthly_real:renderMonthlyReal,
+    ausbildung:renderAusbildungSA,
+    calendar:renderKalenderSA,
+    reports:renderBerichteSA,
     documents:renderDocuments,
     checklists:renderChecklists,
+    access:renderZugangSA,
     users:renderUsers
   };
   if(fn[page])fn[page](m);
@@ -698,6 +711,153 @@ function renderChecklists(m){
         <td>${Array.isArray(c.items)?c.items.length+' items':''}</td>
         <td class="row-actions"><button class="del" onclick="deleteRow('checklists',${c.id})">🗑️</button></td>
       </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+}
+
+// ═══ BEREICHE (Departments) ═══
+function renderDepartments(m){
+  const depts=['Küche','Service','Bar','Sushi','Verwaltung','Ausbildung'];
+  const locs=Object.entries(STANDORTE);
+  let html=`<div class="page-title">Bereiche <span class="record-count">${depts.length} Bereiche · ${locs.length} Standorte</span></div>`;
+  locs.forEach(([locId,locName])=>{
+    const locEmps=DATA.employees.filter(e=>e.location===locId);
+    html+=`<div class="table-wrap" style="margin-bottom:20px"><div class="table-header"><span class="table-title">📍 ${locName}</span><span class="record-count">${locEmps.length} MA</span></div>`;
+    html+='<div style="padding:12px;display:flex;flex-wrap:wrap;gap:10px">';
+    depts.forEach(dept=>{
+      const count=locEmps.filter(e=>e.department===dept).length;
+      html+=`<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:12px 18px;min-width:120px;text-align:center">
+        <div style="font-weight:700;font-size:.95rem">${dept}</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--accent);margin-top:4px">${count}</div>
+        <div style="font-size:.72rem;color:var(--text-muted)">Mitarbeiter</div>
+      </div>`;
+    });
+    html+='</div></div>';
+  });
+  m.innerHTML=html;
+}
+
+// ═══ AUSBILDUNG ═══
+function renderAusbildungSA(m){
+  const d=DATA.azubi_bewertungen||[];
+  const azubis=DATA.employees.filter(e=>e.position&&e.position.toLowerCase().includes('azubi'));
+  m.innerHTML=`
+    <div class="page-title">Ausbildung <span class="record-count">${d.length} Bewertungen · ${azubis.length} Azubis</span></div>
+    <div class="toolbar">
+      <button class="btn btn-accent" onclick="exportCSV(DATA.azubi_bewertungen||[],'ausbildung.csv')"><span class="ms">download</span> CSV</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>Azubi</th><th>Datum</th><th>Bewerter</th><th>Kategorie</th><th>Note</th><th>Kommentar</th><th>Akt.</th></tr></thead>
+      <tbody>${d.map(b=>`<tr>
+        <td>${b.id}</td>
+        <td>${b.emp_name||b.emp_id||''}</td>
+        <td>${fmtDate(b.datum)}</td>
+        <td>${b.bewerter||''}</td>
+        <td>${b.kategorie||''}</td>
+        <td><strong>${b.note!=null?b.note:'—'}</strong></td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${b.kommentar||''}</td>
+        <td class="row-actions"><button class="del" onclick="deleteRow('azubi_bewertungen',${b.id})">🗑️</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  `;
+}
+
+// ═══ PERSONALKALENDER ═══
+function renderKalenderSA(m){
+  const today=new Date().toISOString().slice(0,10);
+  const emps=DATA.employees;
+  const vacs=DATA.vacations.filter(v=>v.status==='approved'&&v.date_from<=today&&v.date_to>=today);
+  const sicks=DATA.sick_leaves.filter(s=>s.status==='active'&&s.date_from<=today&&s.date_to>=today);
+  const vacIds=new Set(vacs.map(v=>v.emp_id));
+  const sickIds=new Set(sicks.map(s=>s.emp_id));
+
+  let html=`<div class="page-title">Personalkalender <span class="record-count">${today}</span></div>`;
+  Object.entries(STANDORTE).forEach(([locId,locName])=>{
+    const locEmps=emps.filter(e=>e.location===locId);
+    html+=`<div class="table-wrap" style="margin-bottom:16px"><div class="table-header"><span class="table-title">📍 ${locName}</span></div><table>
+      <thead><tr><th>Name</th><th>Position</th><th>Bereich</th><th>Status</th></tr></thead><tbody>`;
+    locEmps.forEach(e=>{
+      let status='✅ Aktiv', cls='';
+      if(sickIds.has(e.id)){status='🏥 Krank';cls='style="color:var(--danger)"';}
+      else if(vacIds.has(e.id)){status='🏖️ Urlaub';cls='style="color:var(--success)"';}
+      html+=`<tr><td>${e.name}</td><td>${e.position||''}</td><td>${e.department||''}</td><td ${cls}><strong>${status}</strong></td></tr>`;
+    });
+    html+='</tbody></table></div>';
+  });
+  m.innerHTML=html;
+}
+
+// ═══ BERICHTE ═══
+function renderBerichteSA(m){
+  const emps=DATA.employees;
+  const totalEmps=emps.length;
+  const totalVacs=DATA.vacations.length;
+  const totalSicks=DATA.sick_leaves.length;
+  const totalShifts=DATA.shifts.length;
+  const totalCheckins=DATA.time_records.length;
+  const totalDocs=DATA.documents.length;
+
+  m.innerHTML=`
+    <div class="page-title">Berichte & Export</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center">
+        <div style="font-size:2rem;font-weight:800;color:var(--accent)">${totalEmps}</div><div style="color:var(--text-muted);font-size:.82rem">Mitarbeiter</div>
+      </div>
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center">
+        <div style="font-size:2rem;font-weight:800;color:var(--success)">${totalVacs}</div><div style="color:var(--text-muted);font-size:.82rem">Urlaubsanträge</div>
+      </div>
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center">
+        <div style="font-size:2rem;font-weight:800;color:var(--danger)">${totalSicks}</div><div style="color:var(--text-muted);font-size:.82rem">Krankmeldungen</div>
+      </div>
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center">
+        <div style="font-size:2rem;font-weight:800;color:var(--warning)">${totalShifts}</div><div style="color:var(--text-muted);font-size:.82rem">Schichten</div>
+      </div>
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center">
+        <div style="font-size:2rem;font-weight:800;color:var(--info)">${totalCheckins}</div><div style="color:var(--text-muted);font-size:.82rem">Check-ins</div>
+      </div>
+      <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center">
+        <div style="font-size:2rem;font-weight:800">${totalDocs}</div><div style="color:var(--text-muted);font-size:.82rem">Dokumente</div>
+      </div>
+    </div>
+    <div class="page-title" style="font-size:1rem">Daten exportieren</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px">
+      <button class="btn btn-accent" onclick="exportCSV(DATA.employees,'mitarbeiter.csv')"><span class="ms">download</span> Mitarbeiter</button>
+      <button class="btn btn-accent" onclick="exportCSV(DATA.shifts,'schichten.csv')"><span class="ms">download</span> Schichten</button>
+      <button class="btn btn-accent" onclick="exportCSV(DATA.vacations,'urlaub.csv')"><span class="ms">download</span> Urlaub</button>
+      <button class="btn btn-accent" onclick="exportCSV(DATA.sick_leaves,'krank.csv')"><span class="ms">download</span> Krankmeldungen</button>
+      <button class="btn btn-accent" onclick="exportCSV(DATA.time_records,'zeiterfassung.csv')"><span class="ms">download</span> Zeiterfassung</button>
+      <button class="btn btn-accent" onclick="exportCSV(DATA.documents,'dokumente.csv')"><span class="ms">download</span> Dokumente</button>
+      <button class="btn btn-accent" onclick="exportCSV(DATA.checklists,'checklisten.csv')"><span class="ms">download</span> Checklisten</button>
+      <button class="btn btn-accent" onclick="exportCSV(DATA.azubi_bewertungen||[],'ausbildung.csv')"><span class="ms">download</span> Ausbildung</button>
+    </div>
+  `;
+}
+
+// ═══ ZUGANGSVERWALTUNG ═══
+function renderZugangSA(m){
+  const profs=DATA.user_profiles||[];
+  const perms=DATA.user_permissions||[];
+  m.innerHTML=`
+    <div class="page-title">Zugangsverwaltung <span class="record-count">${profs.length} Benutzer · ${perms.length} Custom-Regeln</span></div>
+    <div class="toolbar">
+      <button class="btn btn-accent" onclick="exportCSV(DATA.user_profiles,'benutzer.csv')"><span class="ms">download</span> CSV</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>User ID</th><th>Name</th><th>Rolle</th><th>Standort</th><th>Auth-ID</th><th>Perm-Mode</th><th>Custom Perms</th></tr></thead>
+      <tbody>${profs.map(p=>{
+        const perm=perms.find(x=>x.user_id===p.user_id);
+        const mode=perm?perm.mode:'—';
+        const customCount=perm&&perm.permissions?Object.values(perm.permissions).filter(v=>v).length:0;
+        return `<tr>
+          <td><code>${p.user_id}</code></td>
+          <td><strong>${p.name}</strong></td>
+          <td><span class="badge">${p.role}</span></td>
+          <td>${STANDORTE[p.location]||p.location||'all'}</td>
+          <td style="font-size:.72rem;color:var(--text-muted)">${p.auth_user_id||'—'}</td>
+          <td>${mode==='custom'?'<span style="color:var(--accent);font-weight:700">Custom</span>':'Standard'}</td>
+          <td>${mode==='custom'?customCount+' aktiv':'—'}</td>
+        </tr>`;
+      }).join('')}</tbody>
     </table></div>
   `;
 }
