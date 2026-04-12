@@ -100,16 +100,19 @@ async function doLogin() {
       return;
     }
 
-    // Check if account is pending approval
-    if (profile.status === 'pending') {
-      await sb.auth.signOut();
-      document.getElementById('loginSupabase').style.display = 'none';
-      document.getElementById('loginRegister').style.display = 'none';
-      document.getElementById('loginPending').style.display = 'block';
-      document.querySelector('.login-tabs').style.display = 'none';
-      loginBtn.disabled = false;
-      loginBtn.textContent = 'Anmelden';
-      return;
+    // Check if account is pending approval (employee status = inactive)
+    if (profile.emp_id) {
+      const { data: empCheck } = await sb.from('employees').select('status').eq('id', profile.emp_id).maybeSingle();
+      if (empCheck && empCheck.status === 'inactive') {
+        await sb.auth.signOut();
+        document.getElementById('loginSupabase').style.display = 'none';
+        document.getElementById('loginRegister').style.display = 'none';
+        document.getElementById('loginPending').style.display = 'block';
+        document.querySelector('.login-tabs').style.display = 'none';
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Anmelden';
+        return;
+      }
     }
 
     // Set current user from profile
@@ -339,45 +342,43 @@ async function checkExistingSession() {
           // Extract name from Google metadata
           const googleName = user.user_metadata?.full_name || user.user_metadata?.name || user.email.split('@')[0];
           const avatar = googleName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-          const empId = 'emp_' + googleName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 10) + '_' + Date.now().toString(36);
+          const userId = 'google_' + googleName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 10) + '_' + Date.now().toString(36);
 
-          // Create pending user_profiles + employees entry
-          const newProfile = {
-            user_id: empId,
-            auth_user_id: user.id,
-            name: googleName,
-            role: 'mitarbeiter',
-            location: 'origami',
-            avatar: avatar,
-            emp_id: empId,
-            status: 'pending'
-          };
-
-          const { error: profErr } = await sb.from('user_profiles').insert(newProfile);
-          if (profErr) console.error('[Auth] Profile create error:', profErr);
-
-          // Also create employee entry
+          // First create employee entry (id is auto-increment)
           const newEmp = {
-            id: empId,
             name: googleName,
             position: 'Neu',
-            department: 'Service',
+            dept: 'Service',
             location: 'origami',
-            status: 'pending',
-            email: user.email,
+            status: 'inactive',
+            start_date: new Date().toISOString().slice(0, 10),
             avatar: avatar,
-            role: 'mitarbeiter',
-            entry_date: new Date().toISOString().slice(0, 10),
             vac_total: 26,
             vac_used: 0,
             sick_days: 0,
             late_count: 0
           };
 
-          const { error: empErr } = await sb.from('employees').insert(newEmp);
+          const { data: empData, error: empErr } = await sb.from('employees').insert(newEmp).select('id').single();
           if (empErr) console.error('[Auth] Employee create error:', empErr);
 
-          console.log('[Auth] ✓ Google user auto-registered:', googleName, '(pending)');
+          const empId = empData?.id || null;
+
+          // Create user_profiles entry
+          const newProfile = {
+            user_id: userId,
+            auth_user_id: user.id,
+            name: googleName,
+            role: 'mitarbeiter',
+            location: 'origami',
+            avatar: avatar,
+            emp_id: empId
+          };
+
+          const { error: profErr } = await sb.from('user_profiles').insert(newProfile);
+          if (profErr) console.error('[Auth] Profile create error:', profErr);
+
+          console.log('[Auth] ✓ Google user auto-registered:', googleName, '(pending, emp_id:', empId, ')');
         }
 
         // Show pending screen
@@ -389,14 +390,17 @@ async function checkExistingSession() {
         return true; // Prevent showing login form
       }
 
-      // Profile exists but pending
-      if (profile.status === 'pending') {
-        hideLoading();
-        document.getElementById('loginSupabase').style.display = 'none';
-        document.getElementById('loginRegister').style.display = 'none';
-        document.getElementById('loginPending').style.display = 'block';
-        document.querySelector('.login-tabs').style.display = 'none';
-        return true;
+      // Profile exists — check if employee is still inactive (pending approval)
+      if (profile.emp_id) {
+        const { data: emp } = await sb.from('employees').select('status').eq('id', profile.emp_id).maybeSingle();
+        if (emp && emp.status === 'inactive') {
+          hideLoading();
+          document.getElementById('loginSupabase').style.display = 'none';
+          document.getElementById('loginRegister').style.display = 'none';
+          document.getElementById('loginPending').style.display = 'block';
+          document.querySelector('.login-tabs').style.display = 'none';
+          return true;
+        }
       }
 
       // Profile OK — restore session
