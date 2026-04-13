@@ -2634,7 +2634,8 @@ function renderAccess(){
   pg.innerHTML=`${pendingHtml}<div class="table-wrap"><div class="table-header" style="display:flex;align-items:center;justify-content:space-between">
     <span class="table-title">Zugangsverwaltung (${activeUsers.length} Benutzer)</span>
     <div style="display:flex;gap:6px;align-items:center">
-      <span style="font-size:.75rem;color:var(--text-muted)">Sortieren:</span>
+      <button class="btn btn-sm btn-success" onclick="openCreateUserModal()" style="font-weight:600"><span class="ms" style="font-size:16px">person_add</span> Neuen Benutzer anlegen</button>
+      <span style="font-size:.75rem;color:var(--text-muted);margin-left:8px">Sortieren:</span>
       <button class="btn btn-sm ${sortBtnLoc}" onclick="accessSort='location';renderAccess()">📍 Standort</button>
       <button class="btn btn-sm ${sortBtnName}" onclick="accessSort='name';renderAccess()">🔤 Name</button>
     </div>
@@ -2648,6 +2649,156 @@ function renderAccess(){
 
   // Update pending badge in sidebar
   updatePendingBadge();
+}
+
+// ═══ CREATE NEW USER MODAL ═══
+function openCreateUserModal() {
+  const locOptions = LOCS.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+  const deptOptions = [...new Set(DEPTS.map(d => d.name))].sort().map(d => `<option value="${d}">${d}</option>`).join('');
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'createUserModal';
+  modal.innerHTML = `<div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <h3><span class="ms" style="font-size:20px;vertical-align:middle">person_add</span> Neuen Benutzer anlegen</h3>
+      <button class="modal-close" onclick="document.getElementById('createUserModal').remove()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:20px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="grid-column:span 2">
+          <label class="form-label">Name *</label>
+          <input class="form-input" id="newUserName" placeholder="Vor- und Nachname" style="width:100%">
+        </div>
+        <div>
+          <label class="form-label">E-Mail *</label>
+          <input class="form-input" id="newUserEmail" type="email" placeholder="email@example.com" style="width:100%">
+        </div>
+        <div>
+          <label class="form-label">Passwort *</label>
+          <input class="form-input" id="newUserPwd" type="password" placeholder="Min. 6 Zeichen" style="width:100%">
+        </div>
+        <div>
+          <label class="form-label">Rolle</label>
+          <select class="form-select" id="newUserRole" style="width:100%">
+            <option value="mitarbeiter">👤 Mitarbeiter</option>
+            <option value="azubi">🎓 Azubi</option>
+            <option value="manager">🏢 Manager</option>
+            <option value="inhaber">👑 Inhaber</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Standort *</label>
+          <select class="form-select" id="newUserLoc" style="width:100%">${locOptions}</select>
+        </div>
+        <div>
+          <label class="form-label">Bereich</label>
+          <select class="form-select" id="newUserDept" style="width:100%">${deptOptions}</select>
+        </div>
+        <div>
+          <label class="form-label">Position</label>
+          <input class="form-input" id="newUserPos" placeholder="z.B. Kellner, Koch..." style="width:100%">
+        </div>
+      </div>
+      <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-sm" onclick="document.getElementById('createUserModal').remove()">Abbrechen</button>
+        <button class="btn btn-sm btn-success" onclick="createNewUser()" id="btnCreateUser" style="font-weight:600">
+          <span class="ms" style="font-size:16px">check</span> Anlegen
+        </button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  requestAnimationFrame(() => modal.classList.add('show'));
+  document.getElementById('newUserName').focus();
+}
+
+async function createNewUser() {
+  const name = document.getElementById('newUserName').value.trim();
+  const email = document.getElementById('newUserEmail').value.trim();
+  const pwd = document.getElementById('newUserPwd').value;
+  const role = document.getElementById('newUserRole').value;
+  const loc = document.getElementById('newUserLoc').value;
+  const dept = document.getElementById('newUserDept').value;
+  const pos = document.getElementById('newUserPos').value.trim() || 'Mitarbeiter';
+
+  if (!name) { toast('Bitte Name eingeben', 'err'); return; }
+  if (!email) { toast('Bitte E-Mail eingeben', 'err'); return; }
+  if (pwd.length < 6) { toast('Passwort muss min. 6 Zeichen haben', 'err'); return; }
+
+  const btn = document.getElementById('btnCreateUser');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="ms spin" style="font-size:16px">progress_activity</span> Wird angelegt...';
+
+  try {
+    // 1. Create Supabase Auth user
+    const { data: authData, error: authErr } = await sb.auth.signUp({
+      email: email,
+      password: pwd,
+      options: { data: { display_name: name } }
+    });
+    if (authErr) { toast('Auth-Fehler: ' + authErr.message, 'err'); btn.disabled = false; btn.textContent = 'Anlegen'; return; }
+    const uid = authData.user?.id;
+    if (!uid) { toast('Kein User-ID erhalten', 'err'); btn.disabled = false; btn.textContent = 'Anlegen'; return; }
+
+    // 2. Create employee record
+    const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const newEmp = {
+      name: name,
+      location: loc,
+      dept: dept,
+      position: pos,
+      status: 'active',
+      start_date: isoDate(new Date()),
+      avatar: initials,
+      vac_total: 26, vac_used: 0, sick_days: 0,
+      late_count: 0, soll_stunden: 160, brutto_gehalt: 0,
+      schule_tage: 0, birthday: null, prob_end: null
+    };
+    const { data: empData, error: empErr } = await sb.from('employees').insert(newEmp).select().single();
+    if (empErr) { toast('Mitarbeiter-Fehler: ' + empErr.message, 'err'); btn.disabled = false; btn.textContent = 'Anlegen'; return; }
+
+    // 3. Create user_profile
+    const profile = {
+      user_id: uid,
+      name: name,
+      role: role,
+      location: loc,
+      status: 'active',
+      emp_id: empData.id,
+      avatar: initials,
+      reg_email: email,
+      reg_position: pos
+    };
+    const { error: profErr } = await sb.from('user_profiles').insert(profile);
+    if (profErr) { toast('Profil-Fehler: ' + profErr.message, 'err'); btn.disabled = false; btn.textContent = 'Anlegen'; return; }
+
+    // 4. Update local data
+    EMPS.push({
+      id: empData.id, name, location: loc, dept, position: pos,
+      status: 'active', start: isoDate(new Date()), avatar: initials,
+      vacTotal: 26, vacUsed: 0, sickDays: 0, lateCount: 0,
+      sollStunden: 160, bruttoGehalt: 0, schuleTage: 0,
+      birthday: '', probEnd: ''
+    });
+    USERS.push({
+      id: uid, name, role, location: loc, status: 'active',
+      empId: empData.id, avatar: initials, regEmail: email,
+      regPosition: pos
+    });
+
+    document.getElementById('createUserModal').remove();
+    toast(`✓ ${name} wurde angelegt!`, 'success');
+    addNotif('info', 'Neuer Benutzer', `${name} (${email}) wurde als ${role} angelegt`);
+    renderAccess();
+    updateBadges();
+
+  } catch (e) {
+    console.error('[CreateUser]', e);
+    toast('Fehler beim Anlegen: ' + e.message, 'err');
+    btn.disabled = false;
+    btn.textContent = 'Anlegen';
+  }
 }
 
 async function changeUserRole(userId, newRole) {
