@@ -3734,7 +3734,7 @@ async function saveDoc(){
   const eid=parseInt(document.getElementById('mDoE').value);
   const emp=EMPS.find(e=>e.id===eid);
   const n=document.getElementById('mDoN').value.trim();
-  if(!n)return alert('Bitte Dokumentname eingeben.');
+  if(!n)return toast('Bitte Dokumentname eingeben.','err');
   const tp=document.getElementById('mDoT').value;
   const icons={contracts:'📄',certs:'🎓',health:'🏥',tax:'💰',other:'📎'};
   const fileInput=document.getElementById('mDoFile');
@@ -3810,7 +3810,7 @@ function applySavedTemplate(){
 
 function openSaveTemplateModal(){
   const loc=currentUser.location==='all'?currentLocation:currentUser.location;
-  if(loc==='all'){alert('Bitte zuerst einen Standort wählen.');return;}
+  if(loc==='all'){toast('Bitte zuerst einen Standort wählen.','err');return;}
   document.getElementById('modalTitle').textContent='Wochenplan als Vorlage speichern';
   document.getElementById('modalBody').innerHTML=`<div class="form-grid">
     <div class="form-group full"><label class="form-label">Vorlagenname</label><input class="form-input" id="mTName" placeholder="z.B. Standardwoche Mo-Fr"></div>
@@ -4600,7 +4600,7 @@ function saveChecklist(){
   const emp=empId?EMPS.find(e=>e.id===empId):null;
   const loc=document.getElementById('mCLLoc').value;
   const lines=document.getElementById('mCLItems').value.trim().split('\n').filter(l=>l.trim());
-  if(!lines.length)return alert('Bitte mindestens eine Aufgabe eingeben.');
+  if(!lines.length)return toast('Bitte mindestens eine Aufgabe eingeben.','err');
   CHECKLISTS.push({id:Date.now(),type,empId,empName:emp?emp.name:'Alle Mitarbeiter',location:loc,items:lines.map(l=>({text:l.trim(),done:false}))});
   closeModal();toast('Checkliste erstellt');renderChecklists();
 }
