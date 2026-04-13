@@ -114,3 +114,32 @@
 - **Nguyên nhân:** `innerHTML` tạo lại DOM → dropdown mới với default value
 - **Cách fix:** Lưu value vào state variable (`scheduleSort`, `scheduleDept`), dùng `selected` attr khi render
 - **Bài học:** Khi dùng `innerHTML` để re-render: PHẢI lưu form state vào JS variable, KHÔNG đọc từ DOM sau render
+
+---
+
+## Bugs từ Deployment (2026-04-13)
+
+### 2026-04-13 – Vercel 404 sau khi push files lớn vào public/ ⚠️ INVESTIGATING
+- **Triệu chứng:** Toàn bộ trang Vercel trả 404 NOT_FOUND. Tất cả URLs đều 404 kể cả `/index.html`
+- **Nguyên nhân (nghi ngờ):** 
+  1. Push files ảnh lớn vào git (favicon.svg 3.1MB, logo-mercury.png 1.1MB, logo-mercuryB.png 2.3MB) → tổng ~6.5MB
+  2. Vercel deployment có thể bị timeout hoặc fail khi clone repo nặng
+  3. Dù đã xóa files khỏi git tracking, lịch sử git vẫn lưu → repo nặng
+  4. Có thể Vercel detect sai Framework Preset (Next.js thay vì static)
+- **File bị ảnh hưởng:** Toàn bộ site, `vercel.json`, `public/`, `index.html`
+- **Đã thử:**
+  - `git rm --cached` các files lớn → thêm vào `.gitignore` → push → vẫn 404
+  - Xóa files khỏi disk → push → vẫn 404
+  - Thêm `"buildCommand": ""`, `"outputDirectory": "."` vào `vercel.json` → vẫn 404
+  - Trigger redeploy bằng empty commit → vẫn 404
+- **Cần kiểm tra:**
+  - Vercel Dashboard → Project Settings → Framework Preset phải là **"Other"** (không phải Next.js)
+  - Build Command phải trống
+  - Output Directory phải trống hoặc `.`
+  - Nếu sai → sửa + click **Redeploy**
+- **Bài học:**
+  - ⚠️ **KHÔNG push files > 500KB vào git** cho Vercel static site
+  - Dùng CDN (Supabase Storage, Cloudinary) cho ảnh lớn thay vì git
+  - Luôn kiểm tra `du -sh` trước khi `git add` files mới
+  - Nếu cần favicon → chỉ giữ 1 file PNG nhỏ (< 50KB)
+  - Vercel project cần đúng Framework Preset = "Other" cho static HTML sites
