@@ -2677,9 +2677,12 @@ function renderAccess(){
     const locSelect = `<select class="form-select" style="min-width:140px" onchange="changeUserLocation('${u.id}',this.value)">
       ${locOpts.map(l => `<option value="${l.id}" ${u.location===l.id?'selected':''}>${l.name}</option>`).join('')}
     </select>`;
-    const deptSelect = emp ? `<select class="form-select" style="min-width:120px;font-size:.82rem" onchange="changeUserDept('${u.id}',this.value)">
-      ${allDepts.map(d => `<option value="${d}" ${emp.dept===d?'selected':''}>${d}</option>`).join('')}
-    </select>` : '<span style="color:var(--text-muted);font-size:.82rem">—</span>';
+    const empDepts = emp ? (emp.dept || '').split(',').map(d => d.trim()).filter(Boolean) : [];
+    const deptTags = emp ? (empDepts.length > 0
+      ? empDepts.map(d => `<span style="display:inline-block;font-size:.7rem;font-weight:600;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:10px;margin:1px 2px">${d}</span>`).join('')
+      : '<span style="color:var(--text-muted);font-size:.75rem">—</span>')
+      : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
+    const deptCell = emp ? `<div style="cursor:pointer;min-width:100px" onclick="openDeptPicker('${u.id}')" title="Klicke zum Ändern">${deptTags}</div>` : deptTags;
     const emailInfo = u.regEmail ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:2px" title="${u.regEmail}">📧 ${u.regEmail}</div>` : '';
     const googleBadge = u.regEmail?.includes('gmail') || u.bannerUrl ? '<span style="font-size:.68rem;background:var(--bg-input);padding:1px 6px;border-radius:4px;color:var(--text-muted);margin-left:4px">Google</span>' : '';
     return `<tr>
@@ -2694,7 +2697,7 @@ function renderAccess(){
         </div>
       </div></td>
       <td><input class="form-input" style="width:140px;font-size:.82rem" value="${emp?.position||u.regPosition||''}" placeholder="Position..." onblur="changeUserPosition('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></td>
-      <td>${deptSelect}</td>
+      <td>${deptCell}</td>
       <td>${roleSelect}</td>
       <td>${locSelect}</td>
       <td>${statusBadge(u.status)}</td>
@@ -2948,6 +2951,52 @@ async function changeUserDept(userId, newDept) {
     syncEmployeeField(emp.id, 'dept', newDept);
     toast(`${u.name}: Bereich → ${newDept}`);
   }
+}
+
+function openDeptPicker(userId) {
+  const u = USERS.find(x => x.id === userId);
+  if (!u || !u.empId) return;
+  const emp = EMPS.find(e => e.id === u.empId);
+  if (!emp) return;
+
+  const allDepts = [...new Set(DEPTS.map(d => d.name))].sort();
+  const currentDepts = (emp.dept || '').split(',').map(d => d.trim()).filter(Boolean);
+
+  // Remove existing picker
+  document.getElementById('deptPickerPopup')?.remove();
+
+  const popup = document.createElement('div');
+  popup.id = 'deptPickerPopup';
+  popup.className = 'modal-overlay';
+  popup.innerHTML = `<div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <h3 style="font-size:.95rem">Bereich für ${u.name}</h3>
+      <button class="modal-close" onclick="document.getElementById('deptPickerPopup').remove()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${allDepts.map(d => `<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;cursor:pointer;border:1px solid var(--border);transition:.15s;font-size:.85rem;font-weight:500" onmouseenter="this.style.background='var(--bg-input)'" onmouseleave="this.style.background=''">
+          <input type="checkbox" class="deptPickerCb" value="${d}" ${currentDepts.includes(d)?'checked':''} style="width:16px;height:16px;accent-color:var(--accent)">
+          ${d}
+        </label>`).join('')}
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-sm" onclick="document.getElementById('deptPickerPopup').remove()">Abbrechen</button>
+        <button class="btn btn-sm btn-primary" onclick="saveDeptPicker('${userId}')">Speichern</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(popup);
+  requestAnimationFrame(() => popup.classList.add('show'));
+}
+
+function saveDeptPicker(userId) {
+  const checked = [...document.querySelectorAll('.deptPickerCb:checked')].map(cb => cb.value);
+  if (checked.length === 0) { toast('Mindestens einen Bereich wählen', 'err'); return; }
+  const newDept = checked.join(', ');
+  changeUserDept(userId, newDept);
+  document.getElementById('deptPickerPopup').remove();
+  renderAccess();
 }
 
 async function approveRegistration(userId) {
