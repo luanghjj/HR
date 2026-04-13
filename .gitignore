@@ -6,3 +6,7 @@ node_modules/
 public/favicon.svg
 public/logo-mercury.png
 public/logo-mercuryB.png
+public/apple-touch-icon.png
+public/favicon.ico
+public/web-app-manifest-192x192.png
+public/web-app-manifest-512x512.png
