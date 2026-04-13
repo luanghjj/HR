@@ -278,6 +278,21 @@ async function handleQrCheckin(locationId) {
     return;
   }
 
+  // CHECK-IN: verify employee has a shift today
+  const me = EMPS.find(e => e.id === currentUser.empId);
+  const todayShift = getVisibleShifts().find(s => s.empId === me?.id && s.date === today && !s.isSick && !s.isVacation);
+
+  if (!todayShift) {
+    // No shift today → block check-in
+    toast('📋 Heute hast du keine Schicht', 'warn');
+    openModal('Keine Schicht', `<div style="text-align:center;padding:20px">
+      <div style="font-size:3rem;margin-bottom:16px">📋</div>
+      <h3 style="font-size:1.1rem;margin-bottom:8px">Heute keine Schicht geplant</h3>
+      <p style="color:var(--text-muted);font-size:.9rem">Du hast heute (${formatDateDE(today)}) keinen Dienst.<br>Bei Fragen wende dich an deinen Manager.</p>
+    </div>`, `<button class="btn btn-primary" onclick="closeModal()">OK</button>`);
+    return;
+  }
+
   // CHECK-IN with GPS verify
   toast('📍 GPS wird geprüft...', 'info');
 
@@ -300,8 +315,6 @@ async function handleQrCheckin(locationId) {
   }
 
   // Late detection
-  const me = EMPS.find(e => e.id === currentUser.empId);
-  const todayShift = getVisibleShifts().find(s => s.empId === me?.id && s.date === today && !s.isSick && !s.isVacation);
   let isLate = false, lateMin = 0;
   if (todayShift) {
     const [sh, sm] = todayShift.from.split(':').map(Number);
@@ -331,9 +344,10 @@ async function handleQrCheckin(locationId) {
     TIME_RECORDS.unshift(activeCheckIn);
 
     const locName = getLocationName(locationId);
+    const shiftInfo = todayShift ? ` · ${todayShift.from}–${todayShift.to}` : '';
     const gpsInfo = gpsVerified === true ? ' ✅ GPS bestätigt' :
                     gpsVerified === false ? ' ⚠️ GPS nicht bestätigt' : '';
-    toast(`✅ Eingecheckt · ${locName}${gpsInfo}`, 'success');
+    toast(`✅ Eingecheckt · ${locName}${shiftInfo}${gpsInfo}`, 'success');
     if (isLate) toast(`⏰ ${lateMin} Min. verspätet`, 'warn');
     if (gpsSuspicious) toast('🔴 GPS-Standort verdächtig — Admin wird benachrichtigt', 'warn');
 
