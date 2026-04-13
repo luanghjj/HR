@@ -2667,6 +2667,8 @@ function renderAccess(){
     return a.name.localeCompare(b.name);
   });
 
+  const allDepts = [...new Set(DEPTS.map(d => d.name))].sort();
+
   let rows = activeUsers.map(u => {
     const emp = u.empId ? EMPS.find(e=>e.id===u.empId) : null;
     const roleSelect = `<select class="form-select" style="min-width:120px" onchange="changeUserRole('${u.id}',this.value)">
@@ -2675,6 +2677,9 @@ function renderAccess(){
     const locSelect = `<select class="form-select" style="min-width:140px" onchange="changeUserLocation('${u.id}',this.value)">
       ${locOpts.map(l => `<option value="${l.id}" ${u.location===l.id?'selected':''}>${l.name}</option>`).join('')}
     </select>`;
+    const deptSelect = emp ? `<select class="form-select" style="min-width:120px;font-size:.82rem" onchange="changeUserDept('${u.id}',this.value)">
+      ${allDepts.map(d => `<option value="${d}" ${emp.dept===d?'selected':''}>${d}</option>`).join('')}
+    </select>` : '<span style="color:var(--text-muted);font-size:.82rem">—</span>';
     const emailInfo = u.regEmail ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:2px" title="${u.regEmail}">📧 ${u.regEmail}</div>` : '';
     const googleBadge = u.regEmail?.includes('gmail') || u.bannerUrl ? '<span style="font-size:.68rem;background:var(--bg-input);padding:1px 6px;border-radius:4px;color:var(--text-muted);margin-left:4px">Google</span>' : '';
     return `<tr>
@@ -2689,9 +2694,9 @@ function renderAccess(){
         </div>
       </div></td>
       <td><input class="form-input" style="width:140px;font-size:.82rem" value="${emp?.position||u.regPosition||''}" placeholder="Position..." onblur="changeUserPosition('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></td>
+      <td>${deptSelect}</td>
       <td>${roleSelect}</td>
       <td>${locSelect}</td>
-      <td>${u.empId ? (emp?.name||'—') : '—'}</td>
       <td>${statusBadge(u.status)}</td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-sm" onclick="openPermissionsModal('${u.id}')" title="Berechtigungen"><span class="ms" style="font-size:16px">shield_person</span></button>
@@ -2712,7 +2717,7 @@ function renderAccess(){
       <button class="btn btn-sm ${sortBtnName}" onclick="accessSort='name';renderAccess()">🔤 Name</button>
     </div>
   </div>
-  <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Position</th><th>Rolle</th><th>Standort</th><th>Mitarbeiter</th><th>Status</th><th></th></tr></thead><tbody>
+  <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Position</th><th>Bereich</th><th>Rolle</th><th>Standort</th><th>Status</th><th></th></tr></thead><tbody>
   ${rows}
   </tbody></table></div></div>
   <div style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:8px;font-size:.82rem;color:var(--text-muted)">
@@ -2931,6 +2936,17 @@ async function changeUserPosition(userId, newPos) {
       syncEmployeeField(emp.id, 'position', emp.position);
       toast(`${u.name}: ${emp.position}`);
     }
+  }
+}
+
+async function changeUserDept(userId, newDept) {
+  const u = USERS.find(x => x.id === userId);
+  if (!u || !u.empId) return;
+  const emp = EMPS.find(e => e.id === u.empId);
+  if (emp) {
+    emp.dept = newDept;
+    syncEmployeeField(emp.id, 'dept', newDept);
+    toast(`${u.name}: Bereich → ${newDept}`);
   }
 }
 
