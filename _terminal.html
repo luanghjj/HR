@@ -263,8 +263,59 @@ async function loadData() {
     .gte('check_in', today + 'T00:00:00')
     .lte('check_in', today + 'T23:59:59');
 
+  // Auto-checkout: run silently
+  await autoCheckout(today, records || []);
+
   renderCheckin(emps || [], records || []);
   document.getElementById('refreshInfo').textContent = 'Aktualisiert: ' + new Date().toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+}
+
+// ─── AUTO-CHECKOUT (30 min after shift end) ───
+const AUTO_CHECKOUT_BUFFER_MIN = 30;
+
+async function autoCheckout(today, records) {
+  // Find open records (no check_out)
+  const openRecords = records.filter(r => !r.check_out);
+  if (openRecords.length === 0) return;
+
+  // Load today's shifts for this location
+  const { data: shifts } = await sb.from('shifts').select('emp_id,shift_date,shift_to')
+    .eq('location', currentLoc)
+    .eq('shift_date', today);
+  if (!shifts || shifts.length === 0) return;
+
+  const now = new Date();
+
+  for (const rec of openRecords) {
+    // Find matching shift for this employee today
+    const shift = shifts.find(s => s.emp_id === rec.emp_id && s.shift_date === today);
+    if (!shift || !shift.shift_to) continue;
+
+    // Parse shift end time
+    const [endH, endM] = shift.shift_to.split(':').map(Number);
+    const shiftEnd = new Date(today + 'T00:00:00');
+    shiftEnd.setHours(endH, endM, 0, 0);
+
+    // Add 30 min buffer
+    const deadline = new Date(shiftEnd.getTime() + AUTO_CHECKOUT_BUFFER_MIN * 60000);
+
+    if (now >= deadline) {
+      // Auto checkout — set check_out = shift end time
+      const checkOutTime = shiftEnd.toISOString();
+      const totalHours = ((shiftEnd - new Date(rec.check_in)) / 3600000).toFixed(2);
+
+      await sb.from('time_records').update({
+        check_out: checkOutTime,
+        total_hours: parseFloat(totalHours)
+      }).eq('id', rec.id);
+
+      // Update local record so UI reflects immediately
+      rec.check_out = checkOutTime;
+      rec.total_hours = parseFloat(totalHours);
+
+      console.log(`[Auto-Checkout] emp_id=${rec.emp_id} → ${shift.shift_to}`);
+    }
+  }
 }
 
 // ─── RENDER CHECK-IN ───

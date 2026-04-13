@@ -298,12 +298,66 @@ async function loadDataFromSupabase() {
     // else: keep static SAVED_TEMPLATES from data.js as fallback
 
     console.log(`[Data] ✓ Loaded: ${LOCS.length} locations, ${DEPTS.length} depts, ${EMPS.length} employees, ${VACS.length} vacations, ${SICKS.length} sick leaves, ${DOCS.length} documents, ${CHECKLISTS.length} checklists, ${SAVED_TEMPLATES.length} templates, ${SCHULE_SCHEDULE.length} school days, ${AUSBILDUNGSNACHWEISE.length} training logs, ${AZUBI_BEWERTUNGEN.length} evaluations, ${TIME_RECORDS.length} time records`);
+
+    // Run auto-checkout after data load
+    await runAutoCheckout();
+
     return true;
 
   } catch (err) {
     console.warn('[Data] ⚠️ Supabase load failed:', err.message);
     console.log('[Data] Using demo data from data.js');
     return false;
+  }
+}
+
+// ═══ AUTO-CHECKOUT (30 min after shift end) ═══
+const AUTO_CHECKOUT_BUFFER = 30; // minutes
+
+async function runAutoCheckout() {
+  const today = isoDate(new Date());
+  const now = new Date();
+
+  // Find open time_records (check_in today, no check_out)
+  const openRecords = TIME_RECORDS.filter(r => r.checkIn?.startsWith(today) && !r.checkOut);
+  if (openRecords.length === 0) return;
+
+  // Find matching shifts
+  const todayShifts = SHIFTS.filter(s => s.date === today);
+  if (todayShifts.length === 0) return;
+
+  let autoCount = 0;
+  for (const rec of openRecords) {
+    const shift = todayShifts.find(s => s.empId === rec.empId);
+    if (!shift || !shift.to) continue;
+
+    // Parse shift end
+    const [endH, endM] = shift.to.split(':').map(Number);
+    const shiftEnd = new Date(today + 'T00:00:00');
+    shiftEnd.setHours(endH, endM, 0, 0);
+
+    // 30 min buffer
+    const deadline = new Date(shiftEnd.getTime() + AUTO_CHECKOUT_BUFFER * 60000);
+
+    if (now >= deadline) {
+      const checkOutTime = shiftEnd.toISOString();
+      const totalHours = ((shiftEnd - new Date(rec.checkIn)) / 3600000).toFixed(2);
+
+      const { error } = await sb.from('time_records').update({
+        check_out: checkOutTime,
+        total_hours: parseFloat(totalHours)
+      }).eq('id', rec.id);
+
+      if (!error) {
+        rec.checkOut = checkOutTime;
+        rec.totalHours = parseFloat(totalHours);
+        autoCount++;
+      }
+    }
+  }
+
+  if (autoCount > 0) {
+    console.log(`[Auto-Checkout] ✓ ${autoCount} Mitarbeiter automatisch ausgecheckt`);
   }
 }
 
