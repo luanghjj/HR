@@ -4865,20 +4865,21 @@ async function saveNewLocation(){
   const id = document.getElementById('locId').value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
   const name = document.getElementById('locName').value.trim();
   const city = document.getElementById('locCity').value.trim();
-  if(!id || !name){ alert('ID und Name sind erforderlich.'); return; }
-  if(LOCS.find(l => l.id === id)){ alert('Diese ID existiert bereits.'); return; }
+  if(!id || !name){ toast('ID und Name sind erforderlich.','err'); return; }
+  if(LOCS.find(l => l.id === id)){ toast('Diese ID existiert bereits.','err'); return; }
 
-  const { error } = await sb.from('locations').insert({ id, name, city });
-  if(error){ alert('Fehler: ' + error.message); return; }
+  // Parse GPS
+  const lat = parseFloat(document.getElementById('locLat').value) || null;
+  const lng = parseFloat(document.getElementById('locLng').value) || null;
+  const radius = parseInt(document.getElementById('locRadius').value) || 50;
+
+  const insertData = { id, name, city, lat, lng, radius_m: radius };
+  const { error } = await sb.from('locations').insert(insertData);
+  if(error){ toast('Fehler: ' + error.message, 'err'); return; }
 
   // Update local data
-  LOCS.push({ id, name, city });
-
-  // Save GPS if provided
-  const lat = parseFloat(document.getElementById('locLat').value);
-  const lng = parseFloat(document.getElementById('locLng').value);
-  const radius = parseInt(document.getElementById('locRadius').value) || 50;
-  if(!isNaN(lat) && !isNaN(lng)){
+  LOCS.push({ id, name, city, lat, lng, radius_m: radius });
+  if(lat != null && lng != null){
     GPS_COORDS[id] = { lat, lng, radius_m: radius };
   }
   LOCATION_SCHEDULE[id] = { dayOff: [0], halfDays: [] };
@@ -4886,7 +4887,7 @@ async function saveNewLocation(){
   closeModal();
   buildLocationSelect();
   renderLocations();
-  showToast('Standort "' + name + '" erstellt ✓');
+  toast('Standort "' + name + '" erstellt ✓', 'success');
 }
 
 function editLocation(locId){
@@ -4918,41 +4919,46 @@ function editLocation(locId){
 async function saveEditLocation(locId){
   const name = document.getElementById('editLocName').value.trim();
   const city = document.getElementById('editLocCity').value.trim();
-  if(!name){ alert('Name ist erforderlich.'); return; }
+  if(!name){ toast('Name ist erforderlich.','err'); return; }
 
-  const { error } = await sb.from('locations').update({ name, city }).eq('id', locId);
-  if(error){ alert('Fehler: ' + error.message); return; }
-
-  const loc = LOCS.find(l => l.id === locId);
-  if(loc){ loc.name = name; loc.city = city; }
-
-  // Update GPS
-  const lat = parseFloat(document.getElementById('editLocLat').value);
-  const lng = parseFloat(document.getElementById('editLocLng').value);
+  // Parse GPS
+  const lat = parseFloat(document.getElementById('editLocLat').value) || null;
+  const lng = parseFloat(document.getElementById('editLocLng').value) || null;
   const radius = parseInt(document.getElementById('editLocRadius').value) || 50;
-  if(!isNaN(lat) && !isNaN(lng)){
+
+  // Save everything to DB
+  const updateData = { name, city, lat, lng, radius_m: radius };
+  const { error } = await sb.from('locations').update(updateData).eq('id', locId);
+  if(error){ toast('Fehler: ' + error.message, 'err'); return; }
+
+  // Update local LOCS
+  const loc = LOCS.find(l => l.id === locId);
+  if(loc){ loc.name = name; loc.city = city; loc.lat = lat; loc.lng = lng; loc.radius_m = radius; }
+
+  // Sync GPS_COORDS
+  if(lat != null && lng != null){
     GPS_COORDS[locId] = { lat, lng, radius_m: radius };
   }
 
-  // Update schedule
+  // Update schedule (Ruhetage)
   const dayOff = [...document.querySelectorAll('.editDayOff:checked')].map(cb => parseInt(cb.value));
   LOCATION_SCHEDULE[locId] = { dayOff, halfDays: LOCATION_SCHEDULE[locId]?.halfDays || [] };
 
   closeModal();
   buildLocationSelect();
   renderLocations();
-  showToast('Standort aktualisiert ✓');
+  toast('Standort aktualisiert ✓', 'success');
 }
 
 async function deleteLocation(locId){
   const loc = LOCS.find(l => l.id === locId);
   if(!loc) return;
   const empCount = EMPS.filter(e => e.location === locId).length;
-  if(empCount > 0){ alert('Kann nicht gelöscht werden — ' + empCount + ' Mitarbeiter zugeordnet.'); return; }
+  if(empCount > 0){ toast('Kann nicht gelöscht werden — ' + empCount + ' Mitarbeiter zugeordnet.','err'); return; }
   if(!confirm('Standort "' + loc.name + '" wirklich löschen?')) return;
 
   const { error } = await sb.from('locations').delete().eq('id', locId);
-  if(error){ alert('Fehler: ' + error.message); return; }
+  if(error){ toast('Fehler: ' + error.message, 'err'); return; }
 
   const idx = LOCS.findIndex(l => l.id === locId);
   if(idx >= 0) LOCS.splice(idx, 1);
@@ -4961,7 +4967,7 @@ async function deleteLocation(locId){
 
   buildLocationSelect();
   renderLocations();
-  showToast('Standort gelöscht ✓');
+  toast('Standort gelöscht ✓', 'success');
 }
 
 // ═══ QR GENERATOR (Admin-only) ═══

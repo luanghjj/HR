@@ -42,12 +42,14 @@ async function loadDataFromSupabase() {
       locs.forEach(l => {
         // Merge GPS coords: prefer DB value, fallback to GPS_COORDS constant
         const gps = GPS_COORDS[l.id] || {};
-        LOCS.push({
-          ...l,
-          lat:      l.lat      ?? gps.lat      ?? null,
-          lng:      l.lng      ?? gps.lng      ?? null,
-          radius_m: l.radius_m ?? gps.radius_m ?? 50
-        });
+        const lat = l.lat ?? gps.lat ?? null;
+        const lng = l.lng ?? gps.lng ?? null;
+        const radius = l.radius_m ?? gps.radius_m ?? 50;
+        LOCS.push({ ...l, lat, lng, radius_m: radius });
+        // Sync GPS_COORDS object
+        if (lat != null && lng != null) {
+          GPS_COORDS[l.id] = { lat, lng, radius_m: radius };
+        }
       });
     }
 

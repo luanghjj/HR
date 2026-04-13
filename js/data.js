@@ -2,7 +2,7 @@
 // OKYU HRM – Demo Data (will be replaced by Supabase in Step 3-4)
 // ═══════════════════════════════════════════════════════════
 
-const LOCS = [
+let LOCS = [
   { id: 'origami',      name: 'Origami Restaurant',  city: 'Göppingen' },
   { id: 'okyu_central', name: 'Okyu Restaurant',     city: 'Stuttgart' },
   { id: 'enso',         name: 'Enso Sushi & Grill',  city: 'Stuttgart' }
