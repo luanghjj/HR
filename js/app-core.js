@@ -4873,7 +4873,7 @@ async function saveNewLocation(){
   const lng = parseFloat(document.getElementById('locLng').value) || null;
   const radius = parseInt(document.getElementById('locRadius').value) || 50;
 
-  const insertData = { id, name, city, lat, lng, radius_m: radius };
+  const insertData = { id, name, city, lat, lng, radius_m: radius, day_off: [0], half_days: [] };
   const { error } = await sb.from('locations').insert(insertData);
   if(error){ toast('Fehler: ' + error.message, 'err'); return; }
 
@@ -4926,8 +4926,12 @@ async function saveEditLocation(locId){
   const lng = parseFloat(document.getElementById('editLocLng').value) || null;
   const radius = parseInt(document.getElementById('editLocRadius').value) || 50;
 
-  // Save everything to DB
-  const updateData = { name, city, lat, lng, radius_m: radius };
+  // Parse Ruhetage
+  const dayOff = [...document.querySelectorAll('.editDayOff:checked')].map(cb => parseInt(cb.value));
+  const halfDays = LOCATION_SCHEDULE[locId]?.halfDays || [];
+
+  // Save everything to DB (including Ruhetage)
+  const updateData = { name, city, lat, lng, radius_m: radius, day_off: dayOff, half_days: halfDays };
   const { error } = await sb.from('locations').update(updateData).eq('id', locId);
   if(error){ toast('Fehler: ' + error.message, 'err'); return; }
 
@@ -4940,9 +4944,8 @@ async function saveEditLocation(locId){
     GPS_COORDS[locId] = { lat, lng, radius_m: radius };
   }
 
-  // Update schedule (Ruhetage)
-  const dayOff = [...document.querySelectorAll('.editDayOff:checked')].map(cb => parseInt(cb.value));
-  LOCATION_SCHEDULE[locId] = { dayOff, halfDays: LOCATION_SCHEDULE[locId]?.halfDays || [] };
+  // Sync LOCATION_SCHEDULE
+  LOCATION_SCHEDULE[locId] = { dayOff, halfDays };
 
   closeModal();
   buildLocationSelect();
