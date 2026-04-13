@@ -2289,6 +2289,8 @@ function renderSchedule(){
           const ruheType = getVacTypeForDate(ds, ruheLoc);
           if(!ruheType){
             h+='<div class="ruhetag-cell"><span class="ruhetag-label">Ruhetag</span></div>';
+          } else if(canEdit){
+            h+=`<div class="empty-cell-add" onclick="quickAddShift('${emp}','${ds}')" title="Schicht hinzufügen"><span class="ms">add</span></div>`;
           } else {
             h+='<span style="color:var(--text-muted);font-size:.7rem">—</span>';
           }
@@ -2348,6 +2350,76 @@ function onDrop(e){e.preventDefault();e.currentTarget.classList.remove('drag-ove
   const cell=e.currentTarget,nd=cell.dataset.date,ne=cell.dataset.emp,sh=SHIFTS.find(s=>s.id===dragData.sid);if(!sh)return;sh.date=nd;
   if(ne&&ne!==sh.empName){const emp=EMPS.find(x=>x.name===ne);if(emp){sh.empId=emp.id;sh.empName=emp.name;sh.dept=emp.dept;sh.location=emp.location;sh.colorClass=getDeptColorClass(emp.dept);}}
   syncUpdateShift(sh);toast('Schicht verschoben ✓');renderSchedule();}
+
+// ═══ QUICK ADD SHIFT (click empty cell) ═══
+function quickAddShift(empName, date) {
+  const emp = EMPS.find(e => e.name === empName);
+  if (!emp) return;
+
+  const tmplOpts = SHIFT_TEMPLATES.map((t, i) => `<option value="${i}">${t.label} (${t.from}–${t.to})</option>`).join('');
+  const dateLabel = formatDateDE(date);
+
+  document.getElementById('modalTitle').textContent = 'Schicht hinzufügen';
+  document.getElementById('modalBody').innerHTML = `<div class="form-grid">
+    <div class="form-group full">
+      <label class="form-label">Mitarbeiter</label>
+      <div class="form-input" style="background:var(--bg-secondary);cursor:default;font-weight:600">${emp.name} — ${emp.dept}</div>
+    </div>
+    <div class="form-group full">
+      <label class="form-label">Datum</label>
+      <div class="form-input" style="background:var(--bg-secondary);cursor:default">${dateLabel}</div>
+      <input type="hidden" id="qaDate" value="${date}">
+      <input type="hidden" id="qaEmpId" value="${emp.id}">
+    </div>
+    <div class="form-group full">
+      <label class="form-label">Vorlage</label>
+      <select class="form-select" id="qaTmpl" onchange="const t=SHIFT_TEMPLATES[this.value];if(t){document.getElementById('qaFrom').value=t.from;document.getElementById('qaTo').value=t.to;}">
+        <option value="">— Manuell —</option>
+        ${tmplOpts}
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label class="form-label">Von</label><input class="form-input" type="time" id="qaFrom" value="09:00"></div>
+      <div class="form-group"><label class="form-label">Bis</label><input class="form-input" type="time" id="qaTo" value="17:00"></div>
+    </div>
+  </div>`;
+  document.getElementById('modalFooter').innerHTML = `<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="saveQuickShift()">Speichern</button>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+async function saveQuickShift() {
+  const empId = parseInt(document.getElementById('qaEmpId').value);
+  const date = document.getElementById('qaDate').value;
+  const from = document.getElementById('qaFrom').value;
+  const to = document.getElementById('qaTo').value;
+  const tmplIdx = document.getElementById('qaTmpl').value;
+  const emp = EMPS.find(e => e.id === empId);
+  if (!emp || !from || !to) { toast('Bitte Zeiten ausfüllen', 'err'); return; }
+
+  const label = tmplIdx !== '' ? SHIFT_TEMPLATES[tmplIdx].label : 'Schicht';
+  const newShift = {
+    empId: emp.id, empName: emp.name, dept: emp.dept, location: emp.location,
+    date, from, to, label, colorClass: getDeptColorClass(emp.dept),
+    isSick: false, isVacation: false, isLate: false, vacHalf: false
+  };
+
+  try {
+    const { data, error } = await sb.from('shifts').insert({
+      emp_id: emp.id, emp_name: emp.name, dept: emp.dept, location: emp.location,
+      date, time_from: from, time_to: to, label, color_class: newShift.colorClass,
+      is_sick: false, is_vacation: false, is_late: false, vac_half: false
+    }).select().single();
+    if (error) { toast('Fehler: ' + error.message, 'err'); return; }
+    newShift.id = data.id;
+    SHIFTS.push(newShift);
+    closeModal();
+    toast(`✓ Schicht für ${emp.name} am ${formatDateDE(date)} erstellt`);
+    renderSchedule();
+  } catch (e) {
+    console.error('[QuickAdd]', e);
+    toast('Fehler beim Speichern', 'err');
+  }
+}
 
 // ═══ EDIT SHIFT (click to edit) ═══
 function editShift(id){

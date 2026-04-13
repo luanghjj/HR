@@ -429,6 +429,31 @@
   font-style: italic; text-transform: uppercase; letter-spacing: .05em;
 }
 
+/* Click-to-add empty cell */
+.sc2-grid-wrap .empty-cell-add {
+  min-height: 82px; border-radius: 14px;
+  border: 2px dashed transparent;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .2s;
+  color: var(--text-muted); opacity: .3;
+}
+.sc2-grid-wrap .empty-cell-add .ms {
+  font-size: 1.4rem; transition: transform .2s;
+}
+.sc2-grid-wrap .empty-cell-add:hover {
+  border-color: var(--accent);
+  background: rgba(99,102,241,.04);
+  color: var(--accent);
+  opacity: 1;
+}
+.sc2-grid-wrap .empty-cell-add:hover .ms {
+  transform: scale(1.2);
+}
+.sc2-grid-wrap .empty-cell-add:active {
+  background: rgba(99,102,241,.1);
+  transform: scale(.96);
+}
+
 /* Shift actions hover overlay */
 .sc2-grid-wrap .shift-block .shift-actions {
   position: absolute;
