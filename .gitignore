@@ -3,3 +3,6 @@
 .idea/
 .vscode/
 node_modules/
+public/favicon.svg
+public/logo-mercury.png
+public/logo-mercuryB.png
