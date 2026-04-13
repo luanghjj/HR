@@ -2678,9 +2678,12 @@ function renderAccess(){
       ${locOpts.map(l => `<option value="${l.id}" ${u.location===l.id?'selected':''}>${l.name}</option>`).join('')}
     </select>`;
     const empDepts = emp ? (emp.dept || '').split(',').map(d => d.trim()).filter(Boolean) : [];
-    const deptTags = emp ? (empDepts.length > 0
-      ? empDepts.map(d => `<span style="display:inline-block;font-size:.7rem;font-weight:600;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:10px;margin:1px 2px">${d}</span>`).join('')
-      : '<span style="color:var(--text-muted);font-size:.75rem">—</span>')
+    const isAlle = empDepts.includes('Alle');
+    const deptTags = emp ? (isAlle
+      ? '<span style="display:inline-block;font-size:.7rem;font-weight:700;background:rgba(217,119,6,.1);color:#d97706;padding:3px 10px;border-radius:10px">Alle</span>'
+      : empDepts.length > 0
+        ? empDepts.map(d => `<span style="display:inline-block;font-size:.7rem;font-weight:600;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:10px;margin:1px 2px">${d}</span>`).join('')
+        : '<span style="color:var(--text-muted);font-size:.75rem">—</span>')
       : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
     const deptCell = emp ? `<div style="cursor:pointer;min-width:100px" onclick="openDeptPicker('${u.id}')" title="Klicke zum Ändern">${deptTags}</div>` : deptTags;
     const emailInfo = u.regEmail ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:2px" title="${u.regEmail}">📧 ${u.regEmail}</div>` : '';
@@ -2961,39 +2964,56 @@ function openDeptPicker(userId) {
 
   const allDepts = [...new Set(DEPTS.map(d => d.name))].sort();
   const currentDepts = (emp.dept || '').split(',').map(d => d.trim()).filter(Boolean);
+  const isAllSelected = currentDepts.length === allDepts.length || currentDepts.includes('Alle');
 
   // Remove existing picker
   document.getElementById('deptPickerPopup')?.remove();
 
   const popup = document.createElement('div');
   popup.id = 'deptPickerPopup';
-  popup.className = 'modal-overlay';
-  popup.innerHTML = `<div class="modal" style="max-width:360px">
-    <div class="modal-header">
-      <h3 style="font-size:.95rem">Bereich für ${u.name}</h3>
-      <button class="modal-close" onclick="document.getElementById('deptPickerPopup').remove()">&times;</button>
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  popup.onclick = (e) => { if (e.target === popup) popup.remove(); };
+  popup.innerHTML = `<div style="background:var(--bg-card);border-radius:20px;padding:24px;width:340px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-size:.95rem;font-weight:700;margin:0">Bereich — ${u.name}</h3>
+      <button onclick="document.getElementById('deptPickerPopup').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted);padding:4px">&times;</button>
     </div>
-    <div class="modal-body" style="padding:16px">
-      <div style="display:flex;flex-direction:column;gap:8px">
-        ${allDepts.map(d => `<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;cursor:pointer;border:1px solid var(--border);transition:.15s;font-size:.85rem;font-weight:500" onmouseenter="this.style.background='var(--bg-input)'" onmouseleave="this.style.background=''">
-          <input type="checkbox" class="deptPickerCb" value="${d}" ${currentDepts.includes(d)?'checked':''} style="width:16px;height:16px;accent-color:var(--accent)">
-          ${d}
-        </label>`).join('')}
-      </div>
-      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-sm" onclick="document.getElementById('deptPickerPopup').remove()">Abbrechen</button>
-        <button class="btn btn-sm btn-primary" onclick="saveDeptPicker('${userId}')">Speichern</button>
-      </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;cursor:pointer;border:2px solid var(--accent);background:rgba(99,102,241,.05);font-size:.85rem;font-weight:700;color:var(--accent)">
+        <input type="checkbox" id="deptPickerAlle" ${isAllSelected?'checked':''} onchange="toggleAllDepts(this.checked)" style="width:18px;height:18px;accent-color:var(--accent)">
+        Alle Bereiche
+      </label>
+      <div style="height:1px;background:var(--border);margin:4px 0"></div>
+      ${allDepts.map(d => `<label style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;cursor:pointer;border:1px solid var(--border);font-size:.85rem;font-weight:500;transition:.15s" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
+        <input type="checkbox" class="deptPickerCb" value="${d}" ${isAllSelected || currentDepts.includes(d)?'checked':''} onchange="syncAlleCheckbox()" style="width:16px;height:16px;accent-color:var(--accent)">
+        ${d}
+      </label>`).join('')}
+    </div>
+    <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-sm" onclick="document.getElementById('deptPickerPopup').remove()">Abbrechen</button>
+      <button class="btn btn-sm btn-primary" onclick="saveDeptPicker('${userId}')">Speichern</button>
     </div>
   </div>`;
   document.body.appendChild(popup);
-  requestAnimationFrame(() => popup.classList.add('show'));
+}
+
+function toggleAllDepts(checked) {
+  document.querySelectorAll('.deptPickerCb').forEach(cb => cb.checked = checked);
+}
+
+function syncAlleCheckbox() {
+  const allCbs = document.querySelectorAll('.deptPickerCb');
+  const allChecked = [...allCbs].every(cb => cb.checked);
+  const alleBox = document.getElementById('deptPickerAlle');
+  if (alleBox) alleBox.checked = allChecked;
 }
 
 function saveDeptPicker(userId) {
-  const checked = [...document.querySelectorAll('.deptPickerCb:checked')].map(cb => cb.value);
+  const allCbs = [...document.querySelectorAll('.deptPickerCb')];
+  const checked = allCbs.filter(cb => cb.checked).map(cb => cb.value);
   if (checked.length === 0) { toast('Mindestens einen Bereich wählen', 'err'); return; }
-  const newDept = checked.join(', ');
+  // If all selected → store "Alle"
+  const newDept = checked.length === allCbs.length ? 'Alle' : checked.join(', ');
   changeUserDept(userId, newDept);
   document.getElementById('deptPickerPopup').remove();
   renderAccess();
