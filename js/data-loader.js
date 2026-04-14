@@ -72,13 +72,13 @@ async function loadDataFromSupabase() {
       EMPS.length = 0;
       emps.forEach(e => EMPS.push({
         id: e.id,
-        name: e.name,
+        name: escapeHtml(e.name),
         location: e.location,
-        dept: e.dept,
-        position: e.position,
+        dept: escapeHtml(e.dept),
+        position: escapeHtml(e.position),
         status: e.status,
         start: e.start_date,
-        avatar: e.avatar,
+        avatar: escapeHtml(e.avatar),
         vacTotal: e.vac_total,
         vacUsed: e.vac_used,
         sickDays: e.sick_days,
@@ -99,13 +99,13 @@ async function loadDataFromSupabase() {
       vacs.forEach(v => VACS.push({
         id: v.id,
         empId: v.emp_id,
-        empName: v.emp_name,
+        empName: escapeHtml(v.emp_name),
         location: v.location,
         from: v.from_date,
         to: v.to_date,
         days: v.days,
         status: v.status,
-        note: v.note || ''
+        note: escapeHtml(v.note || '')
       }));
     }
 
@@ -117,14 +117,14 @@ async function loadDataFromSupabase() {
       sicks.forEach(s => SICKS.push({
         id: s.id,
         empId: s.emp_id,
-        empName: s.emp_name,
+        empName: escapeHtml(s.emp_name),
         location: s.location,
         from: s.from_date,
         to: s.to_date,
         days: s.days,
         status: s.status,
         hasAU: s.has_au,
-        note: s.note || '',
+        note: escapeHtml(s.note || ''),
         auUrl: s.au_url || null
       }));
     }
@@ -137,14 +137,14 @@ async function loadDataFromSupabase() {
       docs.forEach(d => DOCS.push({
         id: d.id,
         empId: d.emp_id,
-        empName: d.emp_name,
-        name: d.name,
+        empName: escapeHtml(d.emp_name),
+        name: escapeHtml(d.name),
         type: d.type,
         date: d.doc_date,
         icon: d.icon,
         fileUrl: d.file_url || null,
         fileSize: d.file_size || 0,
-        fileName: d.file_name || d.name
+        fileName: escapeHtml(d.file_name || d.name)
       }));
     }
 
