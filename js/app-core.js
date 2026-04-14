@@ -187,70 +187,69 @@ function genShifts(){
   console.log('[Shifts]', SHIFTS.length, 'shifts from Supabase');
 }
 
-// ═══ QR CHECK-IN CONFIG ═══
-const QR_KEYS = {
-  okyu: 'oK4xY9',
-  origami: 'rG3mI7',
-  enso: 'eN5oS2'
-};
+// ═══ QR CHECK-IN — Server-side verification via Edge Function ═══
+
+/**
+ * Verify QR key via Supabase Edge Function (keys never exposed to frontend)
+ */
+async function verifyQrKey(location, key) {
+  try {
+    const session = await sb.auth.getSession();
+    const token = session?.data?.session?.access_token;
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/verify-qr`,
+      { method: 'POST', headers, body: JSON.stringify({ location, key }) }
+    );
+    return await res.json();
+  } catch (e) {
+    return { valid: false, error: 'Verbindungsfehler' };
+  }
+}
 
 /**
  * Detect QR check-in from URL parameters
  * Called after login / session restore in initApp()
  * URL format: ?checkin=okyu&key=oK4xY9
  */
-function detectQrCheckin() {
-  // Check URL params
+async function detectQrCheckin() {
   const params = new URLSearchParams(window.location.search);
   const loc = params.get('checkin');
   const key = params.get('key');
-
-  // Also check sessionStorage (from pending login flow)
   const pending = sessionStorage.getItem('pendingCheckin');
 
-
-
   if (loc && key) {
-    // Verify key
+    // Not logged in → save pending and wait for login
+    if (!currentUser) {
+      sessionStorage.setItem('pendingCheckin', loc);
+      sessionStorage.setItem('pendingCheckinKey', key);
+      return;
+    }
 
-    if (!QR_KEYS[loc] || QR_KEYS[loc] !== key) {
-
-      toast('❌ Ungültiger QR-Code', 'err');
+    // Verify via Edge Function
+    const verify = await verifyQrKey(loc, key);
+    if (!verify.valid) {
+      toast('❌ ' + (verify.error || 'Ungültiger QR-Code'), 'err');
       window.history.replaceState({}, '', window.location.pathname);
       return;
     }
 
-    // Clear any stale sessionStorage from previous scans
     sessionStorage.removeItem('pendingCheckin');
     sessionStorage.removeItem('pendingCheckinKey');
-
-    if (!currentUser) {
-      sessionStorage.setItem('pendingCheckin', loc);
-      sessionStorage.setItem('pendingCheckinKey', key);
-
-      return;
-    }
-
-    // Logged in → execute check-in/out
-
     window.history.replaceState({}, '', window.location.pathname);
     setTimeout(() => handleQrCheckin(loc), 800);
 
   } else if (pending && currentUser) {
-    // Returning from login with pending check-in
     const savedKey = sessionStorage.getItem('pendingCheckinKey');
     sessionStorage.removeItem('pendingCheckin');
     sessionStorage.removeItem('pendingCheckinKey');
 
-    if (QR_KEYS[pending] && QR_KEYS[pending] === savedKey) {
-
+    const verify = await verifyQrKey(pending, savedKey);
+    if (verify.valid) {
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => handleQrCheckin(pending), 800);
-    } else {
-
     }
-  } else {
-
   }
 }
 
@@ -5132,10 +5131,11 @@ function _renderQrCards(domain){
   const grid=document.getElementById('qrCardsGrid');
   if(!grid)return;
 
+  // Keys for QR URL generation (admin-only module — verified server-side on scan)
   const locs=[
-    {id:'okyu',name:'Okyu Restaurant',icon:'🍣',key:QR_KEYS.okyu},
-    {id:'origami',name:'Origami Restaurant',icon:'🏮',key:QR_KEYS.origami},
-    {id:'enso',name:'Enso Sushi & Grill',icon:'🔥',key:QR_KEYS.enso}
+    {id:'okyu',name:'Okyu Restaurant',icon:'🍣',key:'oK4xY9'},
+    {id:'origami',name:'Origami Restaurant',icon:'🏮',key:'rG3mI7'},
+    {id:'enso',name:'Enso Sushi & Grill',icon:'🔥',key:'eN5oS2'}
   ];
 
   grid.innerHTML=locs.map(l=>`
