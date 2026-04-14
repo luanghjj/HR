@@ -2,6 +2,12 @@
 // OKYU HRM – Utility Functions
 // ═══════════════════════════════════════════════════════════
 
+/** Escape HTML to prevent XSS */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 /** Format Date to ISO string YYYY-MM-DD */
 function isoDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;

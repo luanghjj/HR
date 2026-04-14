@@ -208,13 +208,13 @@ function detectQrCheckin() {
   // Also check sessionStorage (from pending login flow)
   const pending = sessionStorage.getItem('pendingCheckin');
 
-  console.log('[QR] detectQrCheckin called. URL loc:', loc, 'key:', key, 'pending:', pending, 'user:', currentUser?.name || 'null', 'URL:', window.location.href);
+
 
   if (loc && key) {
     // Verify key
-    console.log('[QR] Checking key: QR_KEYS['+loc+'] =', QR_KEYS[loc], 'vs key =', key, 'match:', QR_KEYS[loc] === key);
+
     if (!QR_KEYS[loc] || QR_KEYS[loc] !== key) {
-      console.warn('[QR] Invalid key for', loc, '- expected:', QR_KEYS[loc], 'got:', key);
+
       toast('❌ Ungültiger QR-Code', 'err');
       window.history.replaceState({}, '', window.location.pathname);
       return;
@@ -227,12 +227,12 @@ function detectQrCheckin() {
     if (!currentUser) {
       sessionStorage.setItem('pendingCheckin', loc);
       sessionStorage.setItem('pendingCheckinKey', key);
-      console.log('[QR] No user → saved pending:', loc);
+
       return;
     }
 
     // Logged in → execute check-in/out
-    console.log('[QR] ✓ User logged in, triggering handleQrCheckin for:', loc);
+
     window.history.replaceState({}, '', window.location.pathname);
     setTimeout(() => handleQrCheckin(loc), 800);
 
@@ -241,16 +241,16 @@ function detectQrCheckin() {
     const savedKey = sessionStorage.getItem('pendingCheckinKey');
     sessionStorage.removeItem('pendingCheckin');
     sessionStorage.removeItem('pendingCheckinKey');
-    console.log('[QR] Found pending:', pending, 'savedKey:', savedKey);
+
     if (QR_KEYS[pending] && QR_KEYS[pending] === savedKey) {
-      console.log('[QR] ✓ Pending key valid, triggering check-in for:', pending);
+
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => handleQrCheckin(pending), 800);
     } else {
-      console.warn('[QR] Invalid saved key for:', pending, '(expected:', QR_KEYS[pending], 'got:', savedKey, ')');
+
     }
   } else {
-    console.log('[QR] No QR params detected');
+
   }
 }
 
@@ -271,7 +271,7 @@ async function handleQrCheckin(locationId) {
 
   if (openRecord) {
     // Smart toggle → CHECK-OUT
-    console.log('[QR] Already checked in → triggering check-out. Record:', openRecord.id, 'checkIn:', openRecord.checkIn);
+
     toast('🔴 Ausstempeln...', 'info');
     activeCheckIn = openRecord;
     await doCheckOut();

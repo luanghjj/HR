@@ -240,5 +240,23 @@ function switchLoginMode(mode) {
   document.getElementById('loginError').style.display = 'none';
 }
 </script>
+
+<!-- Anti-DevTools Protection -->
+<script>
+(function(){
+  // Disable right-click
+  document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  // Block F12, Ctrl+Shift+I/J/C, Ctrl+U
+  document.addEventListener('keydown', function(e){
+    if(e.key==='F12') e.preventDefault();
+    if(e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key)) e.preventDefault();
+    if(e.ctrlKey && e.key==='u') e.preventDefault();
+    if(e.metaKey && e.altKey && ['I','J','C'].includes(e.key)) e.preventDefault();
+  });
+  // Detect DevTools open (console clear trick)
+  var _c=0; Object.defineProperty(window,'__dt',{get:function(){_c++;if(_c>1){console.clear();}}});
+  setInterval(function(){_c=0; console.log('%c','font-size:0',window.__dt);},2000);
+})();
+</script>
 </body>
 </html>
