@@ -87,7 +87,25 @@ async function loadDataFromSupabase() {
         bruttoGehalt: parseFloat(e.brutto_gehalt) || 0,
         schuleTage: e.schule_tage,
         birthday: e.birthday || '',
-        probEnd: e.prob_end || ''
+        probEnd: e.prob_end || '',
+        // Beschäftigung
+        employmentType: e.employment_type || 'Vollzeit',
+        hourlyRate: parseFloat(e.hourly_rate) || 0,
+        weeklyHours: parseFloat(e.weekly_hours) || 0,
+        monthlyHours: parseFloat(e.monthly_hours) || 0,
+        // Steuer & SV
+        taxClass: escapeHtml(e.tax_class || ''),
+        taxId: escapeHtml(e.tax_id || ''),
+        svNumber: escapeHtml(e.sv_number || ''),
+        healthInsurance: escapeHtml(e.health_insurance || ''),
+        // Bankdaten
+        iban: escapeHtml(e.iban || ''),
+        // Persönlich
+        nationality: escapeHtml(e.nationality || ''),
+        address: escapeHtml(e.address || ''),
+        // Aufenthalt
+        residencePermit: escapeHtml(e.residence_permit || ''),
+        workPermitUntil: e.work_permit_until || ''
       }));
     }
 

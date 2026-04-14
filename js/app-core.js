@@ -1229,12 +1229,23 @@ function filterEmpsByDept(dept,btn){
 }
 function viewEmp(id){
   const e=EMPS.find(x=>x.id===id);if(!e)return;
+
+  // Permission checks
+  const isOwnProfile = currentUser.empId === id;
+  const canEdit = can('editEmployees');
+  const showZeit = can('seeZeiterfassung');
+  const isAdmin = can('seeFinancials');
+  const ro = canEdit ? '' : 'disabled';
+
   const ev=VACS.filter(v=>v.empId===id),es=SICKS.filter(s=>s.empId===id),ed=DOCS.filter(d=>d.empId===id);
   const vr=e.vacTotal-e.vacUsed,pl=ev.filter(v=>(v.status==='approved'||v.status==='pending')&&v.from>='2026-03-20').reduce((s,v)=>s+v.days,0);
   const planH=calcPlanHours(e.id);
   const hourly=calcHourly(e);
-  const isAdmin=can('seeFinancials');
 
+  const deptOpts=DEPTS.map(d=>d.name).filter((v,i,a)=>a.indexOf(v)===i);
+  const locOpts=LOCS;
+
+  // Gehalt section (nur Inhaber)
   let adminSection='';
   if(isAdmin){
     adminSection=`
@@ -1264,19 +1275,14 @@ function viewEmp(id){
     </div>`;
   }
 
-  const deptOpts=DEPTS.map(d=>d.name).filter((v,i,a)=>a.indexOf(v)===i);
-  const locOpts=LOCS;
   openModalC('Mitarbeiter: '+e.name,`
     <div class="form-grid">
       <div class="form-group"><div class="form-label">Position</div>
-        <input class="form-input" value="${e.position}" onchange="updateEmpText(${e.id},'position',this.value)">
-      </div>
+        <input class="form-input" value="${e.position}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'position',this.value)"`:''}></div>
       <div class="form-group"><div class="form-label">Standort</div>
-        <select class="form-select" onchange="updateEmpText(${e.id},'location',this.value)">${locOpts.map(l=>`<option value="${l.id}" ${l.id===e.location?'selected':''}>${l.name}</option>`).join('')}</select>
-      </div>
+        <select class="form-select" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'location',this.value)"`:''}>${locOpts.map(l=>`<option value="${l.id}" ${l.id===e.location?'selected':''}>${l.name}</option>`).join('')}</select></div>
       <div class="form-group"><div class="form-label">Bereich</div>
-        <select class="form-select" onchange="updateEmpText(${e.id},'dept',this.value)">${deptOpts.map(d=>`<option ${d===e.dept?'selected':''}>${d}</option>`).join('')}</select>
-      </div>
+        <select class="form-select" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'dept',this.value)"`:''}>${deptOpts.map(d=>`<option ${d===e.dept?'selected':''}>${d}</option>`).join('')}</select></div>
       <div class="form-group"><div class="form-label">Eintritt</div>${formatDateDE(e.start)}</div>
     </div>
     <div class="stats-row" style="margin-top:16px">
@@ -1285,7 +1291,69 @@ function viewEmp(id){
       <div class="stat-card" style="border-left:3px solid var(--late-color)"><div class="stat-label">Verspätungen</div><div class="stat-value" style="font-size:1.4rem">${e.lateCount}</div></div>
       ${isAdmin?`<div class="stat-card" style="border-left:3px solid var(--accent)"><div class="stat-label">Plan-Std.</div><div class="stat-value" style="font-size:1.4rem">${planH}h</div><div class="stat-change">Soll: ${e.sollStunden}h</div></div>`:''}
     </div>
+
+    <!-- ═══ BESCHÄFTIGUNG ═══ -->
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h4 style="margin-bottom:12px;color:var(--accent)">BESCHÄFTIGUNG</h4>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Typ</label>
+        <select class="form-select" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'employmentType',this.value)"`:''}>
+          ${['Vollzeit','Teilzeit','Minijob','Azubi','Werkstudent'].map(t=>`<option ${t===e.employmentType?'selected':''}>${t}</option>`).join('')}
+        </select></div>
+      <div class="form-group"><label class="form-label">EUR/Std</label>
+        <input class="form-input" type="number" step="0.01" value="${e.hourlyRate||''}" ${ro} ${canEdit?`onchange="updateEmpField(${e.id},'hourlyRate',this.value)"`:''}></div>
+      <div class="form-group"><label class="form-label">Std/Woche</label>
+        <input class="form-input" type="number" value="${e.weeklyHours||''}" ${ro} ${canEdit?`onchange="updateEmpField(${e.id},'weeklyHours',this.value)"`:''}></div>
+      <div class="form-group"><label class="form-label">Std/Monat</label>
+        <input class="form-input" type="number" value="${e.monthlyHours||''}" ${ro} ${canEdit?`onchange="updateEmpField(${e.id},'monthlyHours',this.value)"`:''}></div>
+    </div>
+
+    <!-- ═══ STEUER & SV ═══ -->
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h4 style="margin-bottom:12px;color:var(--accent)">STEUER & SV</h4>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Steuerklasse</label>
+        <input class="form-input" value="${e.taxClass}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'taxClass',this.value)"`:''}></div>
+      <div class="form-group"><label class="form-label">Steuer-ID</label>
+        <input class="form-input" value="${e.taxId}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'taxId',this.value)"`:''}></div>
+      <div class="form-group"><label class="form-label">SV-Nummer</label>
+        <input class="form-input" value="${e.svNumber}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'svNumber',this.value)"`:''}></div>
+      <div class="form-group"><label class="form-label">Krankenkasse</label>
+        <input class="form-input" value="${e.healthInsurance}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'healthInsurance',this.value)"`:''}></div>
+    </div>
+
+    <!-- ═══ BANKDATEN ═══ -->
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h4 style="margin-bottom:12px;color:var(--accent)">BANKDATEN</h4>
+    <div class="form-grid">
+      <div class="form-group full"><label class="form-label">IBAN</label>
+        <input class="form-input" value="${e.iban}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'iban',this.value)"`:''}></div>
+    </div>
+
+    <!-- ═══ PERSÖNLICH ═══ -->
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h4 style="margin-bottom:12px;color:var(--accent)">PERSÖNLICH</h4>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Geburtsdatum</label>
+        <input class="form-input" type="date" value="${e.birthday}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'birthday',this.value)"`:''}></div>
+      <div class="form-group"><label class="form-label">Nationalität</label>
+        <input class="form-input" value="${e.nationality}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'nationality',this.value)"`:''}></div>
+      <div class="form-group full"><label class="form-label">Adresse</label>
+        <input class="form-input" value="${e.address}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'address',this.value)"`:''}></div>
+    </div>
+
+    <!-- ═══ AUFENTHALT ═══ -->
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h4 style="margin-bottom:12px;color:var(--accent)">AUFENTHALT</h4>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Aufenthaltstitel</label>
+        <input class="form-input" value="${e.residencePermit}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'residencePermit',this.value)"`:''}></div>
+      <div class="form-group"><label class="form-label">Arbeitserlaubnis bis</label>
+        <input class="form-input" type="date" value="${e.workPermitUntil}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'workPermitUntil',this.value)"`:''}></div>
+    </div>
+
     ${adminSection}
+
     <hr style="border-color:var(--border);margin:16px 0"><h4 style="margin-bottom:8px">Urlaub (${ev.length})</h4>
     ${ev.map(v=>`<div class="emp-row"><div class="emp-details"><div class="emp-name-sm">${formatDateDE(v.from)}–${formatDateDE(v.to)} (${v.days}T)</div><div class="emp-dept">${v.note||''}</div></div>${v.status==='approved'?'<span class="badge badge-success">OK</span>':v.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abg.</span>'}</div>`).join('')||'<p style="color:var(--text-muted);font-size:.82rem">—</p>'}
     <h4 style="margin:16px 0 8px">Krankmeldungen (${es.length})</h4>
@@ -1293,7 +1361,7 @@ function viewEmp(id){
     <h4 style="margin:16px 0 8px">Dokumente (${ed.length})</h4>
     ${ed.map(d=>`<div class="emp-row"><div style="font-size:1.3rem">${d.icon}</div><div class="emp-details"><div class="emp-name-sm">${d.name}</div><div class="emp-dept">${formatDateDE(d.date)}</div></div></div>`).join('')||'<p style="color:var(--text-muted);font-size:.82rem">—</p>'}
 
-    <div class="ze-section">
+    ${showZeit ? `<div class="ze-section">
       <div class="ze-section-hd">
         <h4 style="margin:0">⏱️ Zeiterfassung</h4>
         <span class="ze-badge-ro">Nur lesen</span>
@@ -1314,11 +1382,11 @@ function viewEmp(id){
         <button class="ze-pdf-btn" onclick="zeDownloadTagPDF(${e.id})"><span class="ms">today</span> PDF Tag</button>
         <button class="ze-pdf-btn" onclick="zeDownloadGesamtPDF(${e.id})"><span class="ms">summarize</span> PDF Gesamt</button>
       </div>
-    </div>
+    </div>` : ''}
   `);
 
-  // Auto-load Zeiterfassung data
-  setTimeout(()=>zeLoadView(e.id),100);
+  // Auto-load Zeiterfassung data if visible
+  if(showZeit) setTimeout(()=>zeLoadView(e.id),100);
 }
 
 // ═══ ZEITERFASSUNG HELPERS ═══

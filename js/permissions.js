@@ -12,6 +12,7 @@ const PERMS = {
     seeAllVacations: true, approveVacations: true, seeAllSick: true,
     seeAllDocs: true, canExport: true, manageAccess: true, markLate: true,
     seeFinancials: true, editVacDays: true, editTraining: true,
+    seeZeiterfassung: true, seeOwnDetail: true,
     // ── GehaltsManager — Seiten (5 keys) ──
     gm_see_dash: true, gm_see_abr: true, gm_see_banken: true, gm_see_ma: true, gm_see_smart: true,
     // ── GehaltsManager — Spalten (12 keys) ──
@@ -40,6 +41,7 @@ const PERMS = {
     seeAllVacations: true, approveVacations: true, seeAllSick: true,
     seeAllDocs: true, canExport: true, manageAccess: false, markLate: true,
     seeFinancials: false, editVacDays: false, editTraining: false,
+    seeZeiterfassung: false, seeOwnDetail: true,
     // ── GehaltsManager — Seiten ──
     gm_see_dash: true, gm_see_abr: true, gm_see_banken: true, gm_see_ma: true, gm_see_smart: true,
     // ── Spalten (view most) ──
@@ -67,6 +69,7 @@ const PERMS = {
     seeAllVacations: false, approveVacations: false, seeAllSick: false,
     seeAllDocs: false, canExport: false, manageAccess: false, markLate: false,
     seeFinancials: false, editVacDays: false, editTraining: false,
+    seeZeiterfassung: false, seeOwnDetail: true,
     // ── GehaltsManager — alles deaktiviert ──
     gm_see_dash: false, gm_see_abr: false, gm_see_banken: false, gm_see_ma: false, gm_see_smart: false,
     gm_see_gehalt: false, gm_see_brutto: false, gm_see_netto: false, gm_see_ueberw: false,
@@ -89,6 +92,7 @@ const PERMS = {
     seeAllVacations: false, approveVacations: false, seeAllSick: false,
     seeAllDocs: false, canExport: false, manageAccess: false, markLate: false,
     seeFinancials: false, editVacDays: false, editTraining: false,
+    seeZeiterfassung: false, seeOwnDetail: true,
     // ── GehaltsManager — alles deaktiviert ──
     gm_see_dash: false, gm_see_abr: false, gm_see_banken: false, gm_see_ma: false, gm_see_smart: false,
     gm_see_gehalt: false, gm_see_brutto: false, gm_see_netto: false, gm_see_ueberw: false,

@@ -123,7 +123,14 @@ async function syncEmployeeField(empId, field, value) {
       name: 'name', location: 'location', avatar: 'avatar',
       sollStunden: 'soll_stunden', bruttoGehalt: 'brutto_gehalt',
       schuleTage: 'schule_tage', birthday: 'birthday', probEnd: 'prob_end',
-      start: 'start_date'
+      start: 'start_date',
+      // New detail fields
+      employmentType: 'employment_type', hourlyRate: 'hourly_rate',
+      weeklyHours: 'weekly_hours', monthlyHours: 'monthly_hours',
+      taxClass: 'tax_class', taxId: 'tax_id', svNumber: 'sv_number',
+      healthInsurance: 'health_insurance', iban: 'iban',
+      nationality: 'nationality', address: 'address',
+      residencePermit: 'residence_permit', workPermitUntil: 'work_permit_until'
     };
     const col = colMap[field] || field;
     const { error } = await sb.from('employees').update({ [col]: value }).eq('id', empId);
