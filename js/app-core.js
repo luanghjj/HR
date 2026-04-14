@@ -600,7 +600,12 @@ function renderDashboard(){
         <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="stat-icon">🏥</div><div class="stat-label">Krankentage</div><div class="stat-value">${me.sickDays}</div><div class="stat-change">laufendes Jahr</div></div>
         <div class="stat-card" style="border-left:3px solid var(--warning)"><div class="stat-icon">⏰</div><div class="stat-label">Verspätungen</div><div class="stat-value">${me.lateCount}</div></div>
         <div class="stat-card"><div class="stat-icon">📄</div><div class="stat-label">Dokumente</div><div class="stat-value">${getVisibleDocs().length}</div></div>
-      </div>`;
+      </div>
+      ${can('seeOwnDetail')?`<div style="text-align:center;margin-top:16px">
+        <button onclick="viewEmp(${me.id})" style="padding:12px 28px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-weight:700;font-size:.95rem;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(102,126,234,.3)">
+          <span class="ms">person</span> Mein Profil
+        </button>
+      </div>`:''}`;
   } else {
     const today=isoDate(new Date());
     const now=new Date();
@@ -3262,6 +3267,8 @@ const PERM_GROUPS = {
   'Personal': [
     { key: 'seeAllEmployees', label: 'Alle Mitarbeiter sehen' },
     { key: 'editEmployees', label: 'Mitarbeiter bearbeiten' },
+    { key: 'seeOwnDetail', label: 'Eigenes Profil sehen' },
+    { key: 'seeZeiterfassung', label: 'Zeiterfassung sehen & laden' },
     { key: 'seeDepartments', label: 'Bereiche sehen' },
     { key: 'seeAllLocations', label: 'Alle Standorte sehen' }
   ],
