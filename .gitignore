@@ -14,3 +14,4 @@ tools/
 supabase/
 _sa.html
 _qr.html
+.agents/

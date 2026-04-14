@@ -25,7 +25,7 @@ function buildSidebar(){
   html+=`<div class="nav-item active" onclick="navigate('dashboard',this)">${mi('grid_view')} Dashboard</div>`;
 
   // ── PERSONAL ──
-  const showMitarbeiter = can('seeAllEmployees');
+  const showMitarbeiter = can('seeAllEmployees') || can('seeOwnDetail');
   const showBereiche = can('seeDepartments');
   if(showMitarbeiter || showBereiche){
     sectionStart('personal', 'Personal');
@@ -600,12 +600,7 @@ function renderDashboard(){
         <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="stat-icon">🏥</div><div class="stat-label">Krankentage</div><div class="stat-value">${me.sickDays}</div><div class="stat-change">laufendes Jahr</div></div>
         <div class="stat-card" style="border-left:3px solid var(--warning)"><div class="stat-icon">⏰</div><div class="stat-label">Verspätungen</div><div class="stat-value">${me.lateCount}</div></div>
         <div class="stat-card"><div class="stat-icon">📄</div><div class="stat-label">Dokumente</div><div class="stat-value">${getVisibleDocs().length}</div></div>
-      </div>
-      ${can('seeOwnDetail')?`<div style="text-align:center;margin-top:16px">
-        <button onclick="viewEmp(${me.id})" style="padding:12px 28px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-weight:700;font-size:.95rem;cursor:pointer;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 16px rgba(102,126,234,.3)">
-          <span class="ms">person</span> Mein Profil
-        </button>
-      </div>`:''}`;
+      </div>`;
   } else {
     const today=isoDate(new Date());
     const now=new Date();
@@ -1028,12 +1023,14 @@ function changeDashBanner(input){
 // ═══ EMPLOYEES ═══
 function renderEmployees(){
   const pg=document.getElementById('page-employees');
-  if(!can('seeAllEmployees')){pg.innerHTML=permBanner('Mitarbeiter-Ansicht ist nur für Manager und Inhaber verfügbar.');return;}
-  const emps=getVisibleEmps();
+  if(!can('seeAllEmployees') && !can('seeOwnDetail')){pg.innerHTML=permBanner('Mitarbeiter-Ansicht ist nur für Manager und Inhaber verfügbar.');return;}
+  const isOwnOnly = !can('seeAllEmployees') && can('seeOwnDetail');
+  const emps = isOwnOnly ? EMPS.filter(e=>e.id===currentUser.empId) : getVisibleEmps();
   const isAdmin=can('seeFinancials');
   const todayStr=isoDate(new Date());
-  const onVac=VACS.filter(v=>v.status==='approved'&&v.from<=todayStr&&v.to>=todayStr).length;
-  const onSick=SICKS.filter(s=>s.status==='active'&&s.from<=todayStr&&s.to>=todayStr).length;
+  const empIds=new Set(emps.map(e=>e.id));
+  const onVac=VACS.filter(v=>empIds.has(v.empId)&&v.status==='approved'&&v.from<=todayStr&&v.to>=todayStr).length;
+  const onSick=SICKS.filter(s=>empIds.has(s.empId)&&s.status==='active'&&s.from<=todayStr&&s.to>=todayStr).length;
   const lateTotal=emps.reduce((a,e)=>a+e.lateCount,0);
   const activeCount=emps.filter(e=>e.status==='aktiv').length;
 
@@ -1234,6 +1231,9 @@ function filterEmpsByDept(dept,btn){
 }
 function viewEmp(id){
   const e=EMPS.find(x=>x.id===id);if(!e)return;
+
+  // Security: mitarbeiter/azubi can only view own profile
+  if(!can('seeAllEmployees') && id !== currentUser.empId) return;
 
   // Permission checks
   const isOwnProfile = currentUser.empId === id;
