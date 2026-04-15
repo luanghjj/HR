@@ -230,7 +230,8 @@ function getVisibleShifts() {
   }
   const me = EMPS.find(e => e.id === currentUser.empId);
   if (!me) return [];
-  return SHIFTS.filter(s => s.location === me.location && s.dept === me.dept);
+  const myDepts = (me.dept || '').split(',').map(d => d.trim()).filter(Boolean);
+  return SHIFTS.filter(s => s.location === me.location && myDepts.some(d => d === 'Alle' || d === s.dept));
 }
 
 /** Get documents visible to current user */

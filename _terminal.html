@@ -99,7 +99,7 @@ body { background-color: #f7f9fb; color: #191c1e; }
   <p class="text-slate-400 text-xs mt-4 font-label tracking-wider">Standort wählen um das Terminal zu starten</p>
 </div>
 
-<!-- ═══ DASHBOARD ═══ -->
+<!-- ═══ DASHBOARD ═══ --> 
 <div id="dashboard" class="hidden">
 
   <!-- Top Nav -->
@@ -133,6 +133,10 @@ body { background-color: #f7f9fb; color: #191c1e; }
         <div onclick="switchTab('checklist')" class="sidebar-item flex items-center gap-3 text-slate-500 px-4 py-3 cursor-pointer group" data-tab="checklist">
           <span class="material-symbols-outlined transition-transform duration-200 group-hover:translate-x-1">fact_check</span>
           <span class="font-label text-sm font-medium uppercase tracking-widest">Checklist</span>
+        </div>
+        <div onclick="switchTab('schichtplan')" class="sidebar-item flex items-center gap-3 text-slate-500 px-4 py-3 cursor-pointer group" data-tab="schichtplan">
+          <span class="material-symbols-outlined transition-transform duration-200 group-hover:translate-x-1">calendar_month</span>
+          <span class="font-label text-sm font-medium uppercase tracking-widest">Schichtplan</span>
         </div>
       </nav>
       <div class="pt-4 border-t border-gray-200">
@@ -184,6 +188,11 @@ body { background-color: #f7f9fb; color: #191c1e; }
       <!-- filled by JS -->
     </div>
 
+    <!-- ═══ SCHICHTPLAN TAB ═══ -->
+    <div id="tabSchichtplan" class="hidden">
+      <!-- filled by JS -->
+    </div>
+
   </main>
 
   <!-- Mobile Bottom Nav -->
@@ -196,6 +205,10 @@ body { background-color: #f7f9fb; color: #191c1e; }
       <a onclick="switchTab('checklist')" class="mob-tab flex flex-col items-center text-slate-500 cursor-pointer" data-tab="checklist">
         <span class="material-symbols-outlined">fact_check</span>
         <span class="text-[10px] font-label uppercase tracking-tighter">Check</span>
+      </a>
+      <a onclick="switchTab('schichtplan')" class="mob-tab flex flex-col items-center text-slate-500 cursor-pointer" data-tab="schichtplan">
+        <span class="material-symbols-outlined">calendar_month</span>
+        <span class="text-[10px] font-label uppercase tracking-tighter">Schicht</span>
       </a>
       <a onclick="goBack()" class="flex flex-col items-center text-slate-500 cursor-pointer">
         <span class="material-symbols-outlined">swap_horiz</span>
@@ -426,21 +439,13 @@ function renderEmptyState(icon, title, desc) {
 function switchTab(tab) {
   document.getElementById('tabCheckin').classList.toggle('hidden', tab !== 'checkin');
   document.getElementById('tabChecklist').classList.toggle('hidden', tab !== 'checklist');
-
-  // Nav tabs
-  document.querySelectorAll('.nav-tab').forEach((el, i) => {
-    const isActive = (tab === 'checkin' && i === 0) || (tab === 'checklist' && i === 1);
-    el.classList.toggle('text-indigo-600', isActive);
-    el.classList.toggle('border-indigo-600', isActive);
-    el.classList.toggle('active-tab', isActive);
-    el.classList.toggle('text-slate-400', !isActive);
-    el.classList.toggle('border-transparent', !isActive);
-  });
+  document.getElementById('tabSchichtplan').classList.toggle('hidden', tab !== 'schichtplan');
 
   // Sidebar
   document.querySelectorAll('.sidebar-item').forEach(el => {
     const isActive = el.dataset.tab === tab;
     el.classList.toggle('bg-indigo-50', isActive);
+    el.classList.toggle('rounded-lg', isActive);
     el.classList.toggle('text-indigo-600', isActive);
     el.classList.toggle('text-slate-500', !isActive);
   });
@@ -453,6 +458,130 @@ function switchTab(tab) {
   });
 
   if (tab === 'checklist') renderChecklists();
+  if (tab === 'schichtplan') renderSchichtplan();
+}
+
+// ─── SCHICHTPLAN — fetch từ shift_templates (DB) ───
+// DOW: 0=So, 1=Mo, 2=Di, 3=Mi, 4=Do, 5=Fr, 6=Sa
+const DOW_TEMPLATE_KEY = { 0:'Sa-So', 1:'Mo', 2:'Di-Do', 3:'Di-Do', 4:'Di-Do', 5:'Fr', 6:'Sa-So' };
+const DAY_NAMES_DE    = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+const DAY_NAMES_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+const colorByDept = (dept) => {
+  if (!dept || dept === 'Alle') return { bg:'bg-indigo-50', text:'text-indigo-700', border:'border-indigo-200', badge:'bg-indigo-100 text-indigo-600' };
+  if (dept === 'Service')       return { bg:'bg-blue-50',   text:'text-blue-700',   border:'border-blue-200',   badge:'bg-blue-100 text-blue-600' };
+  if (dept === 'Küche')         return { bg:'bg-amber-50',  text:'text-amber-700',  border:'border-amber-200',  badge:'bg-amber-100 text-amber-700' };
+  if (dept === 'Sushi')         return { bg:'bg-rose-50',   text:'text-rose-700',   border:'border-rose-200',   badge:'bg-rose-100 text-rose-600' };
+  return { bg:'bg-gray-50', text:'text-gray-700', border:'border-gray-200', badge:'bg-gray-100 text-gray-600' };
+};
+
+async function renderSchichtplan() {
+  const container = document.getElementById('tabSchichtplan');
+  container.innerHTML = `<div class="flex items-center justify-center py-20">
+    <div class="animate-spin rounded-full h-8 w-8 border-2 border-indigo-600 border-t-transparent"></div>
+    <span class="ml-3 text-slate-400 font-label text-sm">Lade Schichtplan...</span>
+  </div>`;
+
+  // Fetch from DB
+  const { data: templates, error } = await sb
+    .from('shift_templates')
+    .select('*')
+    .eq('location', currentLoc)
+    .order('id');
+
+  const today    = new Date();
+  const todayDow = today.getDay();
+
+  if (error || !templates?.length) {
+    container.innerHTML = renderEmptyState('calendar_month', 'Kein Schichtplan', 'Für diesen Standort sind keine Schichtvorlagen hinterlegt.');
+    return;
+  }
+
+  const getTemplateForDow = (dow) => {
+    const k = DOW_TEMPLATE_KEY[dow];
+    return templates.find(t => t.name.includes(k));
+  };
+
+  const todayTpl = getTemplateForDow(todayDow);
+  const isFrei   = !todayTpl || !todayTpl.shifts?.length;
+
+  // ── TODAY BLOCK ──
+  let todayHtml = '';
+  if (isFrei) {
+    todayHtml = `
+      <div class="glass-card rounded-2xl flex flex-col items-center justify-center py-14 gap-3">
+        <div class="text-5xl">🔴</div>
+        <div class="font-headline font-black text-2xl text-red-500">FREI</div>
+        <p class="text-slate-400 text-sm font-label">Heute geschlossen</p>
+      </div>`;
+  } else {
+    const depts = [...new Set(todayTpl.shifts.map(s => s.dept))];
+    todayHtml = depts.map(dept => {
+      const deptShifts = todayTpl.shifts.filter(s => s.dept === dept);
+      const c = colorByDept(dept);
+      const blocks = deptShifts.map(s => `
+        <div class="flex items-center gap-2 ${c.bg} ${c.border} border rounded-xl px-4 py-2">
+          <span class="material-symbols-outlined text-lg ${c.text}">schedule</span>
+          <span class="font-headline font-bold text-lg ${c.text}">${s.from}</span>
+          <span class="text-slate-400 font-label text-sm">→</span>
+          <span class="font-headline font-bold text-lg ${c.text}">${s.to}</span>
+          ${s.label ? `<span class="text-xs font-label text-slate-400 ml-1">${s.label}</span>` : ''}
+        </div>`).join('');
+      return `<div class="glass-card rounded-2xl p-5">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="px-3 py-1 rounded-full text-xs font-bold font-label ${c.badge}">${dept}</span>
+        </div>
+        <div class="flex flex-wrap gap-3">${blocks}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── WEEK OVERVIEW ──
+  const weekRows = [1,2,3,4,5,6,0].map(dow => {
+    const isToday = dow === todayDow;
+    const tpl     = getTemplateForDow(dow);
+    const dayFrei = !tpl || !tpl.shifts?.length;
+    let desc = '';
+    if (dayFrei) {
+      desc = '<span class="text-red-500 font-bold">FREI</span>';
+    } else {
+      const depts = [...new Set(tpl.shifts.map(s => s.dept))];
+      desc = depts.map(dept => {
+        const dSh   = tpl.shifts.filter(s => s.dept === dept);
+        const range = dSh.map(s => `${s.from}–${s.to}`).join(' / ');
+        return `<span class="mr-3">${dept !== 'Alle' ? dept + ': ' : ''}${range}</span>`;
+      }).join('');
+    }
+    return `<div class="flex items-center gap-4 px-5 py-3 ${isToday ? 'bg-indigo-50/60' : ''}">
+      <span class="w-8 text-xs font-bold font-label ${isToday ? 'text-indigo-600' : 'text-slate-400'} text-right">${DAY_NAMES_SHORT[dow]}</span>
+      <div class="flex-1 text-xs font-label text-slate-600">${desc}</div>
+      ${isToday ? '<span class="text-[10px] bg-indigo-100 text-indigo-600 font-bold px-2 py-0.5 rounded-full font-label">HEUTE</span>' : ''}
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="mb-8">
+      <div class="flex items-center gap-3 mb-1">
+        <span class="material-symbols-outlined text-indigo-500">calendar_month</span>
+        <h2 class="font-headline font-bold text-xl text-slate-800 tracking-tight">Schichtplan</h2>
+        <span class="text-xs font-label text-slate-400">${DAY_NAMES_DE[todayDow]}, ${today.toLocaleDateString('de-DE',{day:'2-digit',month:'long'})}</span>
+      </div>
+      <p class="text-xs text-slate-400 font-label">Pause 15:00–17:00 täglich (Di–Fr) nicht einberechnet</p>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="font-label text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Heute</h3>
+      <div class="space-y-3">${todayHtml}</div>
+    </div>
+
+    <div class="glass-card rounded-2xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="font-headline font-bold text-slate-800 text-sm tracking-tight">Wochenübersicht</h3>
+        <span class="text-xs text-slate-400 font-label">${currentLoc}</span>
+      </div>
+      <div class="divide-y divide-gray-50">${weekRows}</div>
+    </div>
+  `;
 }
 
 // ─── CHECKLISTS ───

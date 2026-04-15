@@ -2163,7 +2163,7 @@ function renderSchedule(){
 
   let banner=isEmp?permBanner(`Du siehst den Arbeitsplan deines Bereichs (${me?.dept||''} – ${getLocationName(me?.location||'')})`).trim():'';
   let shifts=getVisibleShifts();
-  if(scheduleDept!=='all')shifts=shifts.filter(s=>s.dept===scheduleDept);
+  if(scheduleDept!=='all')shifts=shifts.filter(s=>{const sDepts=(s.dept||'').split(',').map(d=>d.trim());return sDepts.includes(scheduleDept)||sDepts.includes('Alle');});
   // Conflict & efficiency bar
   const _wkStart=getWeekStart(scheduleDate);const _wkDays=[];for(let _i=0;_i<7;_i++){const _d=new Date(_wkStart);_d.setDate(_d.getDate()+_i);_wkDays.push(isoDate(_d));}
   const _totalWkShifts=shifts.filter(s=>_wkDays.includes(s.date)&&!s.isSick&&!s.isVacation).length;
@@ -3191,24 +3191,92 @@ function updatePendingBadge(){
 async function deleteUser(userId){
   const u = USERS.find(x => x.id === userId);
   if(!u) return;
-  if(!confirm(`Benutzer "${u.name}" wirklich löschen? Dies kann nicht rückgängig gemacht werden.`)) return;
 
-  try {
-    // Delete user_profile
-    const { error } = await sb.from('user_profiles').delete().eq('user_id', userId);
-    if(error){ toast('Fehler: ' + error.message, 'err'); return; }
+  const emp = u.empId ? EMPS.find(e => e.id === u.empId) : null;
 
-    // Remove from local array
-    const idx = USERS.findIndex(x => x.id === userId);
-    if(idx >= 0) USERS.splice(idx, 1);
+  // Show confirmation modal
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  overlay.innerHTML = `<div style="background:var(--bg-card);border-radius:20px;padding:28px;width:420px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <div style="width:44px;height:44px;border-radius:50%;background:rgba(239,68,68,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <span class="ms" style="color:#ef4444;font-size:22px">delete</span>
+      </div>
+      <div>
+        <h3 style="margin:0;font-size:1rem;font-weight:700">Benutzer löschen</h3>
+        <p style="margin:2px 0 0;font-size:.8rem;color:var(--text-muted)">Diese Aktion kann nicht rückgängig gemacht werden</p>
+      </div>
+    </div>
+    <div style="background:var(--bg-input);border-radius:12px;padding:14px 16px;margin-bottom:20px;border-left:3px solid #ef4444">
+      <div style="font-weight:700;font-size:.95rem;margin-bottom:4px">${u.name}</div>
+      <div style="font-size:.8rem;color:var(--text-muted)">${u.role} · ${getLocationName(u.location)}</div>
+      ${u.regEmail ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">📧 ${u.regEmail}</div>` : ''}
+    </div>
+    <div style="font-size:.82rem;color:var(--text-muted);margin-bottom:20px">
+      <div style="margin-bottom:6px;font-weight:600;color:var(--text-secondary)">Folgendes wird gelöscht:</div>
+      <div>• Login-Zugang (auth.users)</div>
+      <div>• Benutzerprofil (user_profiles)</div>
+      ${emp ? '<div>• Mitarbeiterdaten (employees)</div>' : ''}
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button id="delCancelBtn" class="btn btn-sm">Abbrechen</button>
+      <button id="delConfirmBtn" class="btn btn-sm btn-danger" style="font-weight:600">
+        <span class="ms" style="font-size:15px;vertical-align:middle">delete</span> Endgültig löschen
+      </button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
 
-    toast(`${u.name} gelöscht`, 'warn');
-    renderAccess();
-  } catch(e) {
-    console.error('[DeleteUser]', e);
-    toast('Fehler beim Löschen', 'err');
-  }
+  document.getElementById('delCancelBtn').onclick = () => overlay.remove();
+  document.getElementById('delConfirmBtn').onclick = async () => {
+    const btn = document.getElementById('delConfirmBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="ms spin" style="font-size:15px">progress_activity</span> Löschen...';
+
+    try {
+      // 1. Delete user_profile
+      const { error: profErr } = await sb.from('user_profiles').delete().eq('user_id', userId);
+      if(profErr){ toast('Profil-Fehler: ' + profErr.message, 'err'); overlay.remove(); return; }
+
+      // 2. Delete employee record
+      if(emp){
+        const { error: empErr } = await sb.from('employees').delete().eq('id', emp.id);
+        if(empErr) console.warn('[DeleteUser] Employee delete error:', empErr.message);
+        // Remove from local EMPS
+        const ei = EMPS.findIndex(e => e.id === emp.id);
+        if(ei >= 0) EMPS.splice(ei, 1);
+      }
+
+      // 3. Delete auth user via admin API (requires service role — backend call)
+      try {
+        const SUPABASE_URL = sb.supabaseUrl || 'https://zkxsyipyjqikqxswpbks.supabase.co';
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/delete-auth-user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await sb.auth.getSession()).data.session?.access_token}` },
+          body: JSON.stringify({ user_id: userId })
+        });
+        if(!res.ok) console.warn('[DeleteUser] Auth delete skipped (no edge function):', await res.text());
+      } catch(authE) {
+        console.warn('[DeleteUser] Auth delete via edge function failed — user_profile deleted only:', authE.message);
+      }
+
+      // 4. Update local USERS
+      const ui = USERS.findIndex(x => x.id === userId);
+      if(ui >= 0) USERS.splice(ui, 1);
+
+      overlay.remove();
+      toast(`${u.name} wurde gelöscht`, 'warn');
+      renderAccess();
+      updateBadges();
+
+    } catch(e) {
+      console.error('[DeleteUser]', e);
+      toast('Fehler beim Löschen: ' + e.message, 'err');
+      overlay.remove();
+    }
+  };
 }
+
 
 // ═══ PERMISSIONS MODAL ═══
 const PERM_GROUPS = {
