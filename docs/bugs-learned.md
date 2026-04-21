@@ -143,3 +143,35 @@
   - Luôn kiểm tra `du -sh` trước khi `git add` files mới
   - Nếu cần favicon → chỉ giữ 1 file PNG nhỏ (< 50KB)
   - Vercel project cần đúng Framework Preset = "Other" cho static HTML sites
+
+---
+
+## Bugs Standorte-Modul (2026-04-21)
+
+### 2026-04-21 – QR Generator hardcode location IDs ✅ FIXED
+- **Triệu chứng:** `_renderQrCards()` dùng `id:'okyu'` nhưng DB là `okyu_central` → QR URL sai
+- **Nguyên nhân:** Locations trong QR Generator được hardcode thay vì dùng LOCS từ Supabase
+- **Cách fix:** Tạo `QR_KEYS` mapping, dùng `LOCS.filter().map()` để generate danh sách động
+- **Bài học:** KHÔNG hardcode data đã có trong DB. Luôn dùng 1 nguồn sự thật (LOCS)
+
+### 2026-04-21 – showAddLocationModal thiếu Ruhetage UI ✅ FIXED
+- **Triệu chứng:** Tạo Standort mới → Ruhetage luôn = Sonntag (hardcode `day_off: [0]`)
+- **Nguyên nhân:** Modal tạo mới không có checkbox Ruhetage, `saveNewLocation()` hardcode `[0]`
+- **Cách fix:** Thêm Ruhetage checkboxes vào modal, đọc `.newDayOff:checked` khi save
+- **Bài học:** Khi editModal có field → createModal cũng PHẢI có field tương ứng
+
+### 2026-04-21 – editLocation thiếu halfDays UI ✅ FIXED
+- **Triệu chứng:** Không thể set ngày halbtags cho location
+- **Nguyên nhân:** Edit modal chỉ có Ruhetage, thiếu Halbtags checkboxes
+- **Cách fix:** Thêm `.editHalfDay` checkboxes, đọc trong `saveEditLocation()`
+- **Bài học:** Kiểm tra tất cả fields trong DB schema có UI tương ứng không
+
+### 2026-04-21 – Hardcode "Stuttgart" trong QR cards ✅ FIXED
+- **Triệu chứng:** QR cards + print luôn hiện "📍 Stuttgart" bất kể thành phố
+- **Cách fix:** Dùng `l.city` (dynamic) thay vì "Stuttgart" (static)
+- **Bài học:** KHÔNG hardcode data có trong DB. Dùng biến
+
+### 2026-04-21 – data.js LOCS fallback sai tên + thành phố ✅ FIXED
+- **Triệu chứng:** Origami ghi "Göppingen" nhưng thực tế ở Stuttgart
+- **Cách fix:** Sửa name + city trong fallback LOCS
+- **Bài học:** Fallback data phải khớp với DB thực tế

@@ -3,9 +3,9 @@
 // ═══════════════════════════════════════════════════════════
 
 let LOCS = [
-  { id: 'origami',      name: 'Origami Restaurant',  city: 'Göppingen' },
-  { id: 'okyu_central', name: 'Okyu Restaurant',     city: 'Stuttgart' },
-  { id: 'enso',         name: 'Enso Sushi & Grill',  city: 'Stuttgart' }
+  { id: 'origami',      name: 'Origami Sushi & Asian Cuisine', city: 'Stuttgart' },
+  { id: 'okyu_central', name: 'Okyu Restaurant',               city: 'Stuttgart' },
+  { id: 'enso',         name: 'Enso Sushi & Grill',            city: 'Stuttgart' }
 ];
 
 const DEPTS = [

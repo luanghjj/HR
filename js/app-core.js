@@ -5047,6 +5047,14 @@ function showAddLocationModal(){
       <div class="form-group"><label>Longitude</label><input class="form-input" id="locLng" type="number" step="0.0001" placeholder="9.1724"></div>
       <div class="form-group"><label>Radius (m)</label><input class="form-input" id="locRadius" type="number" value="50"></div>
     </div>
+    <div class="form-group"><label>Ruhetage</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+        ${['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'].map((d,i) => `<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer">
+          <input type="checkbox" class="newDayOff" value="${i}" ${i===0?'checked':''}>
+          ${d}
+        </label>`).join('')}
+      </div>
+    </div>
   `, `<button class="btn btn-primary" onclick="saveNewLocation()">Speichern</button>`);
 }
 
@@ -5062,7 +5070,9 @@ async function saveNewLocation(){
   const lng = parseFloat(document.getElementById('locLng').value) || null;
   const radius = parseInt(document.getElementById('locRadius').value) || 50;
 
-  const insertData = { id, name, city, lat, lng, radius_m: radius, day_off: [0], half_days: [] };
+  // Read Ruhetage from checkboxes
+  const dayOff = [...document.querySelectorAll('.newDayOff:checked')].map(cb => parseInt(cb.value));
+  const insertData = { id, name, city, lat, lng, radius_m: radius, day_off: dayOff, half_days: [] };
   const { error } = await sb.from('locations').insert(insertData);
   if(error){ toast('Fehler: ' + error.message, 'err'); return; }
 
@@ -5071,7 +5081,7 @@ async function saveNewLocation(){
   if(lat != null && lng != null){
     GPS_COORDS[id] = { lat, lng, radius_m: radius };
   }
-  LOCATION_SCHEDULE[id] = { dayOff: [0], halfDays: [] };
+  LOCATION_SCHEDULE[id] = { dayOff, halfDays: [] };
 
   closeModal();
   buildLocationSelect();
@@ -5102,6 +5112,14 @@ function editLocation(locId){
         </label>`).join('')}
       </div>
     </div>
+    <div class="form-group"><label>Halbtags (halber Tag)</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+        ${dayNames.map((d,i) => `<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer">
+          <input type="checkbox" class="editHalfDay" value="${i}" ${sched.halfDays.includes(i)?'checked':''}>
+          ${d}
+        </label>`).join('')}
+      </div>
+    </div>
   `, `<button class="btn btn-primary" onclick="saveEditLocation('${locId}')">Speichern</button>`);
 }
 
@@ -5117,7 +5135,7 @@ async function saveEditLocation(locId){
 
   // Parse Ruhetage
   const dayOff = [...document.querySelectorAll('.editDayOff:checked')].map(cb => parseInt(cb.value));
-  const halfDays = LOCATION_SCHEDULE[locId]?.halfDays || [];
+  const halfDays = [...document.querySelectorAll('.editHalfDay:checked')].map(cb => parseInt(cb.value));
 
   // Save everything to DB (including Ruhetage)
   const updateData = { name, city, lat, lng, radius_m: radius, day_off: dayOff, half_days: halfDays };
@@ -5222,18 +5240,27 @@ function _renderQrCards(domain){
   const grid=document.getElementById('qrCardsGrid');
   if(!grid)return;
 
-  // Keys for QR URL generation (admin-only module — verified server-side on scan)
-  const locs=[
-    {id:'okyu',name:'Okyu Restaurant',icon:'🍣',key:'oK4xY9'},
-    {id:'origami',name:'Origami Restaurant',icon:'🏮',key:'rG3mI7'},
-    {id:'enso',name:'Enso Sushi & Grill',icon:'🔥',key:'eN5oS2'}
-  ];
+  // QR verification keys (security tokens – must match server-side verify-qr function)
+  const QR_KEYS = {
+    origami:      { icon: '🏮', key: 'rG3mI7' },
+    okyu_central: { icon: '🍣', key: 'oK4xY9' },
+    okyu:         { icon: '🍣', key: 'oK4xY9' },
+    enso:         { icon: '🔥', key: 'eN5oS2' }
+  };
+  const locs = LOCS.filter(l => QR_KEYS[l.id]).map(l => ({
+    id: l.id, name: l.name, city: l.city || '',
+    icon: QR_KEYS[l.id].icon, key: QR_KEYS[l.id].key
+  }));
+  if(locs.length === 0){
+    grid.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">Keine Standorte mit QR-Schlüssel konfiguriert.</div>';
+    return;
+  }
 
   grid.innerHTML=locs.map(l=>`
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:28px;text-align:center">
       <div style="font-size:2.2rem;margin-bottom:8px">${l.icon}</div>
       <div style="font-size:1.1rem;font-weight:700;margin-bottom:4px">${l.name}</div>
-      <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:16px">📍 Stuttgart</div>
+      <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:16px">📍 ${l.city || 'Standort'}</div>
       <div style="background:#fff;border-radius:12px;padding:16px;display:inline-block;margin-bottom:12px"><div id="qrC_${l.id}"></div></div>
       <div style="font-family:'Space Mono',monospace;font-size:.6rem;color:var(--text-muted);word-break:break-all;margin-bottom:8px;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px">${domain}/index.html?checkin=${l.id}&key=${l.key}</div>
       <div style="font-size:.75rem;color:var(--warning);margin-bottom:14px">🔑 Key: <strong>${l.key}</strong></div>
@@ -5284,7 +5311,7 @@ function printQrSingle(locId,locName,icon){
   if(!img)return;
   const src=img.tagName==='IMG'?img.src:img.toDataURL('image/png');
   const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Arial,sans-serif;text-align:center}.c{padding:40px}h1{font-size:2rem;margin-bottom:8px}img{display:block;margin:0 auto 24px}</style></head><body><div class="c"><div style="font-size:3rem;margin-bottom:12px">${icon}</div><h1>${locName}</h1><p style="color:#666;margin-bottom:24px">📍 Stuttgart</p><img src="${src}" width="280" height="280"><p style="font-size:1.1rem;font-weight:bold;margin-bottom:8px">📱 QR scannen zum Check-in</p><p style="color:#999;font-size:.9rem">OKYU HRM — Zeiterfassung</p></div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  w.document.write(`<!DOCTYPE html><html><head><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Arial,sans-serif;text-align:center}.c{padding:40px}h1{font-size:2rem;margin-bottom:8px}img{display:block;margin:0 auto 24px}</style></head><body><div class="c"><div style="font-size:3rem;margin-bottom:12px">${icon}</div><h1>${locName}</h1><p style="color:#666;margin-bottom:24px">📍 ${LOCS.find(lo=>lo.id===locId)?.city||''}</p><img src="${src}" width="280" height="280"><p style="font-size:1.1rem;font-weight:bold;margin-bottom:8px">📱 QR scannen zum Check-in</p><p style="color:#999;font-size:.9rem">OKYU HRM — Zeiterfassung</p></div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`);
   w.document.close();
 }
 
