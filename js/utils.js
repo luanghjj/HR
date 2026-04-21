@@ -197,7 +197,23 @@ function getVisibleEmps() {
     }
     // Apply UI location filter
     if (currentUser.location === 'all') {
-      return currentLocation === 'all' ? emps : emps.filter(e => empHasLoc(e, currentLocation));
+      if (currentLocation === 'all') return emps;
+      return emps.filter(e => {
+        // Employee's own location matches
+        if (empHasLoc(e, currentLocation)) return true;
+        // Linked user has access to this location (e.g. Inhaber with 'all')
+        const u = USERS.find(u => u.empId === e.id);
+        if (u && empHasLoc(u, currentLocation)) {
+          // Auto-fix: sync employee.location to match user.location
+          if (e.location !== u.location) {
+            e.location = u.location;
+            if (typeof syncEmployeeField === 'function') syncEmployeeField(e.id, 'location', u.location);
+            console.log('[AutoSync] employee.location fixed:', e.name, '→', u.location);
+          }
+          return true;
+        }
+        return false;
+      });
     }
     return emps.filter(e => empHasLoc(e, currentUser.location));
   }
