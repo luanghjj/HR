@@ -2666,34 +2666,63 @@ function renderAccess(){
       <div style="padding:0 20px 16px">`;
     pending.forEach(u => {
       const isGoogle = u.regEmail?.includes('gmail') || u.bannerUrl;
-      const locOptions = LOCS.map(l => `<option value="${l.id}" ${u.location===l.id?'selected':''}>${l.name}</option>`).join('');
-      const deptOptions = [...new Set(DEPTS.map(d => d.name))].sort().map(d => `<option value="${d}" ${u.regDept===d?'selected':''}>${d}</option>`).join('');
-      pendingHtml += `<div style="display:flex;align-items:flex-start;gap:14px;padding:14px 0;border-bottom:1px solid var(--border)" id="pending-${u.id}">
-        <div class="emp-avatar" style="width:44px;height:44px;font-size:1rem;flex-shrink:0;margin-top:4px">${u.avatar}</div>
-        <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:6px">
-            <strong style="font-size:.95rem">${u.name}</strong>
-            ${isGoogle ? '<span style="font-size:.68rem;background:var(--bg-input);padding:1px 6px;border-radius:4px;color:var(--text-muted)">Google</span>' : ''}
-            <span style="font-size:.75rem;color:var(--text-muted)">📧 ${u.regEmail||'—'}</span>
+      const roleOpts2 = ['mitarbeiter','azubi','manager','inhaber'];
+      const deptOptions = [...new Set(DEPTS.map(d => d.name))].sort().map(d =>
+        `<option value="${d}" ${u.regDept===d?'selected':''}>${d}</option>`).join('');
+      const empTypes = ['Vollzeit','Teilzeit','Minijob','Azubi','Werkstudent'];
+
+      // Multi-loc display for pending user
+      const uLocs = (u.location || '').split(',').map(l => l.trim()).filter(Boolean);
+      const isAllPend = uLocs.includes('all') || uLocs.length === 0;
+      const locTagsHtml = isAllPend
+        ? '<span style="font-size:.72rem;background:rgba(217,119,6,.1);color:#d97706;padding:2px 8px;border-radius:8px">Alle Standorte</span>'
+        : uLocs.map(lid => `<span style="font-size:.72rem;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:8px;margin:1px 2px">${getLocationName(lid)}</span>`).join('');
+
+      pendingHtml += `<div style="background:var(--bg-input);border-radius:14px;padding:16px;margin-bottom:12px" id="pending-${u.id}">
+        <!-- Header row -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div class="emp-avatar" style="width:44px;height:44px;font-size:1rem;flex-shrink:0">${u.avatar}</div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <input class="form-input" id="pendName-${u.id}" value="${u.name}" placeholder="Name" style="font-size:.9rem;font-weight:600;width:180px">
+              ${isGoogle ? '<span style="font-size:.68rem;background:var(--bg-card);padding:1px 6px;border-radius:4px;color:var(--text-muted)">Google</span>' : ''}
+              <span style="font-size:.75rem;color:var(--text-muted)">📧 ${u.regEmail||'—'}</span>
+            </div>
           </div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center">
-            <div>
-              <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Standort</label>
-              <select class="form-select" id="pendLoc-${u.id}" style="font-size:.82rem;min-width:140px">${locOptions}</select>
-            </div>
-            <div>
-              <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Bereich</label>
-              <select class="form-select" id="pendDept-${u.id}" style="font-size:.82rem;min-width:120px">${deptOptions}</select>
-            </div>
-            <div>
-              <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Position</label>
-              <input class="form-input" id="pendPos-${u.id}" value="${u.regPosition||''}" placeholder="z.B. Kellner" style="font-size:.82rem;width:130px">
-            </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn btn-sm btn-success" onclick="approveRegistration('${u.id}')" style="font-size:.8rem;font-weight:600">✓ Genehmigen</button>
+            <button class="btn btn-sm btn-danger" onclick="rejectRegistration('${u.id}')" style="font-size:.8rem">✕ Ablehnen</button>
           </div>
         </div>
-        <div style="display:flex;gap:8px;flex-shrink:0;margin-top:12px">
-          <button class="btn btn-sm btn-success" onclick="approveRegistration('${u.id}')" style="font-size:.8rem">✓ Genehmigen</button>
-          <button class="btn btn-sm btn-danger" onclick="rejectRegistration('${u.id}')" style="font-size:.8rem">✕ Ablehnen</button>
+        <!-- Edit fields -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
+          <div>
+            <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Rolle</label>
+            <select class="form-select" id="pendRole-${u.id}" style="font-size:.82rem">
+              ${roleOpts2.map(r => `<option value="${r}" ${(u.role||'mitarbeiter')===r?'selected':''}>${r==='inhaber'?'👑 Inhaber':r==='manager'?'🏢 Manager':r==='mitarbeiter'?'👤 Mitarbeiter':'🎓 Azubi'}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Standort</label>
+            <div style="cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:5px 8px;min-height:34px;background:var(--bg-card)" onclick="openPendLocPicker('${u.id}')" title="Klicke zum Ändern">
+              <span id="pendLocTags-${u.id}">${locTagsHtml}</span>
+            </div>
+            <input type="hidden" id="pendLoc-${u.id}" value="${u.location || LOCS[0]?.id || 'origami'}">
+          </div>
+          <div>
+            <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Bereich</label>
+            <select class="form-select" id="pendDept-${u.id}" style="font-size:.82rem">${deptOptions}</select>
+          </div>
+          <div>
+            <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Position</label>
+            <input class="form-input" id="pendPos-${u.id}" value="${u.regPosition||''}" placeholder="z.B. Kellner" style="font-size:.82rem">
+          </div>
+          <div>
+            <label style="font-size:.68rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Beschäftigung</label>
+            <select class="form-select" id="pendType-${u.id}" style="font-size:.82rem">
+              ${empTypes.map(t => `<option value="${t}">${t}</option>`).join('')}
+            </select>
+          </div>
         </div>
       </div>`;
     });
@@ -3140,6 +3169,53 @@ async function saveLocPicker(userId) {
   renderAccess();
 }
 
+// ═══ Pending Registration Location Picker ═══
+function openPendLocPicker(userId) {
+  const hiddenInput = document.getElementById('pendLoc-' + userId);
+  if (!hiddenInput) return;
+  const currentLocs = (hiddenInput.value || '').split(',').map(l => l.trim()).filter(Boolean);
+  document.getElementById('pendLocPickerPopup')?.remove();
+  const popup = document.createElement('div');
+  popup.id = 'pendLocPickerPopup';
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  popup.onclick = (e) => { if (e.target === popup) popup.remove(); };
+  popup.innerHTML = `<div style="background:var(--bg-card);border-radius:20px;padding:24px;width:320px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-size:.95rem;font-weight:700;margin:0">📍 Standort wählen</h3>
+      <button onclick="document.getElementById('pendLocPickerPopup').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted)">&times;</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${LOCS.map(l => `<label style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;cursor:pointer;border:1px solid var(--border);font-size:.85rem;font-weight:500;transition:.15s" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
+        <input type="checkbox" class="pendLocPickerCb" value="${l.id}" ${currentLocs.includes(l.id)?'checked':''} style="width:16px;height:16px;accent-color:var(--accent)">
+        ${l.name}
+      </label>`).join('')}
+    </div>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-sm" onclick="document.getElementById('pendLocPickerPopup').remove()">Abbrechen</button>
+      <button class="btn btn-sm btn-primary" onclick="savePendLocPicker('${userId}')">OK</button>
+    </div>
+  </div>`;
+  document.body.appendChild(popup);
+}
+
+function savePendLocPicker(userId) {
+  const allCbs = [...document.querySelectorAll('.pendLocPickerCb')];
+  const checked = allCbs.filter(cb => cb.checked).map(cb => cb.value);
+  if (checked.length === 0) { toast('Mindestens einen Standort wählen', 'err'); return; }
+  const newLoc = checked.join(',');
+  // Update hidden input
+  const hiddenInput = document.getElementById('pendLoc-' + userId);
+  if (hiddenInput) hiddenInput.value = newLoc;
+  // Update tag display
+  const tagContainer = document.getElementById('pendLocTags-' + userId);
+  if (tagContainer) {
+    tagContainer.innerHTML = checked.map(lid =>
+      `<span style="font-size:.72rem;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:8px;margin:1px 2px">${getLocationName(lid)}</span>`
+    ).join('');
+  }
+  document.getElementById('pendLocPickerPopup').remove();
+}
+
 // ═══ Employee Location Picker (for viewEmp modal) ═══
 function openEmpLocPicker(empId) {
   const emp = EMPS.find(e => e.id === empId);
@@ -3190,12 +3266,15 @@ async function approveRegistration(userId) {
   const u = USERS.find(x => x.id === userId);
   if (!u) return;
 
-  // Read admin-selected values from pending dropdowns
-  const selLoc = document.getElementById('pendLoc-' + userId)?.value || u.location;
+  // Read admin-selected values from pending form
+  const selName = document.getElementById('pendName-' + userId)?.value?.trim() || u.name;
+  const selLoc  = document.getElementById('pendLoc-' + userId)?.value || u.location || LOCS[0]?.id;
   const selDept = document.getElementById('pendDept-' + userId)?.value || u.regDept || 'Service';
-  const selPos = document.getElementById('pendPos-' + userId)?.value?.trim() || u.regPosition || 'Mitarbeiter';
+  const selPos  = document.getElementById('pendPos-' + userId)?.value?.trim() || u.regPosition || 'Mitarbeiter';
+  const selRole = document.getElementById('pendRole-' + userId)?.value || 'mitarbeiter';
+  const selType = document.getElementById('pendType-' + userId)?.value || 'Vollzeit';
 
-  if (!confirm(`${u.name} genehmigen?\n📍 ${getLocationName(selLoc)}\n🏷️ ${selDept}\n💼 ${selPos}`)) return;
+  if (!confirm(`${selName} genehmigen?\n📍 ${getLocationName(selLoc)}\n🏷️ ${selDept} · ${selPos}\n👤 ${selRole} · ${selType}`)) return;
 
   try {
     let empId = u.empId;
@@ -3204,39 +3283,37 @@ async function approveRegistration(userId) {
       // Google user: employee already exists → activate + update with admin-selected values
       const { error: empErr } = await sb.from('employees').update({
         status: 'active',
+        name: selName,
         location: selLoc,
         dept: selDept,
-        position: selPos
+        position: selPos,
+        employment_type: selType
       }).eq('id', empId);
       if (empErr) { toast('Fehler: ' + empErr.message, 'err'); return; }
 
-      // Update local employee data
       const emp = EMPS.find(e => e.id === empId);
       if (emp) {
         emp.status = 'active';
+        emp.name = selName;
         emp.location = selLoc;
         emp.dept = selDept;
         emp.position = selPos;
+        emp.employmentType = selType;
       }
     } else {
       // Manual registration: create new employee
       const newEmp = {
-        name: u.name,
+        name: selName,
         location: selLoc,
         dept: selDept,
         position: selPos,
         status: 'active',
         start_date: isoDate(new Date()),
-        avatar: u.avatar,
-        vac_total: 26,
-        vac_used: 0,
-        sick_days: 0,
-        late_count: 0,
-        soll_stunden: 160,
-        brutto_gehalt: 0,
-        schule_tage: 0,
-        birthday: u.regBirthday || null,
-        prob_end: null
+        avatar: selName.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase(),
+        vac_total: 26, vac_used: 0, sick_days: 0, late_count: 0,
+        soll_stunden: 160, brutto_gehalt: 0, schule_tage: 0,
+        employment_type: selType,
+        birthday: u.regBirthday || null, prob_end: null
       };
 
       const { data: empData, error: empErr } = await sb.from('employees').insert(newEmp).select().single();
@@ -3260,17 +3337,23 @@ async function approveRegistration(userId) {
       });
     }
 
-    // Update user_profile: status='active', location, emp_id linked
+    // Update user_profile: status='active', location, role, name, emp_id linked
+    const newAvatar = selName.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
     const { error: profErr } = await sb.from('user_profiles').update({
       status: 'active',
+      name: selName,
+      role: selRole,
       location: selLoc,
+      avatar: newAvatar,
       emp_id: empId
     }).eq('user_id', userId);
     if (profErr) { toast('Profil-Fehler: ' + profErr.message, 'err'); return; }
 
-    // Update local user data
     u.status = 'active';
+    u.name = selName;
+    u.role = selRole;
     u.location = selLoc;
+    u.avatar = newAvatar;
     u.empId = empId;
 
     addNotif('info', 'Neuer Mitarbeiter', `${u.name} wurde genehmigt und angelegt`);
