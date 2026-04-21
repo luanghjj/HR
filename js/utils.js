@@ -197,7 +197,14 @@ function getVisibleEmps() {
     }
     // Apply UI location filter
     if (currentUser.location === 'all') {
-      return currentLocation === 'all' ? emps : emps.filter(e => empHasLoc(e, currentLocation));
+      if (currentLocation === 'all') return emps;
+      // Filter: employee location matches OR linked user location covers currentLocation
+      return emps.filter(e => {
+        if (empHasLoc(e, currentLocation)) return true;
+        // Check if linked user works at this location (e.g. user.location = 'all')
+        const u = USERS.find(u => u.empId === e.id);
+        return u && empHasLoc(u, currentLocation);
+      });
     }
     return emps.filter(e => empHasLoc(e, currentUser.location));
   }
