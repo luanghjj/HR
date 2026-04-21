@@ -59,17 +59,15 @@ const CHECKLIST_TYPES = [
 // dayOff: day(s) of week closed (0=Sun,1=Mon,...6=Sat)
 // halfDays: day(s) with half-day schedule
 const LOCATION_SCHEDULE = {
-  origami:      { dayOff: [1], halfDays: [6, 0] },  // Mo frei, Sa+So halbtags
-  okyu_central: { dayOff: [0], halfDays: [] },       // So frei
-  enso:         { dayOff: [0], halfDays: [] }         // So frei
+  origami:        { dayOff: [1], halfDays: [6, 0] },  // Mo frei, Sa+So halbtags
+  omoistuttgart:  { dayOff: [1], halfDays: [] }        // Mo frei
 };
 
 // GPS coordinates for each location (used for check-in proximity check)
 // Source: GPS Zeiterfassung SKILL.md – update with real coords via Google Maps
 const GPS_COORDS = {
-  origami:      { lat: 48.77024,    lng: 9.17621,    radius_m: 50 },
-  okyu_central: { lat: 48.7752943,  lng: 9.1724394,  radius_m: 50 },
-  enso:         { lat: 48.7754637,  lng: 9.1818213,  radius_m: 50 }
+  origami:        { lat: 48.77024,   lng: 9.17621,   radius_m: 50 },
+  omoistuttgart:  { lat: 48.7704,    lng: 9.1766,    radius_m: 50 }
 };
 
 /**

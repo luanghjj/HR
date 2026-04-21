@@ -5242,10 +5242,8 @@ function _renderQrCards(domain){
 
   // QR verification keys (security tokens – must match server-side verify-qr function)
   const QR_KEYS = {
-    origami:      { icon: '🏮', key: 'rG3mI7' },
-    okyu_central: { icon: '🍣', key: 'oK4xY9' },
-    okyu:         { icon: '🍣', key: 'oK4xY9' },
-    enso:         { icon: '🔥', key: 'eN5oS2' }
+    origami:        { icon: '🏮', key: 'rG3mI7' },
+    omoistuttgart:  { icon: '🍣', key: 'oM1oI8' }
   };
   const locs = LOCS.filter(l => QR_KEYS[l.id]).map(l => ({
     id: l.id, name: l.name, city: l.city || '',

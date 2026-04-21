@@ -148,9 +148,9 @@ async function doLogin() {
     document.getElementById('userAvatar').textContent = currentUser.avatar;
 
     buildSidebar();
-    buildLocationSelect();
     showLoading('Daten werden geladen...');
     await loadDataFromSupabase();
+    buildLocationSelect();
     hideLoading();
     initApp();
 
@@ -292,8 +292,8 @@ async function doLoginDemo() {
   document.getElementById('userAvatar').textContent = currentUser.avatar;
 
   buildSidebar();
-  buildLocationSelect();
   await loadDataFromSupabase();
+  buildLocationSelect();
   initApp();
 }
 
@@ -431,9 +431,9 @@ async function checkExistingSession() {
       document.getElementById('userAvatar').textContent = currentUser.avatar;
 
       buildSidebar();
-      buildLocationSelect();
       showLoading('Sitzung wird wiederhergestellt...');
       await loadDataFromSupabase();
+      buildLocationSelect();
       hideLoading();
       initApp();
 
