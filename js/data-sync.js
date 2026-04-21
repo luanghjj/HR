@@ -23,6 +23,7 @@ async function syncEmployee(emp) {
       soll_stunden: emp.sollStunden,
       brutto_gehalt: emp.bruttoGehalt,
       schule_tage: emp.schuleTage,
+      employment_type: emp.employmentType || 'Vollzeit',
       birthday: emp.birthday || null,
       prob_end: emp.probEnd || null
     }).eq('id', emp.id);

@@ -3253,13 +3253,27 @@ async function saveEmpLocPicker(empId) {
   const newLoc = checked.join(',');
   const emp = EMPS.find(e => e.id === empId);
   if (!emp) return;
+
+  // 1. Update local EMPS state
   emp.location = newLoc;
-  syncEmployeeField(empId, 'location', newLoc);
+
+  // 2. Persist to employees table
+  await syncEmployeeField(empId, 'location', newLoc);
+
+  // 3. Also sync linked user_profile location (keep in sync)
+  const linkedUser = USERS.find(u => u.empId === empId);
+  if (linkedUser && linkedUser.location !== 'all') {
+    linkedUser.location = newLoc;
+    try {
+      await sb.from('user_profiles').update({ location: newLoc }).eq('user_id', linkedUser.id);
+      console.log('[Sync] ✓ user_profile location synced:', linkedUser.name, '→', newLoc);
+    } catch (e) { console.warn('[Sync] user_profile location sync failed:', e.message); }
+  }
+
   const locLabel = checked.map(l => getLocationName(l)).join(', ');
   toast(`${emp.name} → ${locLabel}`, 'success');
   document.getElementById('empLocPickerPopup').remove();
-  viewEmp(empId); // refresh modal
-  renderEmployees();
+  renderEmployees(); // refresh list without reopening modal
 }
 
 async function approveRegistration(userId) {
@@ -3320,18 +3334,20 @@ async function approveRegistration(userId) {
       if (empErr) { toast('Fehler: ' + empErr.message, 'err'); return; }
       empId = empData.id;
 
+      const selAvatar = selName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
       EMPS.push({
         id: empData.id,
-        name: u.name,
+        name: selName,
         location: selLoc,
         dept: selDept,
         position: selPos,
         status: 'active',
         start: isoDate(new Date()),
-        avatar: u.avatar,
+        avatar: selAvatar,
         vacTotal: 26, vacUsed: 0,
         sickDays: 0, lateCount: 0,
         sollStunden: 160, bruttoGehalt: 0, schuleTage: 0,
+        employmentType: selType,
         birthday: u.regBirthday || '',
         probEnd: ''
       });
