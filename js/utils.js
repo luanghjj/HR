@@ -33,9 +33,15 @@ function getISOWeek(date) {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
-/** Get location name by ID */
+/** Get location name by ID – supports comma-separated multi-location */
 function getLocationName(locationId) {
-  return LOCS.find(l => l.id === locationId)?.name || locationId;
+  if (!locationId) return '—';
+  if (locationId === 'all') return 'Alle Standorte';
+  // Multi-location: join names
+  return locationId.split(',').map(id => {
+    const l = LOCS.find(l => l.id === id.trim());
+    return l ? l.name : id.trim();
+  }).join(', ');
 }
 
 /** Map department name to CSS class */

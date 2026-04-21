@@ -1233,7 +1233,18 @@ function viewEmp(id){
       <div class="form-group"><div class="form-label">Position</div>
         <input class="form-input" value="${e.position}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'position',this.value)"`:''}></div>
       <div class="form-group"><div class="form-label">Standort</div>
-        <select class="form-select" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'location',this.value)"`:''}>${locOpts.map(l=>`<option value="${l.id}" ${l.id===e.location?'selected':''}>${l.name}</option>`).join('')}</select></div>
+        ${canEdit
+          ? (() => {
+              const eLocs = (e.location || '').split(',').map(l => l.trim()).filter(Boolean);
+              const isAllL = eLocs.includes('all');
+              const tags = isAllL
+                ? '<span style="font-size:.72rem;background:rgba(217,119,6,.1);color:#d97706;padding:2px 8px;border-radius:8px">Alle</span>'
+                : eLocs.map(lid => `<span style="font-size:.72rem;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:8px;margin:1px 2px">${getLocationName(lid)}</span>`).join('');
+              return `<div style="cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:7px 10px;min-height:36px" onclick="openEmpLocPicker(${e.id})" title="Klicke zum Ändern">${tags}</div>`;
+            })()
+          : `<div style="padding:7px 0;color:var(--text-muted)">${getLocationName(e.location)}</div>`
+        }
+      </div>
       <div class="form-group"><div class="form-label">Bereich</div>
         <select class="form-select" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'dept',this.value)"`:''}>${deptOpts.map(d=>`<option ${d===e.dept?'selected':''}>${d}</option>`).join('')}</select></div>
       <div class="form-group"><div class="form-label">Eintritt</div>${formatDateDE(e.start)}</div>
@@ -3127,6 +3138,52 @@ async function saveLocPicker(userId) {
   await changeUserLocation(userId, newLoc);
   document.getElementById('locPickerPopup').remove();
   renderAccess();
+}
+
+// ═══ Employee Location Picker (for viewEmp modal) ═══
+function openEmpLocPicker(empId) {
+  const emp = EMPS.find(e => e.id === empId);
+  if (!emp) return;
+  const currentLocs = (emp.location || '').split(',').map(l => l.trim()).filter(Boolean);
+  const isAllSelected = currentLocs.includes('all');
+  document.getElementById('empLocPickerPopup')?.remove();
+  const popup = document.createElement('div');
+  popup.id = 'empLocPickerPopup';
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  popup.onclick = (e) => { if (e.target === popup) popup.remove(); };
+  popup.innerHTML = `<div style="background:var(--bg-card);border-radius:20px;padding:24px;width:340px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-size:.95rem;font-weight:700;margin:0">📍 Standorte — ${emp.name}</h3>
+      <button onclick="document.getElementById('empLocPickerPopup').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted);padding:4px">&times;</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${LOCS.map(l => `<label style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;cursor:pointer;border:1px solid var(--border);font-size:.85rem;font-weight:500;transition:.15s" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
+        <input type="checkbox" class="empLocPickerCb" value="${l.id}" ${currentLocs.includes(l.id)?'checked':''} style="width:16px;height:16px;accent-color:var(--accent)">
+        ${l.name}
+      </label>`).join('')}
+    </div>
+    <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-sm" onclick="document.getElementById('empLocPickerPopup').remove()">Abbrechen</button>
+      <button class="btn btn-sm btn-primary" onclick="saveEmpLocPicker(${empId})">Speichern</button>
+    </div>
+  </div>`;
+  document.body.appendChild(popup);
+}
+
+async function saveEmpLocPicker(empId) {
+  const allCbs = [...document.querySelectorAll('.empLocPickerCb')];
+  const checked = allCbs.filter(cb => cb.checked).map(cb => cb.value);
+  if (checked.length === 0) { toast('Mindestens einen Standort wählen', 'err'); return; }
+  const newLoc = checked.join(',');
+  const emp = EMPS.find(e => e.id === empId);
+  if (!emp) return;
+  emp.location = newLoc;
+  syncEmployeeField(empId, 'location', newLoc);
+  const locLabel = checked.map(l => getLocationName(l)).join(', ');
+  toast(`${emp.name} → ${locLabel}`, 'success');
+  document.getElementById('empLocPickerPopup').remove();
+  viewEmp(empId); // refresh modal
+  renderEmployees();
 }
 
 async function approveRegistration(userId) {
