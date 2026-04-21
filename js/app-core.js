@@ -2689,9 +2689,13 @@ function renderAccess(){
     pendingHtml += '</div></div>';
   }
 
-  // Active users — sort
+  // Active users — filter by location + exclude pending
   const pendingIds = new Set(pending.map(u => u.id));
-  const activeUsers = USERS.filter(u => !pendingIds.has(u.id));
+  let activeUsers = USERS.filter(u => !pendingIds.has(u.id));
+  // Apply location filter from dropdown
+  if (currentLocation !== 'all') {
+    activeUsers = activeUsers.filter(u => u.location === currentLocation || u.location === 'all');
+  }
   activeUsers.sort((a, b) => {
     if (accessSort === 'location') {
       const locA = getLocationName(a.location);
