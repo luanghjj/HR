@@ -2016,7 +2016,7 @@ function renderDepts(){
   if(!depts.length) html+=`<div class="dept-empty"><span class="ms">domain</span><p>Keine Bereiche gefunden.</p></div>`;
 
   depts.forEach(dept=>{
-    const deptEmps=EMPS.filter(e=>e.dept===dept.name&&e.location===dept.location);
+    const deptEmps=EMPS.filter(e=>e.dept===dept.name&&empHasLoc(e,dept.location));
     const activeCount=deptEmps.filter(e=>e.status==='active').length;
     const sickCount=deptEmps.filter(e=>e.status==='sick').length;
     const vacCount=deptEmps.filter(e=>e.status==='vacation').length;
@@ -2115,10 +2115,10 @@ function renderDepts(){
   html+=`</div>`;
 
   if(isAdmin && depts.length){
-    const allEmps=EMPS.filter(e=>depts.some(d=>d.name===e.dept&&d.location===e.location));
+    const allEmps=EMPS.filter(e=>depts.some(d=>d.name===e.dept&&empHasLoc(e,d.location)));
     const totalCostAll=allEmps.reduce((s,e)=>s+e.bruttoGehalt,0);
     const avgPct=depts.length>0?Math.round(depts.map(d=>{
-      const de=EMPS.filter(e=>e.dept===d.name&&e.location===d.location);
+      const de=EMPS.filter(e=>e.dept===d.name&&empHasLoc(e,d.location));
       const th=de.reduce((s,e)=>s+calcPlanHours(e.id),0);
       const sh=de.reduce((s,e)=>s+e.sollStunden,0);
       return sh>0?th/sh*100:0;
@@ -2694,7 +2694,7 @@ function renderAccess(){
   let activeUsers = USERS.filter(u => !pendingIds.has(u.id));
   // Apply location filter from dropdown
   if (currentLocation !== 'all') {
-    activeUsers = activeUsers.filter(u => u.location === currentLocation || u.location === 'all');
+    activeUsers = activeUsers.filter(u => empHasLoc(u, currentLocation));
   }
   activeUsers.sort((a, b) => {
     if (accessSort === 'location') {
@@ -2712,9 +2712,15 @@ function renderAccess(){
     const roleSelect = `<select class="form-select" style="min-width:120px" onchange="changeUserRole('${u.id}',this.value)">
       ${roleOpts.map(r => `<option value="${r}" ${u.role===r?'selected':''}>${r==='inhaber'?'👑 Inhaber':r==='manager'?'🏢 Manager':r==='mitarbeiter'?'👤 Mitarbeiter':'🎓 Azubi'}</option>`).join('')}
     </select>`;
-    const locSelect = `<select class="form-select" style="min-width:140px" onchange="changeUserLocation('${u.id}',this.value)">
-      ${locOpts.map(l => `<option value="${l.id}" ${u.location===l.id?'selected':''}>${l.name}</option>`).join('')}
-    </select>`;
+    // Location – multi-value tags (like dept)
+    const userLocs = (u.location || '').split(',').map(l => l.trim()).filter(Boolean);
+    const isAllLoc = userLocs.includes('all');
+    const locTags = isAllLoc
+      ? '<span style="display:inline-block;font-size:.7rem;font-weight:700;background:rgba(217,119,6,.1);color:#d97706;padding:3px 10px;border-radius:10px">Alle</span>'
+      : userLocs.length > 0
+        ? userLocs.map(lid => `<span style="display:inline-block;font-size:.7rem;font-weight:600;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:10px;margin:1px 2px">${getLocationName(lid)}</span>`).join('')
+        : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
+    const locCell = `<div style="cursor:pointer;min-width:120px" onclick="openLocPicker('${u.id}')" title="Klicke zum Ändern">${locTags}</div>`;
     const empDepts = emp ? (emp.dept || '').split(',').map(d => d.trim()).filter(Boolean) : [];
     const isAlle = empDepts.includes('Alle');
     const deptTags = emp ? (isAlle
@@ -2740,7 +2746,7 @@ function renderAccess(){
       <td><input class="form-input" style="width:140px;font-size:.82rem" value="${emp?.position||u.regPosition||''}" placeholder="Position..." onblur="changeUserPosition('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></td>
       <td>${deptCell}</td>
       <td>${roleSelect}</td>
-      <td>${locSelect}</td>
+      <td>${locCell}</td>
       <td>${statusBadge(u.status)}</td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-sm" onclick="openPermissionsModal('${u.id}')" title="Berechtigungen"><span class="ms" style="font-size:16px">shield_person</span></button>
@@ -2938,10 +2944,20 @@ async function changeUserLocation(userId, newLoc) {
   const u = USERS.find(x => x.id === userId);
   if (!u) return;
   u.location = newLoc;
+  // Sync to linked employee too
+  if (u.empId) {
+    const emp = EMPS.find(e => e.id === u.empId);
+    if (emp) {
+      emp.location = newLoc;
+      syncEmployeeField(emp.id, 'location', newLoc);
+    }
+  }
   try {
     const { error } = await sb.from('user_profiles').update({ location: newLoc }).eq('user_id', userId);
     if (error) { toast('Fehler: ' + error.message, 'err'); return; }
-    toast(`${u.name} → ${newLoc === 'all' ? 'Alle' : getLocationName(newLoc)}`, 'success');
+    const locLabel = newLoc === 'all' ? 'Alle Standorte'
+      : newLoc.split(',').map(l => getLocationName(l.trim())).join(', ');
+    toast(`${u.name} → ${locLabel}`, 'success');
     console.log('[Sync] ✓ Location updated:', u.name, '→', newLoc);
   } catch (e) { toast('Sync-Fehler', 'err'); }
 }
@@ -3054,6 +3070,62 @@ function saveDeptPicker(userId) {
   const newDept = checked.length === allCbs.length ? 'Alle' : checked.join(', ');
   changeUserDept(userId, newDept);
   document.getElementById('deptPickerPopup').remove();
+  renderAccess();
+}
+
+// ═══ Location Picker (multi-location like dept) ═══
+function openLocPicker(userId) {
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+  const currentLocs = (u.location || '').split(',').map(l => l.trim()).filter(Boolean);
+  const isAllSelected = currentLocs.includes('all');
+  document.getElementById('locPickerPopup')?.remove();
+  const popup = document.createElement('div');
+  popup.id = 'locPickerPopup';
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  popup.onclick = (e) => { if (e.target === popup) popup.remove(); };
+  popup.innerHTML = `<div style="background:var(--bg-card);border-radius:20px;padding:24px;width:340px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="font-size:.95rem;font-weight:700;margin:0">📍 Standorte — ${u.name}</h3>
+      <button onclick="document.getElementById('locPickerPopup').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted);padding:4px">&times;</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;cursor:pointer;border:2px solid var(--accent);background:rgba(99,102,241,.05);font-size:.85rem;font-weight:700;color:var(--accent)">
+        <input type="checkbox" id="locPickerAlle" ${isAllSelected?'checked':''} onchange="toggleAllLocs(this.checked)" style="width:18px;height:18px;accent-color:var(--accent)">
+        Alle Standorte
+      </label>
+      <div style="height:1px;background:var(--border);margin:4px 0"></div>
+      ${LOCS.map(l => `<label style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:10px;cursor:pointer;border:1px solid var(--border);font-size:.85rem;font-weight:500;transition:.15s" onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
+        <input type="checkbox" class="locPickerCb" value="${l.id}" ${isAllSelected || currentLocs.includes(l.id)?'checked':''} onchange="syncAlleLocCheckbox()" style="width:16px;height:16px;accent-color:var(--accent)">
+        ${l.name}
+      </label>`).join('')}
+    </div>
+    <div style="margin-top:18px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-sm" onclick="document.getElementById('locPickerPopup').remove()">Abbrechen</button>
+      <button class="btn btn-sm btn-primary" onclick="saveLocPicker('${userId}')">Speichern</button>
+    </div>
+  </div>`;
+  document.body.appendChild(popup);
+}
+
+function toggleAllLocs(checked) {
+  document.querySelectorAll('.locPickerCb').forEach(cb => cb.checked = checked);
+}
+
+function syncAlleLocCheckbox() {
+  const allCbs = document.querySelectorAll('.locPickerCb');
+  const allChecked = [...allCbs].every(cb => cb.checked);
+  const alleBox = document.getElementById('locPickerAlle');
+  if (alleBox) alleBox.checked = allChecked;
+}
+
+async function saveLocPicker(userId) {
+  const allCbs = [...document.querySelectorAll('.locPickerCb')];
+  const checked = allCbs.filter(cb => cb.checked).map(cb => cb.value);
+  if (checked.length === 0) { toast('Mindestens einen Standort wählen', 'err'); return; }
+  const newLoc = checked.length === allCbs.length ? 'all' : checked.join(',');
+  await changeUserLocation(userId, newLoc);
+  document.getElementById('locPickerPopup').remove();
   renderAccess();
 }
 
@@ -3883,7 +3955,7 @@ function applySavedTemplate(){
   const tmpl=SAVED_TEMPLATES.find(t=>t.id===parseInt(sel.value));
   if(!tmpl){return;}
   const weekS=getWeekStart(scheduleDate);
-  const empsInLoc=EMPS.filter(e=>e.location===tmpl.location&&e.status==='active');
+  const empsInLoc=EMPS.filter(e=>empHasLoc(e,tmpl.location)&&e.status==='active');
   let count=0;
   for(let d=0;d<7;d++){
     const day=new Date(weekS);day.setDate(day.getDate()+d);const ds=isoDate(day);
@@ -5002,7 +5074,7 @@ function renderLocations(){
   const locs = LOCS || [];
 
   let rows = locs.map(l => {
-    const empCount = EMPS.filter(e => e.location === l.id).length;
+    const empCount = EMPS.filter(e => empHasLoc(e, l.id)).length;
     const gps = GPS_COORDS[l.id];
     const sched = LOCATION_SCHEDULE[l.id];
     const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
@@ -5167,7 +5239,7 @@ async function saveEditLocation(locId){
 async function deleteLocation(locId){
   const loc = LOCS.find(l => l.id === locId);
   if(!loc) return;
-  const empCount = EMPS.filter(e => e.location === locId).length;
+  const empCount = EMPS.filter(e => empHasLoc(e, locId)).length;
   if(empCount > 0){ toast('Kann nicht gelöscht werden — ' + empCount + ' Mitarbeiter zugeordnet.','err'); return; }
   if(!confirm('Standort "' + loc.name + '" wirklich löschen?')) return;
 

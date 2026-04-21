@@ -165,6 +165,21 @@ function _isLocAllowed(loc) {
   return locs.includes(loc);
 }
 
+/** Check if entity's location(s) overlap with a location filter
+ *  Supports comma-separated multi-location (like dept)
+ *  @param {object} entity - Object with .location property
+ *  @param {string|string[]} locFilter - Single ID, comma-separated IDs, array, or 'all'
+ *  @returns {boolean}
+ */
+function empHasLoc(entity, locFilter) {
+  if (!entity?.location) return false;
+  if (entity.location === 'all' || locFilter === 'all') return true;
+  const eLocs = entity.location.split(',').map(l => l.trim());
+  if (Array.isArray(locFilter)) return eLocs.some(el => locFilter.includes(el));
+  const fLocs = locFilter.split(',').map(l => l.trim());
+  return eLocs.some(el => fLocs.includes(el));
+}
+
 /** Get employees visible to current user */
 function getVisibleEmps() {
   if (can('seeAllEmployees')) {
@@ -172,13 +187,13 @@ function getVisibleEmps() {
     // Apply custom location restriction
     const locs = currentUser?._allowedLocations;
     if (locs && !locs.includes('all')) {
-      emps = emps.filter(e => locs.includes(e.location));
+      emps = emps.filter(e => empHasLoc(e, locs));
     }
     // Apply UI location filter
     if (currentUser.location === 'all') {
-      return currentLocation === 'all' ? emps : emps.filter(e => e.location === currentLocation);
+      return currentLocation === 'all' ? emps : emps.filter(e => empHasLoc(e, currentLocation));
     }
-    return emps.filter(e => e.location === currentUser.location);
+    return emps.filter(e => empHasLoc(e, currentUser.location));
   }
   return EMPS.filter(e => e.id === currentUser.empId);
 }
@@ -189,12 +204,12 @@ function getVisibleVacs() {
     let vacs = VACS;
     const locs = currentUser?._allowedLocations;
     if (locs && !locs.includes('all')) {
-      vacs = vacs.filter(v => locs.includes(v.location));
+      vacs = vacs.filter(v => empHasLoc(v, locs));
     }
     if (currentUser.location === 'all') {
-      return currentLocation === 'all' ? vacs : vacs.filter(v => v.location === currentLocation);
+      return currentLocation === 'all' ? vacs : vacs.filter(v => empHasLoc(v, currentLocation));
     }
-    return vacs.filter(v => v.location === currentUser.location);
+    return vacs.filter(v => empHasLoc(v, currentUser.location));
   }
   return VACS.filter(v => v.empId === currentUser.empId);
 }
@@ -205,12 +220,12 @@ function getVisibleSicks() {
     let sicks = SICKS;
     const locs = currentUser?._allowedLocations;
     if (locs && !locs.includes('all')) {
-      sicks = sicks.filter(s => locs.includes(s.location));
+      sicks = sicks.filter(s => empHasLoc(s, locs));
     }
     if (currentUser.location === 'all') {
-      return currentLocation === 'all' ? sicks : sicks.filter(s => s.location === currentLocation);
+      return currentLocation === 'all' ? sicks : sicks.filter(s => empHasLoc(s, currentLocation));
     }
-    return sicks.filter(s => s.location === currentUser.location);
+    return sicks.filter(s => empHasLoc(s, currentUser.location));
   }
   return SICKS.filter(s => s.empId === currentUser.empId);
 }
@@ -221,17 +236,17 @@ function getVisibleShifts() {
     let shifts = SHIFTS;
     const locs = currentUser?._allowedLocations;
     if (locs && !locs.includes('all')) {
-      shifts = shifts.filter(s => locs.includes(s.location));
+      shifts = shifts.filter(s => empHasLoc(s, locs));
     }
     if (currentUser.location === 'all') {
-      return currentLocation === 'all' ? shifts : shifts.filter(s => s.location === currentLocation);
+      return currentLocation === 'all' ? shifts : shifts.filter(s => empHasLoc(s, currentLocation));
     }
-    return shifts.filter(s => s.location === currentUser.location);
+    return shifts.filter(s => empHasLoc(s, currentUser.location));
   }
   const me = EMPS.find(e => e.id === currentUser.empId);
   if (!me) return [];
   const myDepts = (me.dept || '').split(',').map(d => d.trim()).filter(Boolean);
-  return SHIFTS.filter(s => s.location === me.location && myDepts.some(d => d === 'Alle' || d === s.dept));
+  return SHIFTS.filter(s => empHasLoc(s, me.location) && myDepts.some(d => d === 'Alle' || d === s.dept));
 }
 
 /** Get documents visible to current user */
@@ -243,7 +258,7 @@ function getVisibleDocs() {
     if (!locationFilter) return DOCS;
     return DOCS.filter(d => {
       const emp = EMPS.find(x => x.id === d.empId);
-      return emp && emp.location === locationFilter;
+      return emp && empHasLoc(emp, locationFilter);
     });
   }
   return DOCS.filter(d => d.empId === currentUser.empId);
