@@ -1674,7 +1674,7 @@ async function zeDownloadTagPDF(empId) {
     if(!window.jspdf) { toast('jsPDF-Bibliothek nicht geladen.','err'); return; }
     const {jsPDF} = window.jspdf;
     const doc = new jsPDF({unit:'mm', format:'a4'});
-    const locName = LOCS.find(l=>l.id===e.location)?.name || e.location;
+    const locName = getLocationName(e.location);
     const parts = e.name.split(' ');
     const zeName = parts.length>=2 ? parts[parts.length-1]+', '+parts.slice(0,-1).join(' ') : e.name;
 
@@ -1850,7 +1850,7 @@ async function zeDownloadGesamtPDF(empId) {
     if(!window.jspdf) { toast('jsPDF-Bibliothek nicht geladen.','err'); return; }
     const {jsPDF} = window.jspdf;
     const doc = new jsPDF({unit:'mm', format:'a4'});
-    const locName = LOCS.find(l=>l.id===e.location)?.name || e.location;
+    const locName = getLocationName(e.location);
     const parts = e.name.split(' ');
     const zeName = parts.length>=2 ? parts[parts.length-1]+', '+parts.slice(0,-1).join(' ') : e.name;
     const sollMonat = e.spiSoll || 160;
@@ -2010,7 +2010,7 @@ function saveLate(empId){const e=EMPS.find(x=>x.id===empId);const m=parseInt(doc
 function renderDepts(){
   const pg=document.getElementById('page-departments');
   if(!can('seeAllEmployees')){pg.innerHTML=permBanner('Bereichsübersicht ist nur für Manager und Inhaber verfügbar.');return;}
-  const depts=currentUser.location==='all'?(currentLocation==='all'?DEPTS:DEPTS.filter(d=>d.location===currentLocation)):DEPTS.filter(d=>d.location===currentUser.location);
+  const _uLoc=currentUser.location;const _isAll=_uLoc==='all';const depts=_isAll?(currentLocation==='all'?DEPTS:DEPTS.filter(d=>d.location===currentLocation)):DEPTS.filter(d=>empHasLoc({location:d.location},_uLoc));
   const isAdmin=can('seeFinancials');
   const today=isoDate(new Date());
 
@@ -3740,7 +3740,8 @@ function openModal(type, bodyHtml, footerHtml){
   if(type==='addEmployee'){
     t.textContent='Neuen Mitarbeiter';
     const adm=can('seeFinancials');
-    b.innerHTML=`<div class="form-grid"><div class="form-group"><label class="form-label">Vorname</label><input class="form-input" id="mF"></div><div class="form-group"><label class="form-label">Nachname</label><input class="form-input" id="mL"></div><div class="form-group"><label class="form-label">Standort</label><select class="form-select" id="mLoc">${LOCS.map(l=>`<option value="${l.id}"${l.id===currentUser.location?' selected':''}>${l.name}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Bereich</label><select class="form-select" id="mDpt">${[...new Set(DEPTS.map(d=>d.name))].sort().map(d=>`<option>${d}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Position</label><input class="form-input" id="mPos"></div><div class="form-group"><label class="form-label">Geburtstag</label><input class="form-input" type="date" id="mBday"></div><div class="form-group"><label class="form-label">Urlaubstage / Jahr</label><input class="form-input" type="number" id="mVT" value="26"></div>
+    const _defLoc=currentLocation!=='all'?currentLocation:(currentUser.location!=='all'?currentUser.location.split(',')[0]:'');
+    b.innerHTML=`<div class="form-grid"><div class="form-group"><label class="form-label">Vorname</label><input class="form-input" id="mF"></div><div class="form-group"><label class="form-label">Nachname</label><input class="form-input" id="mL"></div><div class="form-group"><label class="form-label">Standort</label><select class="form-select" id="mLoc">${LOCS.map(l=>`<option value="${l.id}"${l.id===_defLoc?' selected':''}>${l.name}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Bereich</label><select class="form-select" id="mDpt">${[...new Set(DEPTS.map(d=>d.name))].sort().map(d=>`<option>${d}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Position</label><input class="form-input" id="mPos"></div><div class="form-group"><label class="form-label">Geburtstag</label><input class="form-input" type="date" id="mBday"></div><div class="form-group"><label class="form-label">Urlaubstage / Jahr</label><input class="form-input" type="number" id="mVT" value="26"></div>
     ${adm?`<div class="form-group"><label class="form-label">Soll-Stunden / Monat</label><input class="form-input" type="number" id="mSollH" value="160"></div>
     <div class="form-group"><label class="form-label">Brutto Gehalt / Monat</label><input class="form-input" type="number" step="0.01" id="mBrutto" value="0"></div>
     <div class="form-group"><label class="form-label">Schule/Fortbildung (Tage/Monat)</label><input class="form-input" type="number" id="mSchule" value="0"></div>`:''}</div>`;
@@ -3842,7 +3843,7 @@ function openModal(type, bodyHtml, footerHtml){
   } else if(type==='saveTemplate'){
     openSaveTemplateModal();return;
   } else if(type==='addChecklist'){
-    const emps=getVisibleEmps();const loc=currentUser.location==='all'?currentLocation:currentUser.location;
+    const emps=getVisibleEmps();const loc=currentLocation!=='all'?currentLocation:(currentUser.location!=='all'?currentUser.location.split(',')[0]:LOCS[0]?.id||'');
     t.textContent='Neue Checkliste erstellen';
     b.innerHTML=`<div class="form-grid">
       <div class="form-group"><label class="form-label">Typ</label><select class="form-select" id="mCLType">${CHECKLIST_TYPES.map(ct=>`<option value="${ct.id}">${ct.icon} ${ct.name}</option>`).join('')}</select></div>
@@ -4131,7 +4132,7 @@ function applySavedTemplate(){
 }
 
 function openSaveTemplateModal(){
-  const loc=currentUser.location==='all'?currentLocation:currentUser.location;
+  const loc=currentLocation!=='all'?currentLocation:(currentUser.location!=='all'?currentUser.location.split(',')[0]:LOCS[0]?.id||'');
   if(loc==='all'){toast('Bitte zuerst einen Standort wählen.','err');return;}
   document.getElementById('modalTitle').textContent='Wochenplan als Vorlage speichern';
   document.getElementById('modalBody').innerHTML=`<div class="form-grid">
@@ -4145,7 +4146,7 @@ function openSaveTemplateModal(){
 function doSaveTemplate(loc){
   const name=document.getElementById('mTName').value.trim();if(!name)return;
   const weekS=getWeekStart(scheduleDate);const weekE=new Date(weekS);weekE.setDate(weekE.getDate()+6);
-  const wShifts=SHIFTS.filter(s=>s.location===loc&&new Date(s.date)>=weekS&&new Date(s.date)<=weekE&&!s.isSick&&!s.isVacation);
+  const wShifts=SHIFTS.filter(s=>empHasLoc(s,loc)&&new Date(s.date)>=weekS&&new Date(s.date)<=weekE&&!s.isSick&&!s.isVacation);
   const patterns=[];const seen=new Set();
   wShifts.forEach(s=>{const key=s.dept+s.from+s.to;if(!seen.has(key)){seen.add(key);patterns.push({dept:s.dept,from:s.from,to:s.to,label:s.label});}});
   SAVED_TEMPLATES.push({id:Date.now(),location:loc,name,shifts:patterns});
@@ -4650,7 +4651,7 @@ function renderChecklists(){
   const isEmp=currentUser.role==='mitarbeiter';
   let cls=CHECKLISTS;
   if(isEmp){cls=cls.filter(c=>c.empId===currentUser.empId||c.empId===0);}
-  else{const loc=currentUser.location==='all'?(currentLocation==='all'?null:currentLocation):currentUser.location;if(loc)cls=cls.filter(c=>c.location===loc);}
+  else{const loc=currentUser.location==='all'?(currentLocation==='all'?null:currentLocation):currentUser.location;if(loc)cls=cls.filter(c=>empHasLoc(c,loc));}
 
   const banner=isEmp?permBanner('Du siehst nur deine eigenen und allgemeinen Checklisten.'):'';
 
