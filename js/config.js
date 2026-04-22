@@ -77,7 +77,19 @@ const GPS_COORDS = {
 function getVacTypeForDate(dateStr, locationId) {
   const d = new Date(dateStr);
   const dow = d.getDay(); // 0=Sun...6=Sat
-  const sched = LOCATION_SCHEDULE[locationId] || { dayOff: [0], halfDays: [] };
+  // Resolve multi-location: use first matching schedule, or currentLocation
+  let resolvedLoc = locationId;
+  if (!locationId || locationId === 'all') {
+    resolvedLoc = (typeof currentLocation !== 'undefined' && currentLocation !== 'all') ? currentLocation : '';
+  } else if (locationId.includes(',')) {
+    // Multi-loc: use currentLocation if set, else first in list
+    if (typeof currentLocation !== 'undefined' && currentLocation !== 'all') {
+      resolvedLoc = currentLocation;
+    } else {
+      resolvedLoc = locationId.split(',')[0].trim();
+    }
+  }
+  const sched = LOCATION_SCHEDULE[resolvedLoc] || { dayOff: [0], halfDays: [] };
   if (sched.dayOff.includes(dow)) return null;     // closed day → skip
   if (sched.halfDays.includes(dow)) return 'A';     // half day
   return 'B';                                        // full day
