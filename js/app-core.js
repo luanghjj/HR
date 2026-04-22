@@ -2451,7 +2451,7 @@ async function saveQuickShift() {
   try {
     const { data, error } = await sb.from('shifts').insert({
       emp_id: emp.id, emp_name: emp.name, dept: emp.dept, location: emp.location,
-      date, time_from: from, time_to: to, label, color_class: newShift.colorClass,
+      shift_date: date, shift_from: from, shift_to: to, label, color_class: newShift.colorClass,
       is_sick: false, is_vacation: false, is_late: false, vac_half: false
     }).select().single();
     if (error) { toast('Fehler: ' + error.message, 'err'); return; }
