@@ -1776,12 +1776,15 @@ async function zeDownloadTagPDF(empId) {
         doc.text(d.dauer || '', colX[4]+1, y+3.5);
         doc.text(wt, colX[7]+1, y+3.5);
         if(d.ist_stunden) totalMinutes += Math.round(d.ist_stunden * 60);
-      } else if(dateObj.getDay() === 0) {
-        // Sunday
-        doc.text('So Ruhetag', colX[7]+1, y+3.5);
       } else {
-        // No data
-        doc.text(wt, colX[7]+1, y+3.5);
+        // Check if Ruhetag based on employee's location schedule
+        const empLocId = e.location || '';
+        const isRuhe = !getVacTypeForDate(dateStr, empLocId);
+        if (isRuhe) {
+          doc.text('Ruhetag', colX[7]+1, y+3.5);
+        } else {
+          doc.text(wt, colX[7]+1, y+3.5);
+        }
       }
 
       y += rowH;
@@ -5283,7 +5286,7 @@ function showAddLocationModal(){
     <div class="form-group"><label>Ruhetage</label>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
         ${['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'].map((d,i) => `<label style="display:flex;align-items:center;gap:4px;font-size:.85rem;cursor:pointer">
-          <input type="checkbox" class="newDayOff" value="${i}" ${i===0?'checked':''}>
+          <input type="checkbox" class="newDayOff" value="${i}">
           ${d}
         </label>`).join('')}
       </div>
@@ -5326,7 +5329,7 @@ function editLocation(locId){
   const loc = LOCS.find(l => l.id === locId);
   if(!loc) return;
   const gps = GPS_COORDS[locId] || { lat: '', lng: '', radius_m: 50 };
-  const sched = LOCATION_SCHEDULE[locId] || { dayOff: [0], halfDays: [] };
+  const sched = LOCATION_SCHEDULE[locId] || { dayOff: [], halfDays: [] };
   const dayNames = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 
   openModal('Standort bearbeiten: ' + loc.name, `

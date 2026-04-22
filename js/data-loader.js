@@ -51,7 +51,7 @@ async function loadDataFromSupabase() {
           GPS_COORDS[l.id] = { lat, lng, radius_m: radius };
         }
         // Sync LOCATION_SCHEDULE from DB
-        const dbDayOff = Array.isArray(l.day_off) ? l.day_off : LOCATION_SCHEDULE[l.id]?.dayOff || [0];
+        const dbDayOff = Array.isArray(l.day_off) ? l.day_off : LOCATION_SCHEDULE[l.id]?.dayOff || [];
         const dbHalfDays = Array.isArray(l.half_days) ? l.half_days : LOCATION_SCHEDULE[l.id]?.halfDays || [];
         LOCATION_SCHEDULE[l.id] = { dayOff: dbDayOff, halfDays: dbHalfDays };
       });

@@ -67,7 +67,7 @@ const LOCATION_SCHEDULE = {
 // Source: GPS Zeiterfassung SKILL.md – update with real coords via Google Maps
 const GPS_COORDS = {
   origami:        { lat: 48.77024,   lng: 9.17621,   radius_m: 50 },
-  omoistuttgart:  { lat: 48.7704,    lng: 9.1766,    radius_m: 50 }
+  omoistuttgart:  { lat: 48.7704374,  lng: 9.1766313,  radius_m: 50 }
 };
 
 /**
@@ -89,7 +89,7 @@ function getVacTypeForDate(dateStr, locationId) {
       resolvedLoc = locationId.split(',')[0].trim();
     }
   }
-  const sched = LOCATION_SCHEDULE[resolvedLoc] || { dayOff: [0], halfDays: [] };
+  const sched = LOCATION_SCHEDULE[resolvedLoc] || { dayOff: [], halfDays: [] };
   if (sched.dayOff.includes(dow)) return null;     // closed day → skip
   if (sched.halfDays.includes(dow)) return 'A';     // half day
   return 'B';                                        // full day
