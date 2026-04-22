@@ -4,7 +4,7 @@
 
 let LOCS = [
   { id: 'origami',       name: 'Origami Sushi & Asian Cuisine', city: 'Stuttgart' },
-  { id: 'omoistuttgart', name: 'OM·O·I',                        city: 'Stuttgart' }
+  { id: 'omoistuttgart', name: 'O·MO·I Café',                     city: 'Stuttgart' }
 ];
 
 const DEPTS = [
