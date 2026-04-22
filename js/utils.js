@@ -201,18 +201,9 @@ function getVisibleEmps() {
       return emps.filter(e => {
         // Employee's own location matches
         if (empHasLoc(e, currentLocation)) return true;
-        // Linked user has access to this location (e.g. Inhaber with 'all')
+        // Linked user has access (e.g. Inhaber with location='all')
         const u = USERS.find(u => u.empId === e.id);
-        if (u && empHasLoc(u, currentLocation)) {
-          // Auto-fix: sync employee.location to match user.location
-          if (e.location !== u.location) {
-            e.location = u.location;
-            if (typeof syncEmployeeField === 'function') syncEmployeeField(e.id, 'location', u.location);
-            console.log('[AutoSync] employee.location fixed:', e.name, '→', u.location);
-          }
-          return true;
-        }
-        return false;
+        return u && empHasLoc(u, currentLocation);
       });
     }
     return emps.filter(e => empHasLoc(e, currentUser.location));

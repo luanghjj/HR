@@ -2984,8 +2984,8 @@ async function changeUserLocation(userId, newLoc) {
   const u = USERS.find(x => x.id === userId);
   if (!u) return;
   u.location = newLoc;
-  // Sync to linked employee too
-  if (u.empId) {
+  // Sync to linked employee (skip 'all' — employees.location has FK to locations table)
+  if (u.empId && newLoc !== 'all') {
     const emp = EMPS.find(e => e.id === u.empId);
     if (emp) {
       emp.location = newLoc;
