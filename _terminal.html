@@ -220,12 +220,31 @@ const sb = supabase.createClient(SB_URL, SB_KEY);
 let currentLoc = null;
 let refreshInterval = null;
 let clockInterval = null;
-
-const LOC_NAMES = {
-  origami: 'Origami Sushi & Asian Cuisine',
-  enso: 'Enso Sushi & Grill',
-  okyu_central: 'OKYU Zentrale'
+let LOC_NAMES = {};
+const LOC_ICONS = {
+  origami: '🍣', omoistuttgart: '☕', enso: '🔥', okyu_central: '🏢'
 };
+
+// Load locations from Supabase and build picker
+(async function loadLocations() {
+  const { data: locs } = await sb.from('locations').select('id, name, city');
+  if (locs && locs.length) {
+    locs.forEach(l => { LOC_NAMES[l.id] = l.name; });
+    const grid = document.querySelector('#picker .grid');
+    if (grid) {
+      grid.innerHTML = locs.map(l => `
+        <div onclick="selectLocation('${l.id}')" class="glass-card rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 loc-card-hover group">
+          <div class="text-5xl mb-4 group-hover:scale-110 transition-transform">${LOC_ICONS[l.id] || '🏪'}</div>
+          <div class="font-headline font-bold text-lg text-slate-800 mb-1">${l.name}</div>
+          <div class="text-xs text-slate-400 font-label uppercase tracking-widest">${l.city || ''}</div>
+        </div>
+      `).join('');
+    }
+  }
+  // Auto-select from URL param
+  const urlLoc = new URLSearchParams(window.location.search).get('loc');
+  if (urlLoc && LOC_NAMES[urlLoc]) selectLocation(urlLoc);
+})();
 
 // ─── CLOCK ───
 function updateClock() {
@@ -259,8 +278,13 @@ function goBack() {
 async function loadData() {
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: emps } = await sb.from('employees').select('*')
-    .eq('location', currentLoc).eq('status', 'active');
+  // Fetch employees: match exact, contains in multi-loc, or 'all'
+  const { data: allEmps } = await sb.from('employees').select('*').eq('status', 'active');
+  const emps = (allEmps || []).filter(e => {
+    if (!e.location) return false;
+    if (e.location === 'all' || e.location === currentLoc) return true;
+    return e.location.split(',').map(l => l.trim()).includes(currentLoc);
+  });
 
   const { data: records } = await sb.from('time_records').select('*')
     .eq('location', currentLoc)
@@ -559,9 +583,6 @@ function renderChecklists() {
   container.innerHTML = html;
 }
 
-// ─── URL PARAM ───
-const urlLoc = new URLSearchParams(window.location.search).get('loc');
-if (urlLoc && LOC_NAMES[urlLoc]) selectLocation(urlLoc);
 </script>
 </body>
 </html>
