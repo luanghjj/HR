@@ -1158,11 +1158,19 @@ function renderEmpRows(emps){
         <td><span class="mit-mono">${e.sollStunden}h</span></td>
         <td><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
         <td>
-          <div style="display:flex;flex-direction:column;gap:2px;line-height:1.2">
-            ${(e.bruttoGehalt - (e.barGehalt||0)) > 0 ? `<span style="font-size:.7rem;color:var(--accent)">🏦 ${formatEuro(e.bruttoGehalt - (e.barGehalt||0))}</span>` : ''}
-            ${(e.barGehalt||0) > 0 ? `<span style="font-size:.7rem;color:#b45309">💵 ${formatEuro(e.barGehalt)}</span>` : ''}
-            ${!e.barGehalt && !e.bruttoGehalt ? '<span style="font-size:.7rem;color:var(--text-muted)">—</span>' : ''}
-          </div>
+          ${(() => {
+            const ps = PAY_STATUS_CACHE[e.id];
+            const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
+            const barAmt = e.barGehalt || 0;
+            const dot = (st) => st === 'bezahlt'
+              ? '<span title="Bezahlt" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;margin-left:4px;vertical-align:middle"></span>'
+              : '<span title="Ausstehend" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:4px;vertical-align:middle"></span>';
+            return `<div style="display:flex;flex-direction:column;gap:2px;line-height:1.4">
+              ${uebAmt > 0 ? `<span style="font-size:.7rem;color:var(--accent)">🏦 ${formatEuro(uebAmt)}${dot(ps?.ueb_status||'ausstehend')}</span>` : ''}
+              ${barAmt > 0 ? `<span style="font-size:.7rem;color:#b45309">💵 ${formatEuro(barAmt)}${dot(ps?.bar_status||'ausstehend')}</span>` : ''}
+              ${!barAmt && !e.bruttoGehalt ? '<span style="font-size:.7rem;color:var(--text-muted)">—</span>' : ''}
+            </div>`;
+          })()}
         </td>
         <td><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
       `:''}
@@ -1228,6 +1236,20 @@ function viewEmp(id){
     <hr style="border-color:var(--border);margin:16px 0">
     <h4 style="margin-bottom:8px">📋 Gehaltshistorie</h4>
     <div id="salHistArea_${e.id}" style="font-size:.82rem;color:var(--text-muted)">Wird geladen…</div>
+    <hr style="border-color:var(--border);margin:16px 0">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <h4 style="margin:0">💳 Zahlungsstatus</h4>
+      <select class="form-select" id="payStatusMonth_${e.id}" style="width:auto;font-size:.82rem;padding:4px 8px"
+        onchange="loadAndRenderPayStatus(${e.id})">
+        ${Array.from({length:6},(_,i)=>{
+          const d=new Date(); d.setMonth(d.getMonth()-i);
+          const val=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+          const label=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+          return `<option value="${val}" ${i===0?'selected':''}}>${label}</option>`;
+        }).join('')}
+      </select>
+    </div>
+    <div id="payStatusArea_${e.id}" style="font-size:.85rem">Wird geladen…</div>
     <hr style="border-color:var(--border);margin:16px 0">
     <h4 style="margin-bottom:12px">📅 Urlaubstage &amp; 🎓 Schule/Fortbildung <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">Bearbeitbar</span></h4>
     <div class="form-grid">
@@ -1366,8 +1388,85 @@ function viewEmp(id){
 
   // Auto-load Zeiterfassung data if visible
   if(showZeit) setTimeout(()=>zeLoadView(e.id),100);
-  // Auto-load Gehaltshistorie if admin
-  if(isAdmin) setTimeout(()=>renderSalaryHistory(e.id),150);
+  // Auto-load Gehaltshistorie + Zahlungsstatus if admin
+  if(isAdmin) setTimeout(()=>{
+    renderSalaryHistory(e.id);
+    loadAndRenderPayStatus(e.id);
+  }, 150);
+}
+
+// ═══ ZAHLUNGSSTATUS ═══
+async function loadAndRenderPayStatus(empId) {
+  const sel = document.getElementById(`payStatusMonth_${empId}`);
+  const area = document.getElementById(`payStatusArea_${empId}`);
+  if (!sel || !area) return;
+
+  const monthStr = sel.value; // 'YYYY-MM'
+  area.innerHTML = '<span style="color:var(--text-muted);font-size:.78rem">Lädt…</span>';
+
+  const status = await loadPaymentStatus(empId, monthStr);
+  const barSt  = status?.bar_status || 'ausstehend';
+  const uebSt  = status?.ueb_status || 'ausstehend';
+
+  const badge = (st) => st === 'bezahlt'
+    ? '<span style="background:rgba(16,185,129,.15);color:#059669;padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600">✅ Bezahlt</span>'
+    : '<span style="background:rgba(245,158,11,.1);color:#d97706;padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600">⏳ Ausstehend</span>';
+
+  const opt = (val, cur) => `<option value="${val}" ${cur===val?'selected':''}>${val==='bezahlt'?'✅ Bezahlt':'⏳ Ausstehend'}</option>`;
+
+  area.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px">
+      <div style="background:var(--card-bg,rgba(255,255,255,.04));border:1px solid var(--border);border-radius:10px;padding:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:1.1rem">🏦</span>
+          <span style="font-weight:600;font-size:.88rem">Überweisung</span>
+          ${badge(uebSt)}
+        </div>
+        <select class="form-select" style="font-size:.82rem"
+          onchange="savePayStatus(${empId},'ueb',this.value)">
+          ${opt('ausstehend',uebSt)}${opt('bezahlt',uebSt)}
+        </select>
+      </div>
+      <div style="background:var(--card-bg,rgba(255,255,255,.04));border:1px solid var(--border);border-radius:10px;padding:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:1.1rem">💵</span>
+          <span style="font-weight:600;font-size:.88rem">BAR</span>
+          ${badge(barSt)}
+        </div>
+        <select class="form-select" style="font-size:.82rem"
+          onchange="savePayStatus(${empId},'bar',this.value)">
+          ${opt('ausstehend',barSt)}${opt('bezahlt',barSt)}
+        </select>
+      </div>
+    </div>`;
+
+  // Store current values for savePayStatus
+  area.dataset.barSt = barSt;
+  area.dataset.uebSt = uebSt;
+}
+
+async function savePayStatus(empId, type, value) {
+  const sel = document.getElementById(`payStatusMonth_${empId}`);
+  const area = document.getElementById(`payStatusArea_${empId}`);
+  if (!sel || !area) return;
+
+  const monthStr = sel.value;
+  let barSt = area.dataset.barSt || 'ausstehend';
+  let uebSt = area.dataset.uebSt || 'ausstehend';
+
+  if (type === 'bar') barSt = value;
+  else uebSt = value;
+
+  area.dataset.barSt = barSt;
+  area.dataset.uebSt = uebSt;
+
+  await syncPaymentStatus(empId, monthStr, barSt, uebSt);
+  toast(`✓ ${type === 'bar' ? 'BAR' : 'Überweisung'} Status → ${value === 'bezahlt' ? 'Bezahlt' : 'Ausstehend'}`);
+
+  // Refresh badge display
+  loadAndRenderPayStatus(empId);
+  // Refresh table row
+  renderEmployees();
 }
 
 // ═══ ZEITERFASSUNG HELPERS ═══

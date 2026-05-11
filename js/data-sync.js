@@ -174,6 +174,45 @@ async function loadSalaryHistory(empId) {
 }
 
 /**
+ * Load payment status for an employee + month from Supabase
+ * @param {number} empId
+ * @param {string} monthStr - 'YYYY-MM' e.g. '2025-05'
+ */
+async function loadPaymentStatus(empId, monthStr) {
+  try {
+    const monthDate = monthStr + '-01';
+    const { data, error } = await sb.from('payment_status')
+      .select('*').eq('emp_id', empId).eq('month', monthDate).maybeSingle();
+    if (error) { console.warn('[Sync] PayStatus load:', error.message); return null; }
+    return data;
+  } catch (e) { console.warn('[Sync]', e.message); return null; }
+}
+
+/**
+ * Upsert payment status for an employee + month
+ * @param {number} empId
+ * @param {string} monthStr - 'YYYY-MM'
+ * @param {string} barStatus - 'bezahlt' | 'ausstehend'
+ * @param {string} uebStatus - 'bezahlt' | 'ausstehend'
+ */
+async function syncPaymentStatus(empId, monthStr, barStatus, uebStatus) {
+  try {
+    const monthDate = monthStr + '-01';
+    const updatedBy = currentUser?.name || currentUser?.email || 'Unbekannt';
+    const { error } = await sb.from('payment_status').upsert({
+      emp_id: empId,
+      month: monthDate,
+      bar_status: barStatus,
+      ueb_status: uebStatus,
+      updated_at: new Date().toISOString(),
+      updated_by: updatedBy
+    }, { onConflict: 'emp_id,month' });
+    if (error) console.warn('[Sync] PayStatus save:', error.message);
+    else console.log('[Sync] ✓ PayStatus saved:', empId, monthStr, barStatus, uebStatus);
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+
+/**
  * Save Ausbildungsnachweis to Supabase
  */
 async function syncNachweis(n) {

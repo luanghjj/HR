@@ -3,6 +3,9 @@
 // Replaces static data.js with live Supabase queries
 // ═══════════════════════════════════════════════════════════
 
+// Global cache: payment status for current month, keyed by emp_id
+const PAY_STATUS_CACHE = {};
+
 /**
  * Load all data from Supabase into global variables.
  * Maps Supabase column names (snake_case) → JS property names (camelCase)
@@ -318,6 +321,16 @@ async function loadDataFromSupabase() {
     // else: keep static SAVED_TEMPLATES from data.js as fallback
 
     console.log(`[Data] ✓ Loaded: ${LOCS.length} locations, ${DEPTS.length} depts, ${EMPS.length} employees, ${VACS.length} vacations, ${SICKS.length} sick leaves, ${DOCS.length} documents, ${CHECKLISTS.length} checklists, ${SAVED_TEMPLATES.length} templates, ${SCHULE_SCHEDULE.length} school days, ${AUSBILDUNGSNACHWEISE.length} training logs, ${AZUBI_BEWERTUNGEN.length} evaluations, ${TIME_RECORDS.length} time records`);
+
+    // Load payment_status for current month (for table display)
+    const nowM = new Date();
+    const curMonth = nowM.getFullYear() + '-' + String(nowM.getMonth()+1).padStart(2,'0') + '-01';
+    const { data: payData } = await sb.from('payment_status')
+      .select('*').eq('month', curMonth);
+    if (payData) {
+      Object.keys(PAY_STATUS_CACHE).forEach(k => delete PAY_STATUS_CACHE[k]);
+      payData.forEach(p => { PAY_STATUS_CACHE[p.emp_id] = p; });
+    }
 
     // Run auto-checkout after data load
     await runAutoCheckout();
