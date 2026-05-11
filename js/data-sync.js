@@ -131,13 +131,44 @@ async function syncEmployeeField(empId, field, value) {
       taxClass: 'tax_class', taxId: 'tax_id', svNumber: 'sv_number',
       healthInsurance: 'health_insurance', iban: 'iban',
       nationality: 'nationality', address: 'address',
-      residencePermit: 'residence_permit', workPermitUntil: 'work_permit_until'
+      residencePermit: 'residence_permit', workPermitUntil: 'work_permit_until',
+      paymentMethod: 'payment_method'
     };
     const col = colMap[field] || field;
     const { error } = await sb.from('employees').update({ [col]: value }).eq('id', empId);
     if (error) console.warn('[Sync] Field error:', error.message);
     else console.log('[Sync] ✓', field, '=', value, 'for emp', empId);
   } catch (e) { console.warn('[Sync]', e.message); }
+}
+
+/**
+ * Save a salary change to salary_history in Supabase
+ */
+async function syncSalaryHistory(empId, oldAmount, newAmount, note) {
+  try {
+    const changedBy = currentUser?.name || currentUser?.email || 'Unbekannt';
+    const { error } = await sb.from('salary_history').insert({
+      emp_id: empId,
+      old_amount: parseFloat(oldAmount) || 0,
+      new_amount: parseFloat(newAmount) || 0,
+      note: note || '',
+      changed_by: changedBy
+    });
+    if (error) console.warn('[Sync] SalaryHistory error:', error.message);
+    else console.log('[Sync] ✓ Salary history saved:', empId, oldAmount, '→', newAmount);
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+
+/**
+ * Load salary history for an employee from Supabase
+ */
+async function loadSalaryHistory(empId) {
+  try {
+    const { data, error } = await sb.from('salary_history')
+      .select('*').eq('emp_id', empId).order('changed_at', { ascending: false });
+    if (error) { console.warn('[Sync] SalaryHistory load error:', error.message); return []; }
+    return data || [];
+  } catch (e) { console.warn('[Sync]', e.message); return []; }
 }
 
 /**

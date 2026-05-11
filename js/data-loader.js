@@ -105,7 +105,9 @@ async function loadDataFromSupabase() {
         address: escapeHtml(e.address || ''),
         // Aufenthalt
         residencePermit: escapeHtml(e.residence_permit || ''),
-        workPermitUntil: e.work_permit_until || ''
+        workPermitUntil: e.work_permit_until || '',
+        // Zahlung
+        paymentMethod: e.payment_method || 'Überweisung'
       }));
     }
 

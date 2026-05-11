@@ -1059,7 +1059,7 @@ function renderEmployees(){
           <th>Resturlaub</th>
           <th>Kranktage</th>
           <th>Verspätungen</th>
-          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th>€/Std.</th>':''}
+          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th>Zahlung</th><th>€/Std.</th>':''}
           <th class="tc">Status</th>
           <th></th>
         </tr></thead>
@@ -1157,6 +1157,9 @@ function renderEmpRows(emps){
         <td><span class="mit-mono" style="color:${sollColor}">${planH}h</span></td>
         <td><span class="mit-mono">${e.sollStunden}h</span></td>
         <td><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
+        <td>${e.paymentMethod==='BAR'
+          ? '<span class="mit-pill" style="background:rgba(234,179,8,.12);color:#b45309;font-size:.7rem">💵 BAR</span>'
+          : '<span class="mit-pill" style="background:rgba(99,102,241,.1);color:var(--accent);font-size:.7rem">🏦 Überweisung</span>'}</td>
         <td><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
       `:''}
       <td class="tc">${statusHTML}</td>
@@ -1196,26 +1199,36 @@ function viewEmp(id){
   const hourly=calcHourly(e);
 
   const deptOpts=DEPTS.map(d=>d.name).filter((v,i,a)=>a.indexOf(v)===i);
-  const locOpts=LOCS;
 
   // Gehalt section (nur Inhaber)
   let adminSection='';
   if(isAdmin){
     adminSection=`
     <hr style="border-color:var(--border);margin:16px 0">
-    <h4 style="margin-bottom:12px">💰 Gehalt & Stunden <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">Nur Inhaber</span></h4>
+    <h4 style="margin-bottom:12px">💰 Gehalt &amp; Stunden <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">Nur Inhaber</span></h4>
     <div class="form-grid">
       <div class="form-group"><label class="form-label">Soll-Stunden / Monat</label>
         <input class="form-input" type="number" id="edSoll" value="${e.sollStunden}" onchange="recalcSalary(${e.id},'soll')"></div>
       <div class="form-group"><label class="form-label">Plan-Stunden (aktueller Monat)</label>
         <div style="font-family:'Space Mono',monospace;font-size:1.1rem;padding:10px 0;color:${planH>=e.sollStunden?'var(--success)':'var(--danger)'}">${planH}h <span style="font-size:.75rem;color:var(--text-muted)">von ${e.sollStunden}h Soll</span></div></div>
-      <div class="form-group"><label class="form-label">Brutto Gehalt / Monat</label>
-        <input class="form-input" type="number" step="0.01" id="edBrutto" value="${e.bruttoGehalt}" onchange="recalcSalary(${e.id},'brutto')"></div>
+      <div class="form-group"><label class="form-label">Brutto Gehalt / Monat (neu)</label>
+        <input class="form-input" type="number" step="0.01" id="edBrutto" value="${e.bruttoGehalt}" placeholder="Neuen Betrag eingeben"></div>
+      <div class="form-group"><label class="form-label">Zahlungsart</label>
+        <select class="form-select" id="edPayMethod" onchange="updateEmpText(${e.id},'paymentMethod',this.value)">
+          <option value="Überweisung" ${e.paymentMethod!=='BAR'?'selected':''}>🏦 Überweisung</option>
+          <option value="BAR" ${e.paymentMethod==='BAR'?'selected':''}>💵 BAR</option>
+        </select></div>
       <div class="form-group"><label class="form-label">Gehalt / Stunde (berechnet)</label>
         <input class="form-input" type="number" step="0.01" id="edHourly" value="${hourly}" onchange="recalcSalary(${e.id},'hourly')"></div>
+      <div class="form-group"><label class="form-label">Notiz zur Änderung</label>
+        <input class="form-input" id="edSalNote" placeholder="z.B. Gehaltserhöhung ab Mai 2025"></div>
     </div>
+    <button class="btn btn-primary" style="margin-top:4px" onclick="saveSalaryChange(${e.id},${e.bruttoGehalt})">💾 Änderung speichern</button>
     <hr style="border-color:var(--border);margin:16px 0">
-    <h4 style="margin-bottom:12px">📅 Urlaubstage & 🎓 Schule/Fortbildung <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">Bearbeitbar</span></h4>
+    <h4 style="margin-bottom:8px">📋 Gehaltshistorie</h4>
+    <div id="salHistArea_${e.id}" style="font-size:.82rem;color:var(--text-muted)">Wird geladen…</div>
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h4 style="margin-bottom:12px">📅 Urlaubstage &amp; 🎓 Schule/Fortbildung <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">Bearbeitbar</span></h4>
     <div class="form-grid">
       <div class="form-group"><label class="form-label">Urlaubstage Gesamt / Jahr</label>
         <input class="form-input" type="number" id="edVacTotal" value="${e.vacTotal}" onchange="updateEmpField(${e.id},'vacTotal',this.value)"></div>
@@ -1351,6 +1364,8 @@ function viewEmp(id){
 
   // Auto-load Zeiterfassung data if visible
   if(showZeit) setTimeout(()=>zeLoadView(e.id),100);
+  // Auto-load Gehaltshistorie if admin
+  if(isAdmin) setTimeout(()=>renderSalaryHistory(e.id),150);
 }
 
 // ═══ ZEITERFASSUNG HELPERS ═══
@@ -1971,14 +1986,73 @@ function recalcSalary(empId, changed){
     document.getElementById('edBrutto').value=m;
   } else if(changed==='soll'){
     e.sollStunden=soll;
-    // Recalc hourly from existing brutto
     const h=soll>0?Math.round(e.bruttoGehalt/soll*100)/100:0;
     document.getElementById('edHourly').value=h;
   }
-  // Save to Supabase
   syncEmployeeField(empId, 'sollStunden', e.sollStunden);
-  syncEmployeeField(empId, 'bruttoGehalt', e.bruttoGehalt);
-  toast('Gehaltsdaten gespeichert ✓');
+}
+
+// ═══ SALARY CHANGE (mit History) ═══
+async function saveSalaryChange(empId, oldBrutto) {
+  const e = EMPS.find(x => x.id === empId); if (!e) return;
+  const newBrutto = parseFloat(document.getElementById('edBrutto')?.value) || 0;
+  const note = document.getElementById('edSalNote')?.value?.trim() || '';
+  const soll = parseFloat(document.getElementById('edSoll')?.value) || e.sollStunden;
+
+  if (newBrutto === oldBrutto && soll === e.sollStunden) {
+    toast('Keine Änderung festgestellt.', 'warn'); return;
+  }
+
+  // Update employee
+  e.bruttoGehalt = newBrutto;
+  e.sollStunden = soll;
+  await syncEmployeeField(empId, 'bruttoGehalt', newBrutto);
+  await syncEmployeeField(empId, 'sollStunden', soll);
+
+  // Save history entry (only if brutto changed)
+  if (newBrutto !== oldBrutto) {
+    await syncSalaryHistory(empId, oldBrutto, newBrutto, note);
+  }
+
+  toast('✓ Gehalt gespeichert & Änderung protokolliert');
+  renderSalaryHistory(empId);
+  renderEmployees();
+}
+
+async function renderSalaryHistory(empId) {
+  const el = document.getElementById(`salHistArea_${empId}`);
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--text-muted);font-size:.78rem">Lädt…</span>';
+  const history = await loadSalaryHistory(empId);
+  if (!history.length) {
+    el.innerHTML = '<span style="color:var(--text-muted);font-size:.78rem">Keine Einträge vorhanden.</span>';
+    return;
+  }
+  el.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+      <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted)">
+        <th style="text-align:left;padding:4px 6px">Datum</th>
+        <th style="text-align:right;padding:4px 6px">Alt</th>
+        <th style="text-align:right;padding:4px 6px">Neu</th>
+        <th style="text-align:left;padding:4px 6px">Notiz</th>
+        <th style="text-align:left;padding:4px 6px">Geändert von</th>
+      </tr></thead>
+      <tbody>
+        ${history.map(h => {
+          const diff = (h.new_amount - h.old_amount);
+          const diffColor = diff >= 0 ? 'var(--success)' : 'var(--danger)';
+          const sign = diff >= 0 ? '+' : '';
+          const dt = new Date(h.changed_at).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+          return `<tr style="border-bottom:1px solid var(--border-light)">
+            <td style="padding:5px 6px;color:var(--text-muted)">${dt}</td>
+            <td style="padding:5px 6px;text-align:right;font-family:monospace">${formatEuro(h.old_amount)}</td>
+            <td style="padding:5px 6px;text-align:right;font-family:monospace;font-weight:600">${formatEuro(h.new_amount)}</td>
+            <td style="padding:5px 6px;color:${diffColor};font-weight:600">${sign}${formatEuro(diff)}</td>
+            <td style="padding:5px 6px;color:var(--text-muted)">${h.note||'—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
 }
 
 // Update arbitrary employee field
