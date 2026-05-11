@@ -757,6 +757,25 @@ function renderDashboard(){
         <div class="dash-card-header">🔔 Aktivitäten</div>
         <div class="dash-card-body" id="dashNotifs" style="padding-left:32px;position:relative"></div>
       </div>
+
+      <!-- Zahlungsübersicht -->
+      <div class="dash-card" style="margin-bottom:24px" id="dashPayCard">
+        <div class="dash-card-header">
+          💳 Zahlungsübersicht
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+            <select class="form-select" id="dashPayMonth" style="width:auto;font-size:.78rem;padding:3px 8px"
+              onchange="renderDashPayOverview(this.value)">
+              ${Array.from({length:12},(_,i)=>{
+                const d=new Date(); d.setMonth(d.getMonth()-i);
+                const val=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+                const label=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+                return `<option value="${val}" ${i===0?'selected':''}>${label}</option>`;
+              }).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="dash-card-body" id="dashPayBody">Wird geladen…</div>
+      </div>
       `:``}
 
       ${!can('seeFinancials')?`
@@ -900,6 +919,12 @@ function renderDashboard(){
     });
     if (!todayShiftEmps.length) attHtml += '<p style="color:var(--text-muted)">Keine Schichten heute</p>';
     document.getElementById('dashAttendance').innerHTML = attHtml;
+
+    // Auto-load Zahlungsübersicht (nur seeFinancials)
+    if (can('seeFinancials')) {
+      const curM = new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+      setTimeout(() => renderDashPayOverview(curM), 200);
+    }
   }
   updateBadges();
 }
@@ -1042,6 +1067,22 @@ function renderEmployees(){
       </div>
     </div>
     <div class="mit-ctrl-right">
+      ${isAdmin ? (() => {
+        const now = new Date();
+        const curM = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+        return `<div style="display:flex;align-items:center;gap:6px;margin-right:10px">
+          <span style="font-size:.78rem;color:var(--text-muted);white-space:nowrap">💳 Zahlung:</span>
+          <select class="form-select" id="payFilterMonth" style="width:auto;font-size:.78rem;padding:4px 8px"
+            onchange="reloadPayStatusForMonth(this.value)">
+            ${Array.from({length:12},(_,i)=>{
+              const d=new Date(); d.setMonth(d.getMonth()-i);
+              const val=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+              const label=d.toLocaleDateString('de-DE',{month:'short',year:'numeric'});
+              return `<option value="${val}" ${i===0?'selected':''}>${label}</option>`;
+            }).join('')}
+          </select>
+        </div>`;
+      })() : ''}
       <div class="mit-search-wrap">
         <span class="ms">search</span>
         <input class="mit-search" placeholder="Suchen..." oninput="filterEmps(this.value)">
@@ -1397,6 +1438,109 @@ function viewEmp(id){
     renderSalaryHistory(e.id);
     loadAndRenderPayStatus(e.id);
   }, 150);
+}
+
+// ═══ PAYMENT FILTER (Monat wechseln in Mitarbeitertabelle) ═══
+async function reloadPayStatusForMonth(monthStr) {
+  const monthDate = monthStr + '-01';
+  const { data } = await sb.from('payment_status').select('*').eq('month', monthDate);
+  // Rebuild cache
+  Object.keys(PAY_STATUS_CACHE).forEach(k => delete PAY_STATUS_CACHE[k]);
+  if (data) data.forEach(p => { PAY_STATUS_CACHE[p.emp_id] = p; });
+  renderEmpRows(getVisibleEmps());
+  toast(`💳 Zahlungsstatus: ${new Date(monthDate).toLocaleDateString('de-DE',{month:'long',year:'numeric'})}`);
+}
+
+// ═══ DASHBOARD: ZAHLUNGSÜBERSICHT ═══
+async function renderDashPayOverview(monthStr) {
+  const el = document.getElementById('dashPayBody');
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--text-muted);font-size:.82rem">Lädt…</span>';
+
+  const monthDate = monthStr + '-01';
+  const { data: payRows } = await sb.from('payment_status').select('*').eq('month', monthDate);
+  const rows = payRows || [];
+
+  const emps = getVisibleEmps().filter(e => e.bruttoGehalt > 0);
+  const totalUeb = emps.filter(e => e.bruttoGehalt - (e.barGehalt||0) > 0).length;
+  const totalBar = emps.filter(e => (e.barGehalt||0) > 0).length;
+
+  const uebBez = rows.filter(r => r.ueb_status === 'bezahlt').length;
+  const barBez = rows.filter(r => r.bar_status === 'bezahlt').length;
+
+  const uebOff = totalUeb - uebBez;
+  const barOff = totalBar - barBez;
+
+  // Totals
+  const totalUebSum = emps.reduce((s,e) => s + Math.max(0, e.bruttoGehalt-(e.barGehalt||0)), 0);
+  const totalBarSum = emps.reduce((s,e) => s + (e.barGehalt||0), 0);
+  const paidUebSum = emps.filter(e => rows.find(r=>r.emp_id===e.id&&r.ueb_status==='bezahlt')).reduce((s,e)=>s+Math.max(0,e.bruttoGehalt-(e.barGehalt||0)),0);
+  const paidBarSum = emps.filter(e => rows.find(r=>r.emp_id===e.id&&r.bar_status==='bezahlt')).reduce((s,e)=>s+(e.barGehalt||0),0);
+
+  const pct = (a,b) => b > 0 ? Math.round(a/b*100) : 0;
+
+  // Per-employee list (only emps with bar or überweisung)
+  const empRows = emps.map(e => {
+    const ps = rows.find(r => r.emp_id === e.id);
+    const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
+    const barAmt = e.barGehalt || 0;
+    const uebSt = ps?.ueb_status || 'ausstehend';
+    const barSt = ps?.bar_status || 'ausstehend';
+    const b = (st) => st==='bezahlt'
+      ? '<span style="background:rgba(16,185,129,.15);color:#059669;font-size:.68rem;padding:1px 6px;border-radius:4px;font-weight:600">✅</span>'
+      : '<span style="background:rgba(245,158,11,.1);color:#d97706;font-size:.68rem;padding:1px 6px;border-radius:4px;font-weight:600">⏳</span>';
+    return `<tr style="border-bottom:1px solid var(--border-light)">
+      <td style="padding:6px 8px;font-size:.82rem;font-weight:600">${e.name}</td>
+      <td style="padding:6px 8px;font-size:.82rem;font-family:monospace;color:var(--accent)">${uebAmt>0?formatEuro(uebAmt):'—'}</td>
+      <td style="padding:6px 8px">${uebAmt>0?b(uebSt):'—'}</td>
+      <td style="padding:6px 8px;font-size:.82rem;font-family:monospace;color:#b45309">${barAmt>0?formatEuro(barAmt):'—'}</td>
+      <td style="padding:6px 8px">${barAmt>0?b(barSt):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:1.2rem">🏦</span>
+          <span style="font-weight:700;font-size:.9rem">Überweisung</span>
+        </div>
+        <div style="font-size:1.4rem;font-weight:800;font-family:monospace;color:var(--accent)">${formatEuro(paidUebSum)}</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">von ${formatEuro(totalUebSum)} · ${uebBez}/${totalUeb} bezahlt</div>
+        <div style="margin-top:8px;background:var(--border);border-radius:4px;height:5px">
+          <div style="background:var(--accent);border-radius:4px;height:5px;width:${pct(paidUebSum,totalUebSum)}%;transition:width .4s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.7rem;margin-top:4px">
+          <span style="color:#059669">✅ ${uebBez} bezahlt</span>
+          <span style="color:#d97706">⏳ ${uebOff} offen</span>
+        </div>
+      </div>
+      <div style="background:rgba(180,83,9,.06);border:1px solid rgba(180,83,9,.2);border-radius:10px;padding:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:1.2rem">💵</span>
+          <span style="font-weight:700;font-size:.9rem">BAR</span>
+        </div>
+        <div style="font-size:1.4rem;font-weight:800;font-family:monospace;color:#b45309">${formatEuro(paidBarSum)}</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">von ${formatEuro(totalBarSum)} · ${barBez}/${totalBar} bezahlt</div>
+        <div style="margin-top:8px;background:var(--border);border-radius:4px;height:5px">
+          <div style="background:#b45309;border-radius:4px;height:5px;width:${pct(paidBarSum,totalBarSum)}%;transition:width .4s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.7rem;margin-top:4px">
+          <span style="color:#059669">✅ ${barBez} bezahlt</span>
+          <span style="color:#d97706">⏳ ${barOff} offen</span>
+        </div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+      <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted)">
+        <th style="text-align:left;padding:5px 8px">Mitarbeiter</th>
+        <th style="text-align:right;padding:5px 8px">🏦 Überweisung</th>
+        <th style="padding:5px 8px">Status</th>
+        <th style="text-align:right;padding:5px 8px">💵 BAR</th>
+        <th style="padding:5px 8px">Status</th>
+      </tr></thead>
+      <tbody>${empRows}</tbody>
+    </table>`;
 }
 
 // ═══ ZAHLUNGSSTATUS ═══
