@@ -110,7 +110,8 @@ async function loadDataFromSupabase() {
         residencePermit: escapeHtml(e.residence_permit || ''),
         workPermitUntil: e.work_permit_until || '',
         // Zahlung (BAR + Überweisung)
-        barGehalt: parseFloat(e.bar_gehalt) || 0
+        barGehalt: parseFloat(e.bar_gehalt) || 0,
+        bank: e.bank || ''
       }));
     }
 

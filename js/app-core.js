@@ -1100,7 +1100,7 @@ function renderEmployees(){
           <th>Resturlaub</th>
           <th>Kranktage</th>
           <th>Verspätungen</th>
-          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th style="color:var(--accent)">🏦 Überweisung</th><th>Ü-Status</th><th style="color:#b45309">💵 BAR</th><th>BAR-Status</th><th>€/Std.</th>':''}
+          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th style="color:var(--accent)">🏦 Überweisung</th><th>Ü-Status</th><th style="color:#b45309">💵 BAR</th><th>BAR-Status</th><th style="font-size:.75rem">🏦 Bank</th><th>€/Std.</th>':''}
           <th class="tc">Status</th>
           <th></th>
         </tr></thead>
@@ -1215,7 +1215,8 @@ function renderEmpRows(emps){
           <td><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
           <td>${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
           <td><span class="mit-mono" style="color:#b45309">${barAmt > 0 ? formatEuro(barAmt) : '—'}</span></td>
-          <td>${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>`;
+          <td>${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
+          <td><span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap">${e.bank || '—'}</span></td>`;
         })()}
         <td><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
       `:''}
