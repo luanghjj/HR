@@ -245,6 +245,36 @@ async function openMonth(monthStr) {
 }
 
 /**
+ * Save actual BAR Betrag + Comment for a specific month
+ * @param {number} empId
+ * @param {string} monthStr - 'YYYY-MM'
+ * @param {number|null} barBetrag - actual amount paid (null = use bar_gehalt)
+ * @param {string} barComment - free text comment
+ */
+async function saveBarBetrag(empId, monthStr, barBetrag, barComment) {
+  try {
+    const monthDate = monthStr + '-01';
+    const updatedBy = currentUser?.name || currentUser?.email || 'Unbekannt';
+    const ps = PAY_STATUS_CACHE[empId] || {};
+    const { error } = await sb.from('payment_status').upsert({
+      emp_id: empId,
+      month: monthDate,
+      bar_status: ps.bar_status || 'ausstehend',
+      ueb_status: ps.ueb_status || 'ausstehend',
+      bar_betrag: barBetrag,
+      bar_comment: barComment,
+      updated_at: new Date().toISOString(),
+      updated_by: updatedBy
+    }, { onConflict: 'emp_id,month' });
+    if (error) console.warn('[Sync] saveBarBetrag:', error.message);
+    else {
+      PAY_STATUS_CACHE[empId] = { ...ps, bar_betrag: barBetrag, bar_comment: barComment };
+      console.log('[Sync] ✓ bar_betrag saved', empId, barBetrag, barComment);
+    }
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+
+/**
  * Save Ausbildungsnachweis to Supabase
  */
 async function syncNachweis(n) {

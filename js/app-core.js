@@ -1112,7 +1112,7 @@ function renderEmployees(){
           <th>Resturlaub</th>
           <th>Kranktage</th>
           <th>Verspätungen</th>
-          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th style="color:var(--accent)">🏦 Überweisung</th><th>Ü-Status</th><th style="color:#b45309">💵 BAR</th><th>BAR-Status</th><th style="font-size:.75rem">🏦 Bank</th><th>€/Std.</th>':''}
+          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th style="color:var(--accent)">🏦 Überweisung</th><th>Ü-Status</th><th style="color:#b45309">💵 BAR</th><th style="font-size:.75rem;color:#b45309">BAR-Notiz</th><th>BAR-Status</th><th style="font-size:.75rem">🏦 Bank</th><th>€/Std.</th>':''}
           <th class="tc">Status</th>
           <th></th>
         </tr></thead>
@@ -1219,7 +1219,6 @@ function renderEmpRows(emps){
           const isManager = !isInhaber;
           const monthClosed = isMonthClosed(curMonth);
 
-          // Manager can only edit BAR for current (non-closed) month
           const canEditBar = isInhaber || (!monthClosed);
           const canEditUeb = isInhaber;
 
@@ -1239,19 +1238,32 @@ function renderEmpRows(emps){
               </select>`
             : staticBadge(cur);
 
-          // BAR comment + pencil
+          // Actual BAR amount this month (override or fallback to bar_gehalt)
+          const ps = PAY_STATUS_CACHE[e.id];
+          const barBetragVal = (ps?.bar_betrag != null) ? ps.bar_betrag : barAmt;
           const barComment = ps?.bar_comment || '';
-          const commentPencil = canEditBar && barAmt > 0 ? `
-            <button onclick="toggleBarComment(${e.id},'${curMonth}')" title="Kommentar"
-              style="background:none;border:none;cursor:pointer;font-size:.75rem;color:var(--text-muted);padding:0 2px;vertical-align:middle">✏️</button>
-            <div id="barComment_${e.id}" style="display:none;margin-top:4px">
-              <input id="barCommentInput_${e.id}" value="${barComment.replace(/"/g,'&quot;')}"
-                placeholder="z.B. Vorschuss 100€ am 5.5"
-                style="font-size:.7rem;padding:3px 6px;border-radius:5px;border:1px solid var(--border);width:140px;background:var(--bg-input);color:var(--text-primary)"
-                onblur="saveBarComment(${e.id},'${curMonth}',this.value)">
-            </div>` : (barComment ? `<div style="font-size:.65rem;color:var(--text-muted);margin-top:2px;font-style:italic">${barComment}</div>` : '');
 
-          // Bank cell: Inhaber → dropdown, others → text
+          // BAR amount: editable for manager (current, non-closed month)
+          const barAmtCell = barAmt > 0
+            ? (canEditBar
+                ? `<input type="number" step="0.01" min="0" value="${barBetragVal}"
+                    style="font-size:.75rem;padding:2px 5px;border-radius:5px;border:1px solid var(--border);width:70px;font-family:'Space Mono',monospace;color:#b45309;background:var(--bg-input);font-weight:700"
+                    onblur="saveBarBetragFromTable(${e.id},'${curMonth}',+this.value,document.getElementById('barCmt_${e.id}')?.value||'')"
+                    title="BAR Betrag (tatsächlich)">`
+                : `<span class="mit-mono" style="color:#b45309">${formatEuro(barBetragVal)}</span>`)
+            : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
+
+          // BAR Kommentar: always-visible input for manager, readonly text for Inhaber
+          const barCmtCell = barAmt > 0
+            ? (canEditBar
+                ? `<input type="text" id="barCmt_${e.id}" value="${barComment.replace(/"/g,'&quot;')}"
+                    placeholder="z.B. Vorschuss 150€"
+                    style="font-size:.7rem;padding:2px 5px;border-radius:5px;border:1px solid var(--border);width:130px;background:var(--bg-input);color:var(--text-primary)"
+                    onblur="saveBarBetragFromTable(${e.id},'${curMonth}',+(document.getElementById('barInput_${e.id}')?.value||${barBetragVal}),this.value)">`
+                : `<span style="font-size:.7rem;color:var(--text-muted);font-style:italic">${barComment || '—'}</span>`)
+            : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
+
+          // Bank cell: Inhaber dropdown, others text
           const BANKS_LIST = ['Commerzbank','Commerzbank Enso','Commerzbank Okyu','Commerzbank Origami','Deutsche Bank','ING','Revolut Enso','Revolut Okyu','Revolut Ultra','Sparkasse','VR Bank','Volksbank'];
           const bankCell = isInhaber
             ? `<select style="font-size:.7rem;padding:2px 5px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);cursor:pointer"
@@ -1266,10 +1278,8 @@ function renderEmpRows(emps){
           return `
           <td><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
           <td>${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
-          <td>
-            <span class="mit-mono" style="color:#b45309">${barAmt > 0 ? formatEuro(barAmt) : '—'}</span>
-            ${commentPencil}
-          </td>
+          <td id="barAmtCell_${e.id}">${barAmtCell}</td>
+          <td>${barCmtCell}</td>
           <td>${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
           <td>${bankCell}</td>`;
         })()}
@@ -1695,26 +1705,14 @@ async function toggleMonthLock() {
   const ok = closed ? await openMonth(monthStr) : await closeMonth(monthStr);
   if (ok) {
     toast(closed ? `🔓 ${monthStr} geöffnet` : `🔒 ${monthStr} gesperrt`);
-    renderEmployees(); // re-render to update button + dropdown
+    renderEmployees();
   }
 }
 
-// Toggle inline BAR comment input visibility
-function toggleBarComment(empId, monthStr) {
-  const div = document.getElementById(`barComment_${empId}`);
-  if (!div) return;
-  div.style.display = div.style.display === 'none' ? 'block' : 'none';
-  if (div.style.display === 'block') {
-    document.getElementById(`barCommentInput_${empId}`)?.focus();
-  }
-}
-
-// Save BAR comment on blur
-async function saveBarComment(empId, monthStr, comment) {
-  const ps = PAY_STATUS_CACHE[empId] || {};
-  PAY_STATUS_CACHE[empId] = { ...ps, bar_comment: comment };
-  await syncPaymentStatus(empId, monthStr, ps.bar_status||'ausstehend', ps.ueb_status||'ausstehend', comment);
-  toast('✓ Kommentar gespeichert');
+// Save actual BAR Betrag + Notiz from inline inputs (onblur of either input)
+async function saveBarBetragFromTable(empId, monthStr, betrag, comment) {
+  await saveBarBetrag(empId, monthStr, betrag, comment);
+  toast(`✓ BAR: ${formatEuro(betrag)}${comment ? ' · ' + comment : ''}`);
 }
 
 // Save bank for employee (Inhaber only)
