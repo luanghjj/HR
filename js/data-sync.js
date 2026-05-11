@@ -194,22 +194,54 @@ async function loadPaymentStatus(empId, monthStr) {
  * @param {string} monthStr - 'YYYY-MM'
  * @param {string} barStatus - 'bezahlt' | 'ausstehend'
  * @param {string} uebStatus - 'bezahlt' | 'ausstehend'
+ * @param {string} [barComment] - optional comment for BAR payment
  */
-async function syncPaymentStatus(empId, monthStr, barStatus, uebStatus) {
+async function syncPaymentStatus(empId, monthStr, barStatus, uebStatus, barComment) {
   try {
     const monthDate = monthStr + '-01';
     const updatedBy = currentUser?.name || currentUser?.email || 'Unbekannt';
-    const { error } = await sb.from('payment_status').upsert({
+    const payload = {
       emp_id: empId,
       month: monthDate,
       bar_status: barStatus,
       ueb_status: uebStatus,
       updated_at: new Date().toISOString(),
       updated_by: updatedBy
-    }, { onConflict: 'emp_id,month' });
+    };
+    if (barComment !== undefined) payload.bar_comment = barComment;
+    const { error } = await sb.from('payment_status').upsert(payload, { onConflict: 'emp_id,month' });
     if (error) console.warn('[Sync] PayStatus save:', error.message);
-    else console.log('[Sync] ✓ PayStatus saved:', empId, monthStr, barStatus, uebStatus);
+    else console.log('[Sync] ✓ PayStatus saved:', empId, monthStr);
   } catch (e) { console.warn('[Sync]', e.message); }
+}
+
+// ── Month Lock (Inhaber only) ──────────────────────────────────
+function isMonthClosed(monthStr) {
+  return CLOSED_MONTHS.has(monthStr + '-01');
+}
+
+async function closeMonth(monthStr) {
+  const monthDate = monthStr + '-01';
+  const closedBy = currentUser?.name || currentUser?.email || 'Inhaber';
+  try {
+    const { error } = await sb.from('closed_months').upsert(
+      { month: monthDate, closed_by: closedBy, closed_at: new Date().toISOString() },
+      { onConflict: 'month' }
+    );
+    if (error) { console.warn('[Sync] closeMonth:', error.message); return false; }
+    CLOSED_MONTHS.add(monthDate);
+    return true;
+  } catch (e) { console.warn('[Sync]', e.message); return false; }
+}
+
+async function openMonth(monthStr) {
+  const monthDate = monthStr + '-01';
+  try {
+    const { error } = await sb.from('closed_months').delete().eq('month', monthDate);
+    if (error) { console.warn('[Sync] openMonth:', error.message); return false; }
+    CLOSED_MONTHS.delete(monthDate);
+    return true;
+  } catch (e) { console.warn('[Sync]', e.message); return false; }
 }
 
 /**

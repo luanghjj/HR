@@ -5,6 +5,8 @@
 
 // Global cache: payment status for current month, keyed by emp_id
 const PAY_STATUS_CACHE = {};
+// Global set: closed months (DATE strings '2025-04-01') locked by Inhaber
+const CLOSED_MONTHS = new Set();
 
 /**
  * Load all data from Supabase into global variables.
@@ -332,6 +334,11 @@ async function loadDataFromSupabase() {
       Object.keys(PAY_STATUS_CACHE).forEach(k => delete PAY_STATUS_CACHE[k]);
       payData.forEach(p => { PAY_STATUS_CACHE[p.emp_id] = p; });
     }
+
+    // Load closed_months
+    const { data: closedData } = await sb.from('closed_months').select('month');
+    CLOSED_MONTHS.clear();
+    if (closedData) closedData.forEach(r => CLOSED_MONTHS.add(r.month));
 
     // Run auto-checkout after data load
     await runAutoCheckout();

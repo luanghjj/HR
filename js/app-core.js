@@ -1070,6 +1070,8 @@ function renderEmployees(){
       ${isAdmin ? (() => {
         const now = new Date();
         const curM = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+        const isClosed = isMonthClosed(curM);
+        const isInhaber = currentUser?.role === 'inhaber';
         return `<div style="display:flex;align-items:center;gap:6px;margin-right:10px">
           <span style="font-size:.78rem;color:var(--text-muted);white-space:nowrap">💳 Zahlung:</span>
           <select class="form-select" id="payFilterMonth" style="width:auto;font-size:.78rem;padding:4px 8px"
@@ -1078,9 +1080,19 @@ function renderEmployees(){
               const d=new Date(); d.setMonth(d.getMonth()-i);
               const val=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
               const label=d.toLocaleDateString('de-DE',{month:'short',year:'numeric'});
-              return `<option value="${val}" ${i===0?'selected':''}>${label}</option>`;
+              const closed = isMonthClosed(val);
+              return `<option value="${val}" ${i===0?'selected':''}>${label}${closed?' 🔒':''}</option>`;
             }).join('')}
           </select>
+          ${isInhaber ? `<button
+            id="monthLockBtn"
+            onclick="toggleMonthLock()"
+            style="font-size:.75rem;padding:3px 10px;border-radius:7px;border:none;cursor:pointer;font-weight:600;
+              ${isClosed
+                ? 'background:rgba(245,158,11,.15);color:#d97706'
+                : 'background:rgba(16,185,129,.12);color:#059669'}">
+            ${isClosed ? '🔓 Öffnen' : '🔒 Schließen'}
+          </button>` : ''}
         </div>`;
       })() : ''}
       <div class="mit-search-wrap">
@@ -1203,20 +1215,63 @@ function renderEmpRows(emps){
           const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
           const barAmt = e.barGehalt || 0;
           const curMonth = new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+          const isInhaber = currentUser?.role === 'inhaber';
+          const isManager = !isInhaber;
+          const monthClosed = isMonthClosed(curMonth);
+
+          // Manager can only edit BAR for current (non-closed) month
+          const canEditBar = isInhaber || (!monthClosed);
+          const canEditUeb = isInhaber;
+
           const selStyle = (st) => `style="font-size:.68rem;padding:2px 5px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-weight:600;outline:none;`
             + (st==='bezahlt' ? `background:rgba(16,185,129,.12);color:#059669"` : `background:rgba(245,158,11,.08);color:#d97706"`);
-          const mkSel = (type, cur) => `<select ${selStyle(cur)}
-            onchange="savePayStatusFromTable(${e.id},'${type}',this.value,'${curMonth}',this)"
-            title="${type==='ueb'?'Überweisung':'BAR'} Status">
-            <option value="ausstehend" ${cur!=='bezahlt'?'selected':''}>⏳ Offen</option>
-            <option value="bezahlt" ${cur==='bezahlt'?'selected':''}>✅ Bezahlt</option>
-          </select>`;
+
+          const staticBadge = (st) => st==='bezahlt'
+            ? '<span style="background:rgba(16,185,129,.15);color:#059669;font-size:.68rem;padding:2px 6px;border-radius:5px;font-weight:600">✅</span>'
+            : '<span style="background:rgba(245,158,11,.1);color:#d97706;font-size:.68rem;padding:2px 6px;border-radius:5px;font-weight:600">⏳</span>';
+
+          const mkSel = (type, cur, editable) => editable
+            ? `<select ${selStyle(cur)}
+                onchange="savePayStatusFromTable(${e.id},'${type}',this.value,'${curMonth}',this)"
+                title="${type==='ueb'?'Überweisung':'BAR'} Status">
+                <option value="ausstehend" ${cur!=='bezahlt'?'selected':''}>⏳ Offen</option>
+                <option value="bezahlt" ${cur==='bezahlt'?'selected':''}>✅ Bezahlt</option>
+              </select>`
+            : staticBadge(cur);
+
+          // BAR comment + pencil
+          const barComment = ps?.bar_comment || '';
+          const commentPencil = canEditBar && barAmt > 0 ? `
+            <button onclick="toggleBarComment(${e.id},'${curMonth}')" title="Kommentar"
+              style="background:none;border:none;cursor:pointer;font-size:.75rem;color:var(--text-muted);padding:0 2px;vertical-align:middle">✏️</button>
+            <div id="barComment_${e.id}" style="display:none;margin-top:4px">
+              <input id="barCommentInput_${e.id}" value="${barComment.replace(/"/g,'&quot;')}"
+                placeholder="z.B. Vorschuss 100€ am 5.5"
+                style="font-size:.7rem;padding:3px 6px;border-radius:5px;border:1px solid var(--border);width:140px;background:var(--bg-input);color:var(--text-primary)"
+                onblur="saveBarComment(${e.id},'${curMonth}',this.value)">
+            </div>` : (barComment ? `<div style="font-size:.65rem;color:var(--text-muted);margin-top:2px;font-style:italic">${barComment}</div>` : '');
+
+          // Bank cell: Inhaber → dropdown, others → text
+          const BANKS_LIST = ['Commerzbank','Commerzbank Enso','Commerzbank Okyu','Commerzbank Origami','Deutsche Bank','ING','Revolut Enso','Revolut Okyu','Revolut Ultra','Sparkasse','VR Bank','Volksbank'];
+          const bankCell = isInhaber
+            ? `<select style="font-size:.7rem;padding:2px 5px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);cursor:pointer"
+                onchange="saveEmpBank(${e.id},this.value)">
+                <option value="">— Bank —</option>
+                ${BANKS_LIST.map(b=>`<option value="${b}" ${e.bank===b?'selected':''}>${b}</option>`).join('')}
+              </select>`
+            : `<span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap">${e.bank || '—'}</span>`;
+
+          const lockedBadge = (isManager && monthClosed) ? '<span style="font-size:.62rem;color:var(--danger)" title="Monat gesperrt">🔒</span>' : '';
+
           return `
           <td><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
-          <td>${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
-          <td><span class="mit-mono" style="color:#b45309">${barAmt > 0 ? formatEuro(barAmt) : '—'}</span></td>
-          <td>${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
-          <td><span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap">${e.bank || '—'}</span></td>`;
+          <td>${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
+          <td>
+            <span class="mit-mono" style="color:#b45309">${barAmt > 0 ? formatEuro(barAmt) : '—'}</span>
+            ${commentPencil}
+          </td>
+          <td>${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
+          <td>${bankCell}</td>`;
         })()}
         <td><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
       `:''}
@@ -1617,22 +1672,60 @@ async function savePayStatus(empId, type, value) {
 
 // Inline dropdown in table row (no modal needed)
 async function savePayStatusFromTable(empId, type, value, monthStr, selectEl) {
-  // Read current cache
   const ps = PAY_STATUS_CACHE[empId] || {};
   const barSt = type === 'bar' ? value : (ps.bar_status || 'ausstehend');
   const uebSt = type === 'ueb' ? value : (ps.ueb_status || 'ausstehend');
 
-  // Update cache immediately
   PAY_STATUS_CACHE[empId] = { ...ps, bar_status: barSt, ueb_status: uebSt };
 
-  // Restyle dropdown in-place
   const isBez = value === 'bezahlt';
   selectEl.style.cssText = `font-size:.68rem;padding:2px 5px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-weight:600;outline:none;`
     + (isBez ? 'background:rgba(16,185,129,.12);color:#059669' : 'background:rgba(245,158,11,.08);color:#d97706');
 
-  // Persist to DB
   await syncPaymentStatus(empId, monthStr, barSt, uebSt);
   toast(`✓ ${type === 'bar' ? 'BAR' : 'Überweisung'}: ${isBez ? 'Bezahlt' : 'Offen'}`);
+}
+
+// Toggle month lock (Inhaber only)
+async function toggleMonthLock() {
+  const sel = document.getElementById('payFilterMonth');
+  if (!sel) return;
+  const monthStr = sel.value;
+  const closed = isMonthClosed(monthStr);
+  const ok = closed ? await openMonth(monthStr) : await closeMonth(monthStr);
+  if (ok) {
+    toast(closed ? `🔓 ${monthStr} geöffnet` : `🔒 ${monthStr} gesperrt`);
+    renderEmployees(); // re-render to update button + dropdown
+  }
+}
+
+// Toggle inline BAR comment input visibility
+function toggleBarComment(empId, monthStr) {
+  const div = document.getElementById(`barComment_${empId}`);
+  if (!div) return;
+  div.style.display = div.style.display === 'none' ? 'block' : 'none';
+  if (div.style.display === 'block') {
+    document.getElementById(`barCommentInput_${empId}`)?.focus();
+  }
+}
+
+// Save BAR comment on blur
+async function saveBarComment(empId, monthStr, comment) {
+  const ps = PAY_STATUS_CACHE[empId] || {};
+  PAY_STATUS_CACHE[empId] = { ...ps, bar_comment: comment };
+  await syncPaymentStatus(empId, monthStr, ps.bar_status||'ausstehend', ps.ueb_status||'ausstehend', comment);
+  toast('✓ Kommentar gespeichert');
+}
+
+// Save bank for employee (Inhaber only)
+async function saveEmpBank(empId, bank) {
+  try {
+    const { error } = await sb.from('employees').update({ bank }).eq('id', empId);
+    if (error) { toast('❌ Fehler beim Speichern', 'err'); return; }
+    const emp = EMPS.find(e => e.id === empId);
+    if (emp) emp.bank = bank;
+    toast(`🏦 Bank gespeichert: ${bank || '—'}`);
+  } catch(e) { console.warn('[saveEmpBank]', e.message); }
 }
 
 // ═══ ZEITERFASSUNG HELPERS ═══
