@@ -482,7 +482,6 @@ async function doCheckOut() {
 // ═══ DASHBOARD ═══
 function renderDashboard(){
   const pg=document.getElementById('page-dashboard');
-  try {
   const emps=getVisibleEmps();
   const isEmp=currentUser.role==='mitarbeiter'||currentUser.role==='azubi';
   const me=isEmp?EMPS.find(e=>e.id===currentUser.empId):null;
@@ -928,13 +927,6 @@ function renderDashboard(){
     }
   }
   updateBadges();
-  } catch(err) {
-    pg.innerHTML = `<div style="padding:32px;background:#fee2e2;border-radius:12px;margin:20px;font-family:monospace">
-      <b style="color:#dc2626">⚠ Dashboard Fehler:</b><br><br>
-      <span style="color:#7f1d1d">${err.message}</span><br><br>
-      <pre style="font-size:.7rem;color:#991b1b;white-space:pre-wrap">${(err.stack||'').substring(0,600)}</pre>
-    </div>`;
-  }
 }
 
 function updateBadges(){
@@ -1247,7 +1239,6 @@ function renderEmpRows(emps){
             : staticBadge(cur);
 
           // Actual BAR amount this month (override or fallback to bar_gehalt)
-          const ps = PAY_STATUS_CACHE[e.id];
           const barBetragVal = (ps?.bar_betrag != null) ? ps.bar_betrag : barAmt;
           const barComment = ps?.bar_comment || '';
 
