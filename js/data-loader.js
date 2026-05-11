@@ -335,10 +335,12 @@ async function loadDataFromSupabase() {
       payData.forEach(p => { PAY_STATUS_CACHE[p.emp_id] = p; });
     }
 
-    // Load closed_months
-    const { data: closedData } = await sb.from('closed_months').select('month');
-    CLOSED_MONTHS.clear();
-    if (closedData) closedData.forEach(r => CLOSED_MONTHS.add(r.month));
+    // Load closed_months (safe: table may not exist yet)
+    try {
+      const { data: closedData, error: closedErr } = await sb.from('closed_months').select('month');
+      CLOSED_MONTHS.clear();
+      if (!closedErr && closedData) closedData.forEach(r => CLOSED_MONTHS.add(r.month));
+    } catch(_) { /* table not yet created – ignore */ }
 
     // Run auto-checkout after data load
     await runAutoCheckout();
