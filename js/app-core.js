@@ -1161,14 +1161,20 @@ function renderEmpRows(emps){
           const ps = PAY_STATUS_CACHE[e.id];
           const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
           const barAmt = e.barGehalt || 0;
-          const stBadge = (st) => st === 'bezahlt'
-            ? '<span style="background:rgba(16,185,129,.15);color:#059669;font-size:.68rem;padding:2px 6px;border-radius:5px;font-weight:600;white-space:nowrap">✅ Bezahlt</span>'
-            : '<span style="background:rgba(245,158,11,.1);color:#d97706;font-size:.68rem;padding:2px 6px;border-radius:5px;font-weight:600;white-space:nowrap">⏳ Offen</span>';
+          const curMonth = new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
+          const selStyle = (st) => `style="font-size:.68rem;padding:2px 5px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-weight:600;outline:none;`
+            + (st==='bezahlt' ? `background:rgba(16,185,129,.12);color:#059669"` : `background:rgba(245,158,11,.08);color:#d97706"`);
+          const mkSel = (type, cur) => `<select ${selStyle(cur)}
+            onchange="savePayStatusFromTable(${e.id},'${type}',this.value,'${curMonth}',this)"
+            title="${type==='ueb'?'Überweisung':'BAR'} Status">
+            <option value="ausstehend" ${cur!=='bezahlt'?'selected':''}>⏳ Offen</option>
+            <option value="bezahlt" ${cur==='bezahlt'?'selected':''}>✅ Bezahlt</option>
+          </select>`;
           return `
           <td><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
-          <td>${uebAmt > 0 ? stBadge(ps?.ueb_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
+          <td>${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
           <td><span class="mit-mono" style="color:#b45309">${barAmt > 0 ? formatEuro(barAmt) : '—'}</span></td>
-          <td>${barAmt > 0 ? stBadge(ps?.bar_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>`;
+          <td>${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>`;
         })()}
         <td><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
       `:''}
@@ -1461,10 +1467,27 @@ async function savePayStatus(empId, type, value) {
   await syncPaymentStatus(empId, monthStr, barSt, uebSt);
   toast(`✓ ${type === 'bar' ? 'BAR' : 'Überweisung'} Status → ${value === 'bezahlt' ? 'Bezahlt' : 'Ausstehend'}`);
 
-  // Refresh badge display
   loadAndRenderPayStatus(empId);
-  // Refresh table row
-  renderEmployees();
+}
+
+// Inline dropdown in table row (no modal needed)
+async function savePayStatusFromTable(empId, type, value, monthStr, selectEl) {
+  // Read current cache
+  const ps = PAY_STATUS_CACHE[empId] || {};
+  const barSt = type === 'bar' ? value : (ps.bar_status || 'ausstehend');
+  const uebSt = type === 'ueb' ? value : (ps.ueb_status || 'ausstehend');
+
+  // Update cache immediately
+  PAY_STATUS_CACHE[empId] = { ...ps, bar_status: barSt, ueb_status: uebSt };
+
+  // Restyle dropdown in-place
+  const isBez = value === 'bezahlt';
+  selectEl.style.cssText = `font-size:.68rem;padding:2px 5px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-weight:600;outline:none;`
+    + (isBez ? 'background:rgba(16,185,129,.12);color:#059669' : 'background:rgba(245,158,11,.08);color:#d97706');
+
+  // Persist to DB
+  await syncPaymentStatus(empId, monthStr, barSt, uebSt);
+  toast(`✓ ${type === 'bar' ? 'BAR' : 'Überweisung'}: ${isBez ? 'Bezahlt' : 'Offen'}`);
 }
 
 // ═══ ZEITERFASSUNG HELPERS ═══
