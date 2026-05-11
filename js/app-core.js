@@ -1059,7 +1059,7 @@ function renderEmployees(){
           <th>Resturlaub</th>
           <th>Kranktage</th>
           <th>Verspätungen</th>
-          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th>Zahlung</th><th>€/Std.</th>':''}
+          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th style="color:var(--accent)">🏦 Überweisung</th><th>Ü-Status</th><th style="color:#b45309">💵 BAR</th><th>BAR-Status</th><th>€/Std.</th>':''}
           <th class="tc">Status</th>
           <th></th>
         </tr></thead>
@@ -1157,21 +1157,19 @@ function renderEmpRows(emps){
         <td><span class="mit-mono" style="color:${sollColor}">${planH}h</span></td>
         <td><span class="mit-mono">${e.sollStunden}h</span></td>
         <td><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
-        <td>
-          ${(() => {
-            const ps = PAY_STATUS_CACHE[e.id];
-            const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
-            const barAmt = e.barGehalt || 0;
-            const dot = (st) => st === 'bezahlt'
-              ? '<span title="Bezahlt" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;margin-left:4px;vertical-align:middle"></span>'
-              : '<span title="Ausstehend" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:4px;vertical-align:middle"></span>';
-            return `<div style="display:flex;flex-direction:column;gap:2px;line-height:1.4">
-              ${uebAmt > 0 ? `<span style="font-size:.7rem;color:var(--accent)">🏦 ${formatEuro(uebAmt)}${dot(ps?.ueb_status||'ausstehend')}</span>` : ''}
-              ${barAmt > 0 ? `<span style="font-size:.7rem;color:#b45309">💵 ${formatEuro(barAmt)}${dot(ps?.bar_status||'ausstehend')}</span>` : ''}
-              ${!barAmt && !e.bruttoGehalt ? '<span style="font-size:.7rem;color:var(--text-muted)">—</span>' : ''}
-            </div>`;
-          })()}
-        </td>
+        ${(() => {
+          const ps = PAY_STATUS_CACHE[e.id];
+          const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
+          const barAmt = e.barGehalt || 0;
+          const stBadge = (st) => st === 'bezahlt'
+            ? '<span style="background:rgba(16,185,129,.15);color:#059669;font-size:.68rem;padding:2px 6px;border-radius:5px;font-weight:600;white-space:nowrap">✅ Bezahlt</span>'
+            : '<span style="background:rgba(245,158,11,.1);color:#d97706;font-size:.68rem;padding:2px 6px;border-radius:5px;font-weight:600;white-space:nowrap">⏳ Offen</span>';
+          return `
+          <td><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
+          <td>${uebAmt > 0 ? stBadge(ps?.ueb_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
+          <td><span class="mit-mono" style="color:#b45309">${barAmt > 0 ? formatEuro(barAmt) : '—'}</span></td>
+          <td>${barAmt > 0 ? stBadge(ps?.bar_status||'ausstehend') : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>`;
+        })()}
         <td><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
       `:''}
       <td class="tc">${statusHTML}</td>
