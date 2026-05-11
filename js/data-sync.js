@@ -132,7 +132,7 @@ async function syncEmployeeField(empId, field, value) {
       healthInsurance: 'health_insurance', iban: 'iban',
       nationality: 'nationality', address: 'address',
       residencePermit: 'residence_permit', workPermitUntil: 'work_permit_until',
-      paymentMethod: 'payment_method'
+      barGehalt: 'bar_gehalt'
     };
     const col = colMap[field] || field;
     const { error } = await sb.from('employees').update({ [col]: value }).eq('id', empId);
@@ -144,18 +144,20 @@ async function syncEmployeeField(empId, field, value) {
 /**
  * Save a salary change to salary_history in Supabase
  */
-async function syncSalaryHistory(empId, oldAmount, newAmount, note) {
+async function syncSalaryHistory(empId, oldBrutto, newBrutto, oldBar, newBar, note) {
   try {
     const changedBy = currentUser?.name || currentUser?.email || 'Unbekannt';
     const { error } = await sb.from('salary_history').insert({
       emp_id: empId,
-      old_amount: parseFloat(oldAmount) || 0,
-      new_amount: parseFloat(newAmount) || 0,
+      old_brutto: parseFloat(oldBrutto) || 0,
+      new_brutto: parseFloat(newBrutto) || 0,
+      old_bar:    parseFloat(oldBar)    || 0,
+      new_bar:    parseFloat(newBar)    || 0,
       note: note || '',
       changed_by: changedBy
     });
     if (error) console.warn('[Sync] SalaryHistory error:', error.message);
-    else console.log('[Sync] ✓ Salary history saved:', empId, oldAmount, '→', newAmount);
+    else console.log('[Sync] ✓ Salary history saved');
   } catch (e) { console.warn('[Sync]', e.message); }
 }
 

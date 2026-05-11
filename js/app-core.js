@@ -1157,9 +1157,13 @@ function renderEmpRows(emps){
         <td><span class="mit-mono" style="color:${sollColor}">${planH}h</span></td>
         <td><span class="mit-mono">${e.sollStunden}h</span></td>
         <td><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
-        <td>${e.paymentMethod==='BAR'
-          ? '<span class="mit-pill" style="background:rgba(234,179,8,.12);color:#b45309;font-size:.7rem">💵 BAR</span>'
-          : '<span class="mit-pill" style="background:rgba(99,102,241,.1);color:var(--accent);font-size:.7rem">🏦 Überweisung</span>'}</td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:2px;line-height:1.2">
+            ${(e.bruttoGehalt - (e.barGehalt||0)) > 0 ? `<span style="font-size:.7rem;color:var(--accent)">🏦 ${formatEuro(e.bruttoGehalt - (e.barGehalt||0))}</span>` : ''}
+            ${(e.barGehalt||0) > 0 ? `<span style="font-size:.7rem;color:#b45309">💵 ${formatEuro(e.barGehalt)}</span>` : ''}
+            ${!e.barGehalt && !e.bruttoGehalt ? '<span style="font-size:.7rem;color:var(--text-muted)">—</span>' : ''}
+          </div>
+        </td>
         <td><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
       `:''}
       <td class="tc">${statusHTML}</td>
@@ -1197,10 +1201,8 @@ function viewEmp(id){
   const vr=e.vacTotal-e.vacUsed,pl=ev.filter(v=>(v.status==='approved'||v.status==='pending')&&v.from>='2026-03-20').reduce((s,v)=>s+v.days,0);
   const planH=calcPlanHours(e.id);
   const hourly=calcHourly(e);
-
   const deptOpts=DEPTS.map(d=>d.name).filter((v,i,a)=>a.indexOf(v)===i);
 
-  // Gehalt section (nur Inhaber)
   let adminSection='';
   if(isAdmin){
     adminSection=`
@@ -1211,19 +1213,18 @@ function viewEmp(id){
         <input class="form-input" type="number" id="edSoll" value="${e.sollStunden}" onchange="recalcSalary(${e.id},'soll')"></div>
       <div class="form-group"><label class="form-label">Plan-Stunden (aktueller Monat)</label>
         <div style="font-family:'Space Mono',monospace;font-size:1.1rem;padding:10px 0;color:${planH>=e.sollStunden?'var(--success)':'var(--danger)'}">${planH}h <span style="font-size:.75rem;color:var(--text-muted)">von ${e.sollStunden}h Soll</span></div></div>
-      <div class="form-group"><label class="form-label">Brutto Gehalt / Monat (neu)</label>
-        <input class="form-input" type="number" step="0.01" id="edBrutto" value="${e.bruttoGehalt}" placeholder="Neuen Betrag eingeben"></div>
-      <div class="form-group"><label class="form-label">Zahlungsart</label>
-        <select class="form-select" id="edPayMethod" onchange="updateEmpText(${e.id},'paymentMethod',this.value)">
-          <option value="Überweisung" ${e.paymentMethod!=='BAR'?'selected':''}>🏦 Überweisung</option>
-          <option value="BAR" ${e.paymentMethod==='BAR'?'selected':''}>💵 BAR</option>
-        </select></div>
+      <div class="form-group"><label class="form-label">🏦 Überweisung (€/Monat)</label>
+        <input class="form-input" type="number" step="0.01" id="edUeberweisung" value="${e.bruttoGehalt-(e.barGehalt||0)}" placeholder="0.00" oninput="recalcBrutto(${e.id})"></div>
+      <div class="form-group"><label class="form-label">💵 BAR (€/Monat)</label>
+        <input class="form-input" type="number" step="0.01" id="edBar" value="${e.barGehalt||0}" placeholder="0.00" oninput="recalcBrutto(${e.id})"></div>
+      <div class="form-group"><label class="form-label">Brutto Gesamt (berechnet)</label>
+        <div id="edBruttoDisplay" style="font-family:'Space Mono',monospace;font-size:1.2rem;padding:10px 0;color:var(--success);font-weight:700">${formatEuro(e.bruttoGehalt)}</div></div>
       <div class="form-group"><label class="form-label">Gehalt / Stunde (berechnet)</label>
-        <input class="form-input" type="number" step="0.01" id="edHourly" value="${hourly}" onchange="recalcSalary(${e.id},'hourly')"></div>
+        <div id="edHourlyDisplay" style="font-family:'Space Mono',monospace;font-size:1rem;padding:10px 0;color:var(--text-muted)">${formatEuro(hourly)}/h</div></div>
       <div class="form-group"><label class="form-label">Notiz zur Änderung</label>
         <input class="form-input" id="edSalNote" placeholder="z.B. Gehaltserhöhung ab Mai 2025"></div>
     </div>
-    <button class="btn btn-primary" style="margin-top:4px" onclick="saveSalaryChange(${e.id},${e.bruttoGehalt})">💾 Änderung speichern</button>
+    <button class="btn btn-primary" style="margin-top:4px" onclick="saveSalaryChange(${e.id},${e.bruttoGehalt},${e.barGehalt||0})">💾 Änderung speichern</button>
     <hr style="border-color:var(--border);margin:16px 0">
     <h4 style="margin-bottom:8px">📋 Gehaltshistorie</h4>
     <div id="salHistArea_${e.id}" style="font-size:.82rem;color:var(--text-muted)">Wird geladen…</div>
@@ -1240,6 +1241,7 @@ function viewEmp(id){
         <div style="font-family:'Space Mono',monospace;font-size:1.3rem;padding:10px 0;color:var(--success)" id="edVacRemain">${vr-pl} Tage</div></div>
     </div>`;
   }
+
 
   openModalC('Mitarbeiter: '+e.name,`
     <div class="form-grid">
@@ -1992,26 +1994,43 @@ function recalcSalary(empId, changed){
   syncEmployeeField(empId, 'sollStunden', e.sollStunden);
 }
 
-// ═══ SALARY CHANGE (mit History) ═══
-async function saveSalaryChange(empId, oldBrutto) {
+// ═══ RECALC BRUTTO (live preview khi nhập BAR / Überweisung) ═══
+function recalcBrutto(empId) {
+  const ub = parseFloat(document.getElementById('edUeberweisung')?.value) || 0;
+  const bar = parseFloat(document.getElementById('edBar')?.value) || 0;
+  const total = ub + bar;
+  const soll = parseFloat(document.getElementById('edSoll')?.value) || 0;
+  const hourly = soll > 0 ? Math.round(total / soll * 100) / 100 : 0;
+  const dispB = document.getElementById('edBruttoDisplay');
+  const dispH = document.getElementById('edHourlyDisplay');
+  if (dispB) dispB.textContent = formatEuro(total);
+  if (dispH) dispH.textContent = formatEuro(hourly) + '/h';
+}
+
+// ═══ SALARY CHANGE (mit History + BAR Split) ═══
+async function saveSalaryChange(empId, oldBrutto, oldBar) {
   const e = EMPS.find(x => x.id === empId); if (!e) return;
-  const newBrutto = parseFloat(document.getElementById('edBrutto')?.value) || 0;
+  const newUeb = parseFloat(document.getElementById('edUeberweisung')?.value) || 0;
+  const newBar = parseFloat(document.getElementById('edBar')?.value) || 0;
+  const newBrutto = newUeb + newBar;
   const note = document.getElementById('edSalNote')?.value?.trim() || '';
   const soll = parseFloat(document.getElementById('edSoll')?.value) || e.sollStunden;
 
-  if (newBrutto === oldBrutto && soll === e.sollStunden) {
+  if (newBrutto === oldBrutto && newBar === oldBar && soll === e.sollStunden) {
     toast('Keine Änderung festgestellt.', 'warn'); return;
   }
 
-  // Update employee
+  // Update local + DB
   e.bruttoGehalt = newBrutto;
+  e.barGehalt = newBar;
   e.sollStunden = soll;
   await syncEmployeeField(empId, 'bruttoGehalt', newBrutto);
+  await syncEmployeeField(empId, 'barGehalt', newBar);
   await syncEmployeeField(empId, 'sollStunden', soll);
 
-  // Save history entry (only if brutto changed)
-  if (newBrutto !== oldBrutto) {
-    await syncSalaryHistory(empId, oldBrutto, newBrutto, note);
+  // Save to history if amounts changed
+  if (newBrutto !== oldBrutto || newBar !== (oldBar||0)) {
+    await syncSalaryHistory(empId, oldBrutto, newBrutto, oldBar||0, newBar, note);
   }
 
   toast('✓ Gehalt gespeichert & Änderung protokolliert');
@@ -2032,23 +2051,31 @@ async function renderSalaryHistory(empId) {
     <table style="width:100%;border-collapse:collapse;font-size:.8rem">
       <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted)">
         <th style="text-align:left;padding:4px 6px">Datum</th>
-        <th style="text-align:right;padding:4px 6px">Alt</th>
-        <th style="text-align:right;padding:4px 6px">Neu</th>
+        <th style="text-align:right;padding:4px 6px">Brutto alt</th>
+        <th style="text-align:right;padding:4px 6px">Brutto neu</th>
+        <th style="text-align:right;padding:4px 6px">🏦 Überweisung</th>
+        <th style="text-align:right;padding:4px 6px">💵 BAR</th>
         <th style="text-align:left;padding:4px 6px">Notiz</th>
-        <th style="text-align:left;padding:4px 6px">Geändert von</th>
+        <th style="text-align:left;padding:4px 6px">Von</th>
       </tr></thead>
       <tbody>
         ${history.map(h => {
-          const diff = (h.new_amount - h.old_amount);
+          const diff = (h.new_brutto||h.new_amount||0) - (h.old_brutto||h.old_amount||0);
           const diffColor = diff >= 0 ? 'var(--success)' : 'var(--danger)';
           const sign = diff >= 0 ? '+' : '';
           const dt = new Date(h.changed_at).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+          const newBrutto = h.new_brutto || h.new_amount || 0;
+          const oldBrutto = h.old_brutto || h.old_amount || 0;
+          const newBar = h.new_bar || 0;
+          const newUeb = newBrutto - newBar;
           return `<tr style="border-bottom:1px solid var(--border-light)">
             <td style="padding:5px 6px;color:var(--text-muted)">${dt}</td>
-            <td style="padding:5px 6px;text-align:right;font-family:monospace">${formatEuro(h.old_amount)}</td>
-            <td style="padding:5px 6px;text-align:right;font-family:monospace;font-weight:600">${formatEuro(h.new_amount)}</td>
-            <td style="padding:5px 6px;color:${diffColor};font-weight:600">${sign}${formatEuro(diff)}</td>
+            <td style="padding:5px 6px;text-align:right;font-family:monospace">${formatEuro(oldBrutto)}</td>
+            <td style="padding:5px 6px;text-align:right;font-family:monospace;font-weight:600;color:${diffColor}">${formatEuro(newBrutto)} <small>(${sign}${formatEuro(diff)})</small></td>
+            <td style="padding:5px 6px;text-align:right;color:var(--accent)">${formatEuro(newUeb)}</td>
+            <td style="padding:5px 6px;text-align:right;color:#b45309">${formatEuro(newBar)}</td>
             <td style="padding:5px 6px;color:var(--text-muted)">${h.note||'—'}</td>
+            <td style="padding:5px 6px;color:var(--text-muted);font-size:.75rem">${h.changed_by||'—'}</td>
           </tr>`;
         }).join('')}
       </tbody>

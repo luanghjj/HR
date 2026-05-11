@@ -106,8 +106,8 @@ async function loadDataFromSupabase() {
         // Aufenthalt
         residencePermit: escapeHtml(e.residence_permit || ''),
         workPermitUntil: e.work_permit_until || '',
-        // Zahlung
-        paymentMethod: e.payment_method || 'Überweisung'
+        // Zahlung (BAR + Überweisung)
+        barGehalt: parseFloat(e.bar_gehalt) || 0
       }));
     }
 
