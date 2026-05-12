@@ -1104,8 +1104,8 @@ function renderEmployees(){
 
   <!-- Table -->
   <div class="mit-table-card">
-    <div class="mit-table-scroll">
-      <table class="mit-table">
+    <div class="mit-table-scroll" style="overflow-x:auto;-webkit-overflow-scrolling:touch;display:block;width:100%">
+      <table class="mit-table" style="width:max-content;min-width:100%;border-collapse:collapse;text-align:left">
         <thead><tr>
           <th>Name & Position</th>
           <th>Standort / Dept.</th>
