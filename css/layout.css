@@ -391,8 +391,6 @@
   flex: 1;
   padding: 28px 32px;
   overflow-y: auto;
-  overflow-x: clip;  /* clip without creating scroll container — allows child overflow-x:auto to work */
-  min-width: 0;      /* prevent flex blowout */
 }
 
 .page {

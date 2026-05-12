@@ -206,7 +206,7 @@
   background: var(--bg-card);
   border-radius: 26px;
   box-shadow: 0 2px 24px rgba(32,54,189,.05);
-  /* NOTE: no overflow:hidden here — allows horizontal scroll */
+  overflow: hidden;          /* constrain width → scroll wrapper creates real overflow */
   margin-bottom: 24px;
 }
 .mit-table-scroll {
