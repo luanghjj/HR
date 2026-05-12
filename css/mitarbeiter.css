@@ -246,7 +246,7 @@
 }
 .mit-table tbody tr:last-child { border-bottom: none; }
 .mit-table tbody tr:hover { background: rgba(248,249,251,.8); }
-.mit-table tbody td { padding: 14px 20px; vertical-align: middle; }
+.mit-table tbody td { padding: 14px 20px; vertical-align: middle; white-space: nowrap; }
 .mit-table tbody td:first-child { padding-left: 28px; }
 .mit-table tbody td:last-child  { padding-right: 28px; }
 
