@@ -210,16 +210,17 @@
   margin-bottom: 24px;
 }
 .mit-table-scroll {
-  overflow-x: auto;
+  overflow-x: scroll;          /* scroll = always show scrollbar (fix macOS hidden scrollbar) */
   -webkit-overflow-scrolling: touch;
   border-radius: 26px;
-  min-width: 0;              /* prevent flex/grid blowout */
+  min-width: 0;
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: rgba(99,102,241,.5) rgba(0,0,0,.08);
 }
-.mit-table-scroll::-webkit-scrollbar { height: 5px; }
-.mit-table-scroll::-webkit-scrollbar-track { background: transparent; }
-.mit-table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.mit-table-scroll::-webkit-scrollbar { height: 8px; }
+.mit-table-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,.05); border-radius: 4px; }
+.mit-table-scroll::-webkit-scrollbar-thumb { background: rgba(99,102,241,.45); border-radius: 4px; }
+.mit-table-scroll::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,.7); }
 .mit-table {
   width: max-content;        /* grow to fit content → creates overflow → scroll */
   min-width: 100%;           /* but fill container when narrow */
