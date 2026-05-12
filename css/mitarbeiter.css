@@ -206,9 +206,11 @@
   background: var(--bg-card);
   border-radius: 16px;
   box-shadow: 0 2px 24px rgba(32,54,189,.05);
-  overflow-x: scroll;          /* horizontal scroll */
-  overflow-y: visible;         /* don't clip rows */
   margin-bottom: 24px;
+  /* Lock width → force horizontal scroll */
+  max-width: calc(100vw - var(--sidebar-w) - 64px);
+  overflow-x: scroll;
+  overflow-y: visible;
   scrollbar-width: thin;
   scrollbar-color: rgba(99,102,241,.5) rgba(0,0,0,.06);
 }
