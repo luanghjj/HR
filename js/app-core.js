@@ -1103,7 +1103,7 @@ function renderEmployees(){
   </div>
 
   <!-- Table -->
-  <div class="mit-table-card" style="overflow-x:scroll;scrollbar-width:thin;scrollbar-color:rgba(99,102,241,.5) rgba(0,0,0,.06)">
+  <div class="mit-table-card">
     <table class="mit-table" style="width:max-content;min-width:100%;border-collapse:collapse;text-align:left">
         <thead><tr>
           <th>Name & Position</th>

@@ -204,11 +204,18 @@
 /* ─── Table Card ─── */
 .mit-table-card {
   background: var(--bg-card);
-  border-radius: 26px;
+  border-radius: 16px;
   box-shadow: 0 2px 24px rgba(32,54,189,.05);
-  overflow: hidden;          /* constrain width → scroll wrapper creates real overflow */
+  overflow-x: scroll;          /* horizontal scroll */
+  overflow-y: visible;         /* don't clip rows */
   margin-bottom: 24px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99,102,241,.5) rgba(0,0,0,.06);
 }
+.mit-table-card::-webkit-scrollbar { height: 8px; }
+.mit-table-card::-webkit-scrollbar-track { background: rgba(0,0,0,.05); border-radius: 0 0 16px 16px; }
+.mit-table-card::-webkit-scrollbar-thumb { background: rgba(99,102,241,.5); border-radius: 4px; }
+.mit-table-card::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,.75); }
 .mit-table-scroll {
   overflow-x: scroll;          /* scroll = always show scrollbar (fix macOS hidden scrollbar) */
   -webkit-overflow-scrolling: touch;
