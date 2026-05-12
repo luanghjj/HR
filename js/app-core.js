@@ -2724,7 +2724,7 @@ function renderSchedule(){
       });
     }
     const showH=can('seeFinancials');
-    let h='<div class="sc2-grid-wrap"><div class="table-wrap" style="overflow-x:auto"><table><thead><tr><th style="min-width:200px">Mitarbeiter</th>';
+    let h='<div class="sc2-grid-wrap"><table style="width:max-content;min-width:100%"><thead><tr><th style="min-width:200px">Mitarbeiter</th>';
     dayD.forEach((ds,i)=>{const d=new Date(ds);const isToday=ds===isoDate(new Date());h+=`<th${isToday?' class="is-today"':''}><div class="th-day">${DAYS_DE[i]}</div><div class="th-date">${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}</div></th>`;});
     if(showH)h+='<th style="text-align:right">Σ Std.</th>';
     h+='</tr></thead><tbody>';
@@ -2813,7 +2813,7 @@ function renderSchedule(){
       h+='</tr>';
     });
     if(!emps.length)h+=`<tr><td colspan="${8+(showH?1:0)}" style="text-align:center;color:var(--text-muted)">Keine Schichten</td></tr>`;
-    h+='</tbody></table></div></div>';
+    h+='</tbody></table></div>';
     // Add footer and stats bento
     const _deptColors={};DEPTS.forEach(dept=>{_deptColors[dept.name]=dept.color||'var(--accent)';});
     const _deptHours={};shifts.filter(s=>_wkDays.includes(s.date)&&!s.isSick&&!s.isVacation).forEach(s=>{const[fh,fm]=s.from.split(':').map(Number);const[th,tm]=s.to.split(':').map(Number);const h2=(th+tm/60)-(fh+fm/60);_deptHours[s.dept]=(_deptHours[s.dept]||0)+h2;});
