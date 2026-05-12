@@ -2743,25 +2743,25 @@ function renderSchedule(){
           if (tr && tr.isLate && !s.isLate) { s.isLate = true; s.lateMin = tr.lateMin || 0; }
           // Compact mode for special days
           if (s.isSick) {
-            h+=`<div class="shift-block compact-block is-sick"
+            h+=`<div class="shift-block compact-block is-sick" ${canEdit?`onclick="shiftBlockTap(${s.id})"`:''}
               ${canEdit?`draggable="true" ondragstart="onDragStart(event,${s.id})" ondragend="onDragEnd(event)"`:''}  data-sid="${s.id}">
               <span class="compact-letter">K</span>
               ${canEdit?`<div class="shift-actions"><button class="shift-action-btn sick-btn" onclick="event.stopPropagation();markSick(${s.id})" title="Gesund">✅</button><button class="shift-action-btn" onclick="event.stopPropagation();deleteShift(${s.id})" title="Löschen" style="color:var(--danger)">🗑️</button></div>`:''}</div>`;
           } else if (s.isVacation) {
             const vLetter = s.vacHalf ? 'A' : 'B';
             const vClass = s.vacHalf ? 'is-vacation vac-half' : 'is-vacation';
-            h+=`<div class="shift-block compact-block ${vClass}"
+            h+=`<div class="shift-block compact-block ${vClass}" ${canEdit?`onclick="shiftBlockTap(${s.id})"`:''}
               ${canEdit?`draggable="true" ondragstart="onDragStart(event,${s.id})" ondragend="onDragEnd(event)"`:''}  data-sid="${s.id}">
               <span class="compact-letter">${vLetter}</span>
               ${canEdit?`<div class="shift-actions"><button class="shift-action-btn vac-btn" onclick="event.stopPropagation();markVac(${s.id})" title="Aufheben">✅</button><button class="shift-action-btn" onclick="event.stopPropagation();deleteShift(${s.id})" title="Löschen" style="color:var(--danger)">🗑️</button></div>`:''}</div>`;
           } else if (s.label === 'Schule' || s.colorClass === 'schule') {
-            h+=`<div class="shift-block compact-block schule" ${canEdit?`onclick="editShift(${s.id})" style="cursor:pointer"`:''}  
+            h+=`<div class="shift-block compact-block schule" ${canEdit?`onclick="shiftBlockTap(${s.id})" style="cursor:pointer"`:''}  
               ${canEdit?`draggable="true" ondragstart="onDragStart(event,${s.id})" ondragend="onDragEnd(event)"`:''}  data-sid="${s.id}">
               <span class="compact-letter">S</span>
               <div class="shift-time">${s.from}–${s.to}</div>
               ${canEdit?`<div class="shift-actions"><button class="shift-action-btn sick-btn" onclick="event.stopPropagation();markSick(${s.id})" title="Krank">🏥</button><button class="shift-action-btn" onclick="event.stopPropagation();deleteShift(${s.id})" title="Löschen" style="color:var(--danger)">🗑️</button></div>`:''}</div>`;
           } else {
-            h+=`<div class="shift-block ${s.colorClass} ${s.isLate?'is-late':''}" ${canEdit?`onclick="editShift(${s.id})" style="cursor:pointer"`:''}  
+            h+=`<div class="shift-block ${s.colorClass} ${s.isLate?'is-late':''}" ${canEdit?`onclick="shiftBlockTap(${s.id})" style="cursor:pointer"`:''}  
               ${canEdit?`draggable="true" ondragstart="onDragStart(event,${s.id})" ondragend="onDragEnd(event)"`:''}  data-sid="${s.id}">
               <div class="shift-name">${s.label}${s.isLate?' <span class="late-marker">⏰+'+s.lateMin+'m</span>':''}</div>
               <div class="shift-time">${s.from}–${s.to}</div>
@@ -2930,6 +2930,61 @@ async function saveQuickShift() {
   } catch (e) {
     console.error('[QuickAdd]', e);
     toast('Fehler beim Speichern', 'err');
+  }
+}
+
+// ═══ MOBILE BOTTOM SHEET FOR SHIFT ACTIONS ═══
+function isMobileView() { return window.innerWidth <= 768; }
+
+function openShiftBS(shiftId, shiftType) {
+  const s = SHIFTS.find(x => x.id === shiftId);
+  if (!s) return;
+
+  const overlay = document.getElementById('shiftBsOverlay');
+  const panel = document.getElementById('shiftBsPanel');
+  const title = document.getElementById('shiftBsTitle');
+  const grid = document.getElementById('shiftBsGrid');
+
+  title.textContent = `${s.empName} · ${s.from}–${s.to}`;
+
+  let btns = '';
+  if (s.isSick) {
+    btns = `
+      <button class="shift-bs-btn vac" onclick="closeShiftBS();markSick(${shiftId})"><span class="bs-icon">✅</span><span class="bs-label">Gesund melden</span></button>
+      <button class="shift-bs-btn delete" onclick="closeShiftBS();deleteShift(${shiftId})"><span class="bs-icon">🗑️</span><span class="bs-label">Löschen</span></button>`;
+  } else if (s.isVacation) {
+    btns = `
+      <button class="shift-bs-btn vac" onclick="closeShiftBS();markVac(${shiftId})"><span class="bs-icon">✅</span><span class="bs-label">Aufheben</span></button>
+      <button class="shift-bs-btn delete" onclick="closeShiftBS();deleteShift(${shiftId})"><span class="bs-icon">🗑️</span><span class="bs-label">Löschen</span></button>`;
+  } else {
+    btns = `
+      <button class="shift-bs-btn edit" onclick="closeShiftBS();editShift(${shiftId})"><span class="bs-icon">✏️</span><span class="bs-label">Bearbeiten</span></button>
+      <button class="shift-bs-btn sick" onclick="closeShiftBS();markSick(${shiftId})"><span class="bs-icon">🏥</span><span class="bs-label">Krank</span></button>
+      <button class="shift-bs-btn vac" onclick="closeShiftBS();markVac(${shiftId})"><span class="bs-icon">🏖️</span><span class="bs-label">Urlaub</span></button>
+      <button class="shift-bs-btn late" onclick="closeShiftBS();markLateShift(${shiftId})"><span class="bs-icon">⏰</span><span class="bs-label">Verspätet</span></button>
+      <button class="shift-bs-btn delete" onclick="closeShiftBS();deleteShift(${shiftId})" style="grid-column:1/-1"><span class="bs-icon">🗑️</span><span class="bs-label">Löschen</span></button>`;
+  }
+  grid.innerHTML = btns;
+
+  requestAnimationFrame(() => {
+    overlay.classList.add('active');
+    panel.classList.add('active');
+  });
+}
+
+function closeShiftBS() {
+  document.getElementById('shiftBsOverlay').classList.remove('active');
+  document.getElementById('shiftBsPanel').classList.remove('active');
+}
+
+// Intercept shift block clicks on mobile → open bottom sheet
+function shiftBlockTap(shiftId, originalAction) {
+  if (isMobileView()) {
+    openShiftBS(shiftId);
+  } else {
+    // Desktop: run original action (editShift)
+    if (typeof originalAction === 'function') originalAction();
+    else editShift(shiftId);
   }
 }
 

@@ -256,5 +256,16 @@ function switchLoginMode(mode) {
   setInterval(function(){_c=0; console.log('%c','font-size:0',window.__dt);},2000);
 })();
 </script>
+
+<!-- Mobile Shift Action Bottom Sheet -->
+<div class="shift-bottom-sheet-overlay" id="shiftBsOverlay" onclick="closeShiftBS()"></div>
+<div class="shift-bottom-sheet" id="shiftBsPanel">
+  <div class="shift-bs-handle"></div>
+  <div class="shift-bs-title" id="shiftBsTitle">Schicht-Aktionen</div>
+  <div class="shift-bs-grid" id="shiftBsGrid"></div>
+  <button class="shift-bs-cancel" onclick="closeShiftBS()">Abbrechen</button>
+</div>
+
 </body>
+
 </html>

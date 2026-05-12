@@ -530,30 +530,88 @@
   .sc2-bento .is-blue { grid-column: 1; }
   .sc2-title { font-size: 1.5rem; }
 
-  /* Mobile: always show shift action buttons (no hover on touch) */
+  /* Mobile: keep hover actions hidden — use bottom sheet instead */
   .sc2-grid-wrap .shift-block .shift-actions {
-    display: flex !important;
-    position: relative;
-    inset: auto;
-    background: none;
-    backdrop-filter: none;
-    border-radius: 0;
-    padding: 6px 0 0;
-    gap: 6px;
-    justify-content: flex-start;
-  }
-  .sc2-grid-wrap .shift-action-btn {
-    width: 40px; height: 40px;
-    font-size: 1.1rem;
-    border: 1px solid var(--border);
-    box-shadow: 0 1px 4px rgba(0,0,0,.08);
-  }
-  .sc2-grid-wrap .shift-block {
-    min-height: auto;
-    padding: 8px 10px;
-  }
-  .sc2-grid-wrap .shift-cell {
-    min-height: auto;
+    display: none !important;
   }
 }
 
+/* ─── Mobile Shift Action Bottom Sheet ─── */
+.shift-bottom-sheet-overlay {
+  position: fixed; inset: 0; z-index: 9998;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity .2s ease;
+  pointer-events: none;
+}
+.shift-bottom-sheet-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.shift-bottom-sheet {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;
+  background: var(--bg-card);
+  border-radius: 24px 24px 0 0;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 40px rgba(0,0,0,.15);
+  transform: translateY(100%);
+  transition: transform .25s cubic-bezier(.32,.72,0,1);
+}
+.shift-bottom-sheet.active {
+  transform: translateY(0);
+}
+.shift-bs-handle {
+  width: 40px; height: 4px;
+  background: var(--border); border-radius: 4px;
+  margin: 0 auto 16px;
+}
+.shift-bs-title {
+  font-size: .75rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-muted); margin-bottom: 16px;
+  text-align: center;
+}
+.shift-bs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.shift-bs-btn {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px;
+  padding: 20px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  cursor: pointer;
+  transition: all .15s;
+  min-height: 80px;
+}
+.shift-bs-btn:active {
+  transform: scale(.95);
+  background: rgba(99,102,241,.1);
+}
+.shift-bs-btn .bs-icon {
+  font-size: 1.8rem;
+}
+.shift-bs-btn .bs-label {
+  font-size: .78rem; font-weight: 700;
+  color: var(--text-primary);
+}
+.shift-bs-btn.sick   { border-color: #fecaca; background: #fef2f2; }
+.shift-bs-btn.vac    { border-color: #bbf7d0; background: #f0fdf4; }
+.shift-bs-btn.late   { border-color: #fde68a; background: #fffbeb; }
+.shift-bs-btn.delete { border-color: #fecaca; background: #fff5f5; }
+.shift-bs-btn.edit   { border-color: #c7d2fe; background: #eef2ff; }
+.shift-bs-cancel {
+  display: block; width: 100%;
+  padding: 16px; margin-top: 12px;
+  border-radius: 14px; border: none;
+  background: var(--bg-input);
+  font-size: .9rem; font-weight: 700;
+  color: var(--text-secondary);
+  cursor: pointer; transition: .15s;
+}
+.shift-bs-cancel:active { background: var(--border); }
