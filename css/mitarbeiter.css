@@ -213,7 +213,7 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   border-radius: 26px;
-  /* Scrollbar styling */
+  min-width: 0;              /* prevent flex/grid blowout */
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
@@ -221,7 +221,8 @@
 .mit-table-scroll::-webkit-scrollbar-track { background: transparent; }
 .mit-table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 .mit-table {
-  width: 100%;
+  width: max-content;        /* grow to fit content → creates overflow → scroll */
+  min-width: 100%;           /* but fill container when narrow */
   border-collapse: collapse;
   text-align: left;
 }
