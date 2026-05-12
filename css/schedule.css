@@ -155,15 +155,23 @@
 .sc2-grid-wrap {
   background: var(--bg-card);
   border-radius: 24px;
-  overflow: hidden;
+  overflow-x: scroll;
+  overflow-y: visible;
   box-shadow: 0 4px 24px rgba(0,0,0,.08);
   border: 1px solid var(--border);
   margin-bottom: 24px;
+  max-width: calc(100vw - var(--sidebar-w) - 64px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99,102,241,.5) rgba(0,0,0,.06);
 }
-.sc2-grid-wrap .table-wrap { overflow-x: auto; margin: 0; }
+.sc2-grid-wrap::-webkit-scrollbar { height: 8px; }
+.sc2-grid-wrap::-webkit-scrollbar-track { background: rgba(0,0,0,.05); }
+.sc2-grid-wrap::-webkit-scrollbar-thumb { background: rgba(99,102,241,.5); border-radius: 4px; }
+.sc2-grid-wrap .table-wrap { overflow-x: visible; margin: 0; }
 .sc2-grid-wrap table {
-  width: 100%; border-collapse: collapse;
+  width: max-content; min-width: 100%; border-collapse: collapse;
 }
+
 
 /* Table header */
 .sc2-grid-wrap thead tr { background: var(--bg-input); }
@@ -529,6 +537,12 @@
   .sc2-bento { grid-template-columns: 1fr; }
   .sc2-bento .is-blue { grid-column: 1; }
   .sc2-title { font-size: 1.5rem; }
+
+  /* Mobile: grid wrap full width scroll */
+  .sc2-grid-wrap {
+    max-width: calc(100vw - 32px);
+    border-radius: 16px;
+  }
 
   /* Mobile: keep hover actions hidden — use bottom sheet instead */
   .sc2-grid-wrap .shift-block .shift-actions {
