@@ -529,4 +529,31 @@
   .sc2-bento { grid-template-columns: 1fr; }
   .sc2-bento .is-blue { grid-column: 1; }
   .sc2-title { font-size: 1.5rem; }
+
+  /* Mobile: always show shift action buttons (no hover on touch) */
+  .sc2-grid-wrap .shift-block .shift-actions {
+    display: flex !important;
+    position: relative;
+    inset: auto;
+    background: none;
+    backdrop-filter: none;
+    border-radius: 0;
+    padding: 6px 0 0;
+    gap: 6px;
+    justify-content: flex-start;
+  }
+  .sc2-grid-wrap .shift-action-btn {
+    width: 40px; height: 40px;
+    font-size: 1.1rem;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .sc2-grid-wrap .shift-block {
+    min-height: auto;
+    padding: 8px 10px;
+  }
+  .sc2-grid-wrap .shift-cell {
+    min-height: auto;
+  }
 }
+
