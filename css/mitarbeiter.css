@@ -218,6 +218,12 @@
 .mit-table-card::-webkit-scrollbar-track { background: rgba(0,0,0,.05); border-radius: 0 0 16px 16px; }
 .mit-table-card::-webkit-scrollbar-thumb { background: rgba(99,102,241,.5); border-radius: 4px; }
 .mit-table-card::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,.75); }
+@media (max-width: 768px) {
+  .mit-table-card {
+    max-width: calc(100vw - 24px);
+    border-radius: 12px;
+  }
+}
 .mit-table-scroll {
   overflow-x: scroll;          /* scroll = always show scrollbar (fix macOS hidden scrollbar) */
   -webkit-overflow-scrolling: touch;
