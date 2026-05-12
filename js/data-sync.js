@@ -275,8 +275,36 @@ async function saveBarBetrag(empId, monthStr, barBetrag, barComment) {
 }
 
 /**
- * Save Ausbildungsnachweis to Supabase
+ * Save Ü-Datum or BAR-Datum for a specific month
+ * @param {number} empId
+ * @param {string} monthStr - 'YYYY-MM'
+ * @param {'ueb'|'bar'} type
+ * @param {string} dateVal - 'YYYY-MM-DD' or ''
  */
+async function savePayDatum(empId, monthStr, type, dateVal) {
+  try {
+    const monthDate = monthStr + '-01';
+    const updatedBy = currentUser?.name || currentUser?.email || 'Unbekannt';
+    const ps = PAY_STATUS_CACHE[empId] || {};
+    const field = type === 'ueb' ? 'ue_datum' : 'bar_datum';
+    const { error } = await sb.from('payment_status').upsert({
+      emp_id: empId,
+      month: monthDate,
+      bar_status: ps.bar_status || 'ausstehend',
+      ueb_status: ps.ueb_status || 'ausstehend',
+      [field]: dateVal || null,
+      updated_at: new Date().toISOString(),
+      updated_by: updatedBy
+    }, { onConflict: 'emp_id,month' });
+    if (error) console.warn('[Sync] savePayDatum:', error.message);
+    else {
+      PAY_STATUS_CACHE[empId] = { ...ps, [field]: dateVal };
+      toast(`✓ ${type === 'ueb' ? 'Ü' : 'BAR'}-Datum: ${dateVal || '—'}`);
+    }
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+
+
 async function syncNachweis(n) {
   try {
     if (n.id && typeof n.id === 'number') {

@@ -206,10 +206,20 @@
   background: var(--bg-card);
   border-radius: 26px;
   box-shadow: 0 2px 24px rgba(32,54,189,.05);
-  overflow: hidden;
+  /* NOTE: no overflow:hidden here — allows horizontal scroll */
   margin-bottom: 24px;
 }
-.mit-table-scroll { overflow-x: auto; }
+.mit-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 26px;
+  /* Scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.mit-table-scroll::-webkit-scrollbar { height: 5px; }
+.mit-table-scroll::-webkit-scrollbar-track { background: transparent; }
+.mit-table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 .mit-table {
   width: 100%;
   border-collapse: collapse;

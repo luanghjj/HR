@@ -1112,7 +1112,7 @@ function renderEmployees(){
           <th>Resturlaub</th>
           <th>Kranktage</th>
           <th>Verspätungen</th>
-          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th style="color:var(--accent)">🏦 Überweisung</th><th>Ü-Status</th><th style="color:#b45309">💵 BAR</th><th style="font-size:.75rem;color:#b45309">BAR-Notiz</th><th>BAR-Status</th><th style="font-size:.75rem">🏦 Bank</th><th>€/Std.</th>':''}
+          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th style="color:var(--accent)">🏦 Überweisung</th><th>Ü-Status</th><th style="font-size:.75rem;color:var(--text-muted)">Ü-Datum</th><th style="color:#b45309">💵 BAR</th><th style="font-size:.75rem;color:#b45309">BAR-Notiz</th><th>BAR-Status</th><th style="font-size:.75rem;color:var(--text-muted)">BAR-Datum</th><th style="font-size:.75rem">🏦 Bank</th><th>€/Std.</th>':''}
           <th class="tc">Status</th>
           <th></th>
         </tr></thead>
@@ -1274,12 +1274,22 @@ function renderEmpRows(emps){
 
           const lockedBadge = (isManager && monthClosed) ? '<span style="font-size:.62rem;color:var(--danger)" title="Monat gesperrt">🔒</span>' : '';
 
+          // Date inputs for Ü-Datum and BAR-Datum
+          const ueDatumVal = ps?.ue_datum || '';
+          const barDatumVal = ps?.bar_datum || '';
+          const mkDate = (type, val, editable) => editable
+            ? `<input type="date" value="${val}" style="font-size:.68rem;padding:2px 5px;border-radius:5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);width:110px"
+                onchange="savePayDatum(${e.id},'${curMonth}','${type}',this.value)">`
+            : (val ? `<span style="font-size:.7rem;color:var(--text-muted);font-family:'Space Mono',monospace">${val}</span>` : '<span style="color:var(--text-muted);font-size:.7rem">—</span>');
+
           return `
           <td><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
           <td>${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
+          <td>${uebAmt > 0 ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>
           <td id="barAmtCell_${e.id}">${barAmtCell}</td>
           <td>${barCmtCell}</td>
           <td>${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
+          <td>${barAmt > 0 ? mkDate('bar', barDatumVal, canEditBar) : '—'}</td>
           <td>${bankCell}</td>`;
         })()}
         <td><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
