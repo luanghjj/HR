@@ -1103,9 +1103,8 @@ function renderEmployees(){
   </div>
 
   <!-- Table -->
-  <div class="mit-table-card">
-    <div class="mit-table-scroll" style="overflow-x:scroll;-webkit-overflow-scrolling:touch;display:block;width:100%">
-      <table class="mit-table" style="width:max-content;min-width:100%;border-collapse:collapse;text-align:left">
+  <div class="mit-table-card" style="overflow-x:scroll;scrollbar-width:thin;scrollbar-color:rgba(99,102,241,.5) rgba(0,0,0,.06)">
+    <table class="mit-table" style="width:max-content;min-width:100%;border-collapse:collapse;text-align:left">
         <thead><tr>
           <th>Name & Position</th>
           <th>Standort / Dept.</th>
@@ -1117,8 +1116,7 @@ function renderEmployees(){
           <th></th>
         </tr></thead>
         <tbody id="empTB"></tbody>
-      </table>
-    </div>
+    </table>
     <div class="mit-pagination"><span class="mit-pag-info">Zeige <strong>${emps.length}</strong> Mitarbeiter</span></div>
   </div>
 
