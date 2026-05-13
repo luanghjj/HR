@@ -1095,6 +1095,13 @@ function renderEmployees(){
           </button>` : ''}
         </div>`;
       })() : ''}
+      <div class="mit-col-toggle-wrap" style="position:relative">
+        <button class="mit-filter-btn" onclick="toggleColDropdown()" title="Spalten ein-/ausblenden"><span class="ms">view_column</span> Spalten</button>
+        <div class="mit-col-dropdown" id="mitColDropdown" style="display:none;position:absolute;top:100%;right:0;z-index:100;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.12);padding:12px;min-width:200px;max-height:400px;overflow-y:auto;margin-top:6px">
+          <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px">Spalten anzeigen</div>
+          <div id="mitColChecks"></div>
+        </div>
+      </div>
       <div class="mit-search-wrap">
         <span class="ms">search</span>
         <input class="mit-search" placeholder="Suchen..." oninput="filterEmps(this.value)">
@@ -1106,14 +1113,14 @@ function renderEmployees(){
   <div class="mit-table-card">
     <table class="mit-table" style="width:max-content;min-width:100%;border-collapse:collapse;text-align:left">
         <thead><tr>
-          <th>Name & Position</th>
-          <th>Standort / Dept.</th>
-          <th>Resturlaub</th>
-          <th>Kranktage</th>
-          <th>Verspätungen</th>
-          ${isAdmin?'<th>Schule</th><th>Plan Std.</th><th>Soll Std.</th><th>Brutto</th><th style="color:var(--accent)">🏦 Überweisung</th><th>Ü-Status</th><th style="font-size:.75rem;color:var(--text-muted)">Ü-Datum</th><th style="color:#b45309">💵 BAR</th><th style="font-size:.75rem;color:#b45309">BAR-Notiz</th><th>BAR-Status</th><th style="font-size:.75rem;color:var(--text-muted)">BAR-Datum</th><th style="font-size:.75rem">🏦 Bank</th><th>€/Std.</th>':''}
-          <th class="tc">Status</th>
-          <th></th>
+          <th data-col="name">Name & Position</th>
+          <th data-col="standort">Standort / Dept.</th>
+          <th data-col="urlaub">Resturlaub</th>
+          <th data-col="krank">Kranktage</th>
+          <th data-col="verspat">Verspätungen</th>
+          ${isAdmin?'<th data-col="schule">Schule</th><th data-col="plan">Plan Std.</th><th data-col="soll">Soll Std.</th><th data-col="brutto">Brutto</th><th data-col="ueb" style="color:var(--accent)">🏦 Überweisung</th><th data-col="ueb_st">Ü-Status</th><th data-col="ueb_dat" style="font-size:.75rem;color:var(--text-muted)">Ü-Datum</th><th data-col="bar" style="color:#b45309">💵 BAR</th><th data-col="bar_notiz" style="font-size:.75rem;color:#b45309">BAR-Notiz</th><th data-col="bar_st">BAR-Status</th><th data-col="bar_dat" style="font-size:.75rem;color:var(--text-muted)">BAR-Datum</th><th data-col="bank" style="font-size:.75rem">🏦 Bank</th><th data-col="hourly">€/Std.</th>':''}
+          <th data-col="status" class="tc">Status</th>
+          <th data-col="actions"></th>
         </tr></thead>
         <tbody id="empTB"></tbody>
     </table>
@@ -1176,7 +1183,7 @@ function renderEmpRows(emps){
     // Online dot color
     const dotColor=st==='aktiv'||st==='active'?'#22c55e':st==='urlaub'||st==='vacation'?'#f59e0b':'#94a3b8';
     return`<tr class="mit-emp-row">
-      <td>
+      <td data-col="name">
         <div class="mit-emp-cell">
           <div class="mit-emp-dot" style="background:${avatarBg}">
             ${initials}
@@ -1188,11 +1195,11 @@ function renderEmpRows(emps){
           </div>
         </div>
       </td>
-      <td>
+      <td data-col="standort">
         <div class="mit-loc-main">${getLocationName(e.location)}</div>
         <div class="mit-loc-sub">${e.dept}</div>
       </td>
-      <td>
+      <td data-col="urlaub">
         <div class="mit-vac-wrap">
           <div class="mit-vac-nums">
             <span class="mit-vac-remain">${vacRemain} Tage</span>
@@ -1201,13 +1208,13 @@ function renderEmpRows(emps){
           <div class="mit-vac-bar"><div class="mit-vac-fill" style="width:${vacUsedPct}%"></div></div>
         </div>
       </td>
-      <td><span class="${e.sickDays>3?'mit-pill sick':''}" style="${e.sickDays<=3?'font-size:.82rem;color:var(--text-muted)':''}">${e.sickDays}</span></td>
-      <td>${e.lateCount?`<span class="mit-pill late">${e.lateCount}×</span>`:'—'}</td>
+      <td data-col="krank"><span class="${e.sickDays>3?'mit-pill sick':''}" style="${e.sickDays<=3?'font-size:.82rem;color:var(--text-muted)':''}">${e.sickDays}</span></td>
+      <td data-col="verspat">${e.lateCount?`<span class="mit-pill late">${e.lateCount}×</span>`:'—'}</td>
       ${isAdmin?`
-        <td>${e.schuleTage>0?`<span class="mit-pill schule">${e.schuleTage}T</span>`:'—'}</td>
-        <td><span class="mit-mono" style="color:${sollColor}">${planH}h</span></td>
-        <td><span class="mit-mono">${e.sollStunden}h</span></td>
-        <td><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
+        <td data-col="schule">${e.schuleTage>0?`<span class="mit-pill schule">${e.schuleTage}T</span>`:'—'}</td>
+        <td data-col="plan"><span class="mit-mono" style="color:${sollColor}">${planH}h</span></td>
+        <td data-col="soll"><span class="mit-mono">${e.sollStunden}h</span></td>
+        <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
         ${(() => {
           const ps = PAY_STATUS_CACHE[e.id];
           const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
@@ -1281,19 +1288,19 @@ function renderEmpRows(emps){
             : (val ? `<span style="font-size:.7rem;color:var(--text-muted);font-family:'Space Mono',monospace">${val}</span>` : '<span style="color:var(--text-muted);font-size:.7rem">—</span>');
 
           return `
-          <td><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
-          <td>${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
-          <td>${uebAmt > 0 ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>
-          <td id="barAmtCell_${e.id}">${barAmtCell}</td>
-          <td>${barCmtCell}</td>
-          <td>${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
-          <td>${barAmt > 0 ? mkDate('bar', barDatumVal, canEditBar) : '—'}</td>
-          <td>${bankCell}</td>`;
+          <td data-col="ueb"><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
+          <td data-col="ueb_st">${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
+          <td data-col="ueb_dat">${uebAmt > 0 ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>
+          <td data-col="bar" id="barAmtCell_${e.id}">${barAmtCell}</td>
+          <td data-col="bar_notiz">${barCmtCell}</td>
+          <td data-col="bar_st">${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
+          <td data-col="bar_dat">${barAmt > 0 ? mkDate('bar', barDatumVal, canEditBar) : '—'}</td>
+          <td data-col="bank">${bankCell}</td>`;
         })()}
-        <td><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
+        <td data-col="hourly"><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>
       `:''}
-      <td class="tc">${statusHTML}</td>
-      <td>
+      <td data-col="status" class="tc">${statusHTML}</td>
+      <td data-col="actions">
         <div class="mit-actions">
           ${can('markLate')?`<button class="mit-icon-btn" onclick="openLateModal(${e.id})" title="Verspätung"><span class="ms">alarm_on</span></button>`:''}
           <button class="mit-detail-btn" onclick="viewEmp(${e.id})">Details</button>
@@ -1301,6 +1308,7 @@ function renderEmpRows(emps){
       </td>
     </tr>`;
   }).join('');
+  setTimeout(applyMitColVisibility,0);
 }
 
 function filterEmps(q){const emps=getVisibleEmps().filter(e=>e.name.toLowerCase().includes(q.toLowerCase())||e.dept.toLowerCase().includes(q.toLowerCase()));renderEmpRows(emps);}
@@ -1310,6 +1318,76 @@ function filterEmpsByDept(dept,btn){
   const emps=dept==='all'?getVisibleEmps():getVisibleEmps().filter(e=>e.dept===dept);
   renderEmpRows(emps);
 }
+
+// ═══ COLUMN TOGGLE (Spalten ausblenden) ═══
+const MIT_COL_LABELS = {
+  name:'Name & Position', standort:'Standort', urlaub:'Resturlaub', krank:'Kranktage', verspat:'Verspätungen',
+  schule:'Schule', plan:'Plan Std.', soll:'Soll Std.', brutto:'Brutto',
+  ueb:'Überweisung', ueb_st:'Ü-Status', ueb_dat:'Ü-Datum',
+  bar:'BAR', bar_notiz:'BAR-Notiz', bar_st:'BAR-Status', bar_dat:'BAR-Datum',
+  bank:'Bank', hourly:'€/Std.', status:'Status', actions:'Aktionen'
+};
+const MIT_COL_FIXED = ['name','actions']; // always visible
+
+function getMitColState() {
+  try { return JSON.parse(localStorage.getItem('mitColState') || '{}'); } catch { return {}; }
+}
+function saveMitColState(state) {
+  localStorage.setItem('mitColState', JSON.stringify(state));
+}
+
+function toggleColDropdown() {
+  const dd = document.getElementById('mitColDropdown');
+  const isOpen = dd.style.display !== 'none';
+  dd.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) initColChecks();
+}
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  const dd = document.getElementById('mitColDropdown');
+  if (!dd) return;
+  const wrap = e.target.closest('.mit-col-toggle-wrap');
+  if (!wrap && dd.style.display !== 'none') dd.style.display = 'none';
+});
+
+function initColChecks() {
+  const container = document.getElementById('mitColChecks');
+  if (!container) return;
+  const state = getMitColState();
+  const cols = document.querySelectorAll('.mit-table th[data-col]');
+  const colKeys = [...new Set([...cols].map(th => th.dataset.col))];
+
+  container.innerHTML = colKeys.map(key => {
+    if (MIT_COL_FIXED.includes(key)) return '';
+    const label = MIT_COL_LABELS[key] || key;
+    const checked = state[key] !== false;
+    return `<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:.82rem;font-weight:600;color:var(--text-primary);border-radius:8px;transition:.12s"
+      onmouseenter="this.style.background='var(--bg-input)'" onmouseleave="this.style.background='transparent'">
+      <input type="checkbox" ${checked?'checked':''} onchange="toggleMitCol('${key}',this.checked)" style="accent-color:var(--accent);width:16px;height:16px">
+      ${label}
+    </label>`;
+  }).join('');
+}
+
+function toggleMitCol(key, visible) {
+  const state = getMitColState();
+  state[key] = visible;
+  saveMitColState(state);
+  applyMitColVisibility();
+}
+
+function applyMitColVisibility() {
+  const state = getMitColState();
+  Object.keys(MIT_COL_LABELS).forEach(key => {
+    if (MIT_COL_FIXED.includes(key)) return;
+    const hidden = state[key] === false;
+    document.querySelectorAll(`[data-col="${key}"]`).forEach(el => {
+      el.style.display = hidden ? 'none' : '';
+    });
+  });
+}
+// Apply on page load after render
+const _origRenderEmpRows = typeof renderEmpRows === 'function' ? renderEmpRows : null;
 function viewEmp(id){
   const e=EMPS.find(x=>x.id===id);if(!e)return;
 
