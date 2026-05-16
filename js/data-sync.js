@@ -132,7 +132,7 @@ async function syncEmployeeField(empId, field, value) {
       healthInsurance: 'health_insurance', iban: 'iban',
       nationality: 'nationality', address: 'address',
       residencePermit: 'residence_permit', workPermitUntil: 'work_permit_until',
-      barGehalt: 'bar_gehalt'
+      barGehalt: 'bar_gehalt', nettoGehalt: 'netto_gehalt'
     };
     const col = colMap[field] || field;
     const { error } = await sb.from('employees').update({ [col]: value }).eq('id', empId);

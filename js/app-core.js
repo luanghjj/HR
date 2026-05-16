@@ -1423,6 +1423,10 @@ function viewEmp(id){
         <input class="form-input" type="number" step="0.01" id="edBar" value="${e.barGehalt||0}" placeholder="0.00" oninput="recalcBrutto(${e.id})"></div>
       <div class="form-group"><label class="form-label">Brutto Gesamt (berechnet)</label>
         <div id="edBruttoDisplay" style="font-family:'Space Mono',monospace;font-size:1.2rem;padding:10px 0;color:var(--success);font-weight:700">${formatEuro(e.bruttoGehalt)}</div></div>
+      <div class="form-group"><label class="form-label">Netto Gesamt (berechnet)</label>
+        <input class="form-input" type="number" step="0.01" id="edNetto" value="${e.nettoGehalt||0}" placeholder="0.00"
+          style="font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--info)"
+          onchange="saveNettoGehalt(${e.id},+this.value)"></div>
       <div class="form-group"><label class="form-label">Gehalt / Stunde (berechnet)</label>
         <div id="edHourlyDisplay" style="font-family:'Space Mono',monospace;font-size:1rem;padding:10px 0;color:var(--text-muted)">${formatEuro(hourly)}/h</div></div>
       <div class="form-group"><label class="form-label">Notiz zur Änderung</label>
@@ -2477,6 +2481,14 @@ async function saveSalaryChange(empId, oldBrutto, oldBar) {
   toast('✓ Gehalt gespeichert & Änderung protokolliert');
   renderSalaryHistory(empId);
   renderEmployees();
+}
+
+// ═══ NETTO GEHALT (Eingabe vom Steuerberater) ═══
+async function saveNettoGehalt(empId, value) {
+  const e = EMPS.find(x => x.id === empId); if (!e) return;
+  e.nettoGehalt = value;
+  await syncEmployeeField(empId, 'nettoGehalt', value);
+  toast('✓ Netto Gesamt gespeichert: ' + formatEuro(value));
 }
 
 async function renderSalaryHistory(empId) {

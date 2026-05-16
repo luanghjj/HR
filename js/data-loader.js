@@ -113,6 +113,7 @@ async function loadDataFromSupabase() {
         workPermitUntil: e.work_permit_until || '',
         // Zahlung (BAR + Überweisung)
         barGehalt: parseFloat(e.bar_gehalt) || 0,
+        nettoGehalt: parseFloat(e.netto_gehalt) || 0,
         bank: e.bank || ''
       }));
     }
