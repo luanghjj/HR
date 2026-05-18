@@ -165,11 +165,22 @@ async function syncSalaryHistory(empId, oldBrutto, newBrutto, oldBar, newBar, no
 
 /**
  * Load salary history for an employee from Supabase
+ * @param {number} empId
+ * @param {number|null} monthsLimit - if set, only load entries from last N months
  */
-async function loadSalaryHistory(empId) {
+async function loadSalaryHistory(empId, monthsLimit) {
   try {
-    const { data, error } = await sb.from('salary_history')
+    let query = sb.from('salary_history')
       .select('*').eq('emp_id', empId).order('changed_at', { ascending: false });
+
+    // Limit by date if monthsLimit is set (Manager: 3 months)
+    if (monthsLimit) {
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - monthsLimit);
+      query = query.gte('changed_at', cutoff.toISOString());
+    }
+
+    const { data, error } = await query;
     if (error) { console.warn('[Sync] SalaryHistory load error:', error.message); return []; }
     return data || [];
   } catch (e) { console.warn('[Sync]', e.message); return []; }

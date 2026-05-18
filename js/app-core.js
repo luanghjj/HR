@@ -1797,9 +1797,20 @@ async function savePayStatus(empId, type, value) {
   area.dataset.uebSt = uebSt;
 
   await syncPaymentStatus(empId, monthStr, barSt, uebSt);
-  toast(`✓ ${type === 'bar' ? 'BAR' : 'Überweisung'} Status → ${value === 'bezahlt' ? 'Bezahlt' : 'Ausstehend'}`);
 
+  // Log to Gehaltshistorie when status → bezahlt
+  if (value === 'bezahlt') {
+    const e = EMPS.find(x => x.id === empId);
+    if (e) {
+      const label = type === 'bar' ? '💵 BAR' : '🏦 Überweisung';
+      const amt = type === 'bar' ? (e.barGehalt || 0) : (e.bruttoGehalt - (e.barGehalt || 0));
+      await syncSalaryHistory(empId, amt, amt, 0, 0, label + ' bezahlt · ' + monthStr);
+    }
+  }
+
+  toast(`✓ ${type === 'bar' ? 'BAR' : 'Überweisung'} Status → ${value === 'bezahlt' ? 'Bezahlt' : 'Ausstehend'}`);
   loadAndRenderPayStatus(empId);
+  renderSalaryHistory(empId);
 }
 
 // Inline dropdown in table row (no modal needed)
@@ -1815,6 +1826,17 @@ async function savePayStatusFromTable(empId, type, value, monthStr, selectEl) {
     + (isBez ? 'background:rgba(16,185,129,.12);color:#059669' : 'background:rgba(245,158,11,.08);color:#d97706');
 
   await syncPaymentStatus(empId, monthStr, barSt, uebSt);
+
+  // Log to Gehaltshistorie when status → bezahlt
+  if (isBez) {
+    const e = EMPS.find(x => x.id === empId);
+    if (e) {
+      const label = type === 'bar' ? '💵 BAR' : '🏦 Überweisung';
+      const amt = type === 'bar' ? (e.barGehalt || 0) : (e.bruttoGehalt - (e.barGehalt || 0));
+      await syncSalaryHistory(empId, amt, amt, 0, 0, label + ' bezahlt · ' + monthStr);
+    }
+  }
+
   toast(`✓ ${type === 'bar' ? 'BAR' : 'Überweisung'}: ${isBez ? 'Bezahlt' : 'Offen'}`);
 }
 
@@ -2702,8 +2724,11 @@ async function renderSalaryHistory(empId) {
   if (!el) { console.warn('[SalHist] Area not found for emp', empId); return; }
   el.innerHTML = '<span style="color:var(--text-muted);font-size:.78rem">Lädt…</span>';
   try {
-    const history = await loadSalaryHistory(empId);
-    console.log('[SalHist] Loaded', history.length, 'entries for emp', empId);
+    // Manager: nur letzte 3 Monate, Inhaber: alles
+    const isInhaber = currentUser?.role === 'inhaber';
+    const monthsLimit = isInhaber ? null : 3;
+    const history = await loadSalaryHistory(empId, monthsLimit);
+    console.log('[SalHist] Loaded', history.length, 'entries for emp', empId, isInhaber ? '(all)' : '(3 months)');
     if (!history.length) {
       el.innerHTML = '<span style="color:var(--text-muted);font-size:.78rem">Keine Einträge vorhanden. Änderungen über "💾 Änderung speichern" werden hier protokolliert.</span>';
       return;
