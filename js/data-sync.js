@@ -149,7 +149,7 @@ async function syncEmployeeField(empId, field, value) {
 async function syncSalaryHistory(empId, oldBrutto, newBrutto, oldBar, newBar, note) {
   try {
     const changedBy = currentUser?.name || currentUser?.email || 'Unbekannt';
-    const { error } = await sb.from('salary_history').insert({
+    const payload = {
       emp_id: empId,
       old_brutto: parseFloat(oldBrutto) || 0,
       new_brutto: parseFloat(newBrutto) || 0,
@@ -157,10 +157,21 @@ async function syncSalaryHistory(empId, oldBrutto, newBrutto, oldBar, newBar, no
       new_bar:    parseFloat(newBar)    || 0,
       note: note || '',
       changed_by: changedBy
-    });
-    if (error) console.warn('[Sync] SalaryHistory error:', error.message);
-    else console.log('[Sync] ✓ Salary history saved');
-  } catch (e) { console.warn('[Sync]', e.message); }
+    };
+    console.log('[Sync] Inserting salary_history:', JSON.stringify(payload));
+    const { error } = await sb.from('salary_history').insert(payload);
+    if (error) {
+      console.warn('[Sync] SalaryHistory error:', error.message);
+      if (typeof toast === 'function') toast('⚠️ Gehaltshistorie Fehler: ' + error.message, 'danger');
+      return false;
+    }
+    console.log('[Sync] ✓ Salary history saved');
+    return true;
+  } catch (e) {
+    console.warn('[Sync] SalaryHistory exception:', e.message);
+    if (typeof toast === 'function') toast('⚠️ Gehaltshistorie: ' + e.message, 'danger');
+    return false;
+  }
 }
 
 /**
