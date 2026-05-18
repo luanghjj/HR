@@ -1422,7 +1422,9 @@ function viewEmp(id){
       <div class="form-group"><label class="form-label">💵 BAR (€/Monat)</label>
         <input class="form-input" type="number" step="0.01" id="edBar" value="${e.barGehalt||0}" placeholder="0.00" oninput="recalcBrutto(${e.id})"></div>
       <div class="form-group"><label class="form-label">Brutto Gesamt (berechnet)</label>
-        <div id="edBruttoDisplay" style="font-family:'Space Mono',monospace;font-size:1.2rem;padding:10px 0;color:var(--success);font-weight:700">${formatEuro(e.bruttoGehalt)}</div></div>
+        <input class="form-input" type="number" step="0.01" id="edBruttoDisplay" value="${e.bruttoGehalt}" placeholder="0.00"
+          style="font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--success)"
+          oninput="recalcFromBrutto(${e.id})"></div>
       <div class="form-group"><label class="form-label">Netto Gesamt (berechnet)</label>
         <input class="form-input" type="number" step="0.01" id="edNetto" value="${e.nettoGehalt||0}" placeholder="0.00"
           style="font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--info)"
@@ -2448,7 +2450,20 @@ function recalcBrutto(empId) {
   const hourly = soll > 0 ? Math.round(total / soll * 100) / 100 : 0;
   const dispB = document.getElementById('edBruttoDisplay');
   const dispH = document.getElementById('edHourlyDisplay');
-  if (dispB) dispB.textContent = formatEuro(total);
+  if (dispB) dispB.value = total;
+  if (dispH) dispH.textContent = formatEuro(hourly) + '/h';
+}
+
+// ═══ RECALC FROM BRUTTO (khi nhập Brutto trực tiếp → cập nhật Überweisung) ═══
+function recalcFromBrutto(empId) {
+  const brutto = parseFloat(document.getElementById('edBruttoDisplay')?.value) || 0;
+  const bar = parseFloat(document.getElementById('edBar')?.value) || 0;
+  const ueb = Math.max(0, brutto - bar);
+  const soll = parseFloat(document.getElementById('edSoll')?.value) || 0;
+  const hourly = soll > 0 ? Math.round(brutto / soll * 100) / 100 : 0;
+  const dispU = document.getElementById('edUeberweisung');
+  const dispH = document.getElementById('edHourlyDisplay');
+  if (dispU) dispU.value = ueb;
   if (dispH) dispH.textContent = formatEuro(hourly) + '/h';
 }
 
@@ -2457,7 +2472,7 @@ async function saveSalaryChange(empId, oldBrutto, oldBar) {
   const e = EMPS.find(x => x.id === empId); if (!e) return;
   const newUeb = parseFloat(document.getElementById('edUeberweisung')?.value) || 0;
   const newBar = parseFloat(document.getElementById('edBar')?.value) || 0;
-  const newBrutto = newUeb + newBar;
+  const newBrutto = parseFloat(document.getElementById('edBruttoDisplay')?.value) || (newUeb + newBar);
   const note = document.getElementById('edSalNote')?.value?.trim() || '';
   const soll = parseFloat(document.getElementById('edSoll')?.value) || e.sollStunden;
 
