@@ -1803,8 +1803,7 @@ async function savePayStatus(empId, type, value) {
     const e = EMPS.find(x => x.id === empId);
     if (e) {
       const label = type === 'bar' ? '💵 BAR' : '🏦 Überweisung';
-      const amt = type === 'bar' ? (e.barGehalt || 0) : (e.bruttoGehalt - (e.barGehalt || 0));
-      const ok = await syncSalaryHistory(empId, amt, amt, 0, 0, label + ' bezahlt · ' + monthStr);
+      const ok = await syncSalaryHistory(empId, e.bruttoGehalt, e.bruttoGehalt, e.barGehalt||0, e.barGehalt||0, label + ' bezahlt · ' + monthStr);
       if (ok) toast('📋 Gehaltshistorie aktualisiert', 'success');
     }
   }
@@ -1833,8 +1832,7 @@ async function savePayStatusFromTable(empId, type, value, monthStr, selectEl) {
     const e = EMPS.find(x => x.id === empId);
     if (e) {
       const label = type === 'bar' ? '💵 BAR' : '🏦 Überweisung';
-      const amt = type === 'bar' ? (e.barGehalt || 0) : (e.bruttoGehalt - (e.barGehalt || 0));
-      const ok = await syncSalaryHistory(empId, amt, amt, 0, 0, label + ' bezahlt · ' + monthStr);
+      const ok = await syncSalaryHistory(empId, e.bruttoGehalt, e.bruttoGehalt, e.barGehalt||0, e.barGehalt||0, label + ' bezahlt · ' + monthStr);
       if (ok) toast('📋 Gehaltshistorie aktualisiert', 'success');
     }
   }
