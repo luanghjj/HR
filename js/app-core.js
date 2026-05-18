@@ -1463,7 +1463,28 @@ function viewEmp(id){
         <input class="form-input" type="number" id="edSchule" value="${e.schuleTage}" onchange="updateEmpField(${e.id},'schuleTage',this.value)"></div>
       <div class="form-group"><label class="form-label">Verbleibender Resturlaub</label>
         <div style="font-family:'Space Mono',monospace;font-size:1.3rem;padding:10px 0;color:var(--success)" id="edVacRemain">${vr-pl} Tage</div></div>
-    </div>`;
+    </div>
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h4 style="margin-bottom:12px">📥 Steuerberater Export <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">DATEV</span></h4>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" style="font-size:.82rem;padding:8px 16px;display:flex;align-items:center;gap:6px" onclick="exportStammdatenCSV()">
+        <span class="ms" style="font-size:1rem">person</span> Stammdaten (CSV)
+      </button>
+      <div style="display:flex;align-items:center;gap:6px">
+        <select class="form-select" id="stbExportMonth" style="width:auto;font-size:.82rem;padding:4px 8px">
+          ${Array.from({length:12},(_,i)=>{
+            const d=new Date(); d.setMonth(d.getMonth()-i);
+            const val=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+            const label=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+            return \`<option value="\${val}" \${i===0?'selected':''}>\${label}</option>\`;
+          }).join('')}
+        </select>
+        <button class="btn btn-primary" style="font-size:.82rem;padding:8px 16px;display:flex;align-items:center;gap:6px" onclick="exportLohndatenCSV(document.getElementById('stbExportMonth').value)">
+          <span class="ms" style="font-size:1rem">payments</span> Lohndaten (CSV)
+        </button>
+      </div>
+    </div>
+    <p style="font-size:.72rem;color:var(--text-muted);margin-top:8px">Format: DATEV-kompatibel · Semikolon-getrennt · Windows-1252</p>`;
   }
 
 
@@ -1537,12 +1558,22 @@ function viewEmp(id){
     <hr style="border-color:var(--border);margin:16px 0">
     <h4 style="margin-bottom:12px;color:var(--accent)">PERSÖNLICH</h4>
     <div class="form-grid">
+      <div class="form-group"><label class="form-label">Vorname</label>
+        <input class="form-input" value="${e.firstName}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'firstName',this.value)"`:''} placeholder="Vorname"></div>
+      <div class="form-group"><label class="form-label">Nachname</label>
+        <input class="form-input" value="${e.lastName}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'lastName',this.value)"`:''} placeholder="Nachname"></div>
       <div class="form-group"><label class="form-label">Geburtsdatum</label>
         <input class="form-input" type="date" value="${e.birthday}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'birthday',this.value)"`:''}></div>
       <div class="form-group"><label class="form-label">Nationalität</label>
         <input class="form-input" value="${e.nationality}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'nationality',this.value)"`:''}></div>
-      <div class="form-group full"><label class="form-label">Adresse</label>
-        <input class="form-input" value="${e.address}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'address',this.value)"`:''}></div>
+      <div class="form-group full"><label class="form-label">Straße + Hausnummer</label>
+        <input class="form-input" value="${e.street}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'street',this.value)"`:''} placeholder="z.B. Königstr. 10"></div>
+      <div class="form-group"><label class="form-label">PLZ</label>
+        <input class="form-input" value="${e.zip}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'zip',this.value)"`:''} placeholder="z.B. 70173"></div>
+      <div class="form-group"><label class="form-label">Ort</label>
+        <input class="form-input" value="${e.city}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'city',this.value)"`:''} placeholder="z.B. Stuttgart"></div>
+      <div class="form-group full"><label class="form-label">Adresse (komplett)</label>
+        <input class="form-input" value="${e.address}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'address',this.value)"`:''} style="color:var(--text-muted);font-size:.85rem"></div>
     </div>
 
     <!-- ═══ AUFENTHALT ═══ -->
@@ -2504,6 +2535,166 @@ async function saveNettoGehalt(empId, value) {
   e.nettoGehalt = value;
   await syncEmployeeField(empId, 'nettoGehalt', value);
   toast('✓ Netto Gesamt gespeichert: ' + formatEuro(value));
+}
+
+// ═══════════════════════════════════════════════════════════
+// STEUERBERATER EXPORT (DATEV-kompatibel)
+// ═══════════════════════════════════════════════════════════
+
+// Helper: Zahl → deutsches Format (Komma als Dezimaltrenner)
+function fmtDE(num) {
+  if (num == null || isNaN(num)) return '0,00';
+  return Number(num).toFixed(2).replace('.', ',');
+}
+
+// Helper: Datum YYYY-MM-DD → DD.MM.YYYY
+function fmtDateDE(iso) {
+  if (!iso) return '';
+  const p = iso.split('-');
+  return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : iso;
+}
+
+// Helper: CSV-Feld escapen (Semikolon, Anführungszeichen)
+function csvField(val) {
+  const s = String(val ?? '');
+  if (s.includes(';') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s.includes(',') ? '"' + s + '"' : s;
+}
+
+// Helper: Personalnummer 5-stellig
+function persnr(id) { return String(id).padStart(5, '0'); }
+
+// Helper: CSV-Datei herunterladen
+function downloadCSV(filename, csvContent) {
+  // BOM für Excel-Kompatibilität (UTF-8)
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Helper: DATEV EXTF Header-Zeile
+function datevHeader(category, label, colCount) {
+  const now = new Date();
+  const ts = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+  // EXTF;700;Kategorie;Format-Label;Formatversion;Erzeugt-am;;;;;Spaltenanzahl
+  return `"EXTF";700;${category};"${label}";1;${ts};;;;;${colCount}`;
+}
+
+// ═══ EXPORT: Stammdaten ═══
+function exportStammdatenCSV() {
+  const emps = getVisibleEmps().filter(e => e.status === 'active' || e.status === 'aktiv');
+  if (!emps.length) { toast('Keine aktiven Mitarbeiter gefunden.', 'warn'); return; }
+
+  const headers = [
+    'Personalnummer','Nachname','Vorname','Geburtsdatum',
+    'Straße','PLZ','Ort','Nationalität',
+    'Steuerklasse','Steuer-ID','SV-Nummer','Krankenkasse',
+    'IBAN','Bank',
+    'Beschäftigungsart','Eintrittsdatum',
+    'Stunden_pro_Woche','Stunden_pro_Monat','Stundenlohn',
+    'Brutto_Gesamt','Netto_Gesamt',
+    'Aufenthaltstitel','Arbeitserlaubnis_bis',
+    'Standort','Bereich','Position','Status'
+  ];
+
+  const rows = emps.map(e => {
+    const vn = e.firstName || e.name.split(' ').slice(0, -1).join(' ') || e.name;
+    const nn = e.lastName || e.name.split(' ').pop() || '';
+    return [
+      persnr(e.id),
+      csvField(nn), csvField(vn), fmtDateDE(e.birthday),
+      csvField(e.street), csvField(e.zip), csvField(e.city), csvField(e.nationality),
+      csvField(e.taxClass), csvField(e.taxId), csvField(e.svNumber), csvField(e.healthInsurance),
+      csvField(e.iban), csvField(e.bank),
+      csvField(e.employmentType), fmtDateDE(e.start),
+      fmtDE(e.weeklyHours), fmtDE(e.monthlyHours), fmtDE(e.hourlyRate),
+      fmtDE(e.bruttoGehalt), fmtDE(e.nettoGehalt),
+      csvField(e.residencePermit), fmtDateDE(e.workPermitUntil),
+      csvField(getLocationName(e.location)), csvField(e.dept), csvField(e.position), csvField(e.status)
+    ].join(';');
+  });
+
+  const now = new Date();
+  const monthLabel = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+
+  let csv = datevHeader(21, 'Stammdaten OKYU HRM', headers.length) + '\r\n';
+  csv += headers.join(';') + '\r\n';
+  csv += rows.join('\r\n') + '\r\n';
+
+  downloadCSV(`EXTF_Stammdaten_${monthLabel}.csv`, csv);
+  toast(`📥 Stammdaten exportiert: ${emps.length} Mitarbeiter`);
+}
+
+// ═══ EXPORT: Lohndaten (monatlich) ═══
+async function exportLohndatenCSV(monthStr) {
+  if (!monthStr) { toast('Bitte Monat auswählen.', 'warn'); return; }
+
+  const emps = getVisibleEmps().filter(e => (e.status === 'active' || e.status === 'aktiv') && e.bruttoGehalt > 0);
+  if (!emps.length) { toast('Keine Mitarbeiter mit Gehalt gefunden.', 'warn'); return; }
+
+  // Zahlungsstatus für den gewählten Monat laden
+  const monthDate = monthStr + '-01';
+  const { data: payData } = await sb.from('payment_status').select('*').eq('month', monthDate);
+  const payMap = {};
+  if (payData) payData.forEach(p => { payMap[p.emp_id] = p; });
+
+  // Urlaubstage im Monat berechnen
+  const [yr, mo] = monthStr.split('-').map(Number);
+  const mStart = `${yr}-${String(mo).padStart(2,'0')}-01`;
+  const mEnd = `${yr}-${String(mo).padStart(2,'0')}-${new Date(yr, mo, 0).getDate()}`;
+
+  const headers = [
+    'Personalnummer','Nachname','Vorname','Monat',
+    'Soll_Stunden','Ist_Stunden',
+    'Brutto_Gesamt','Netto_Gesamt','Überweisung','BAR',
+    'Krankentage','Urlaubstage','Schultage',
+    'Status_Überweisung','Status_BAR',
+    'ÜW_Datum','BAR_Datum','BAR_Betrag_tatsächlich','BAR_Notiz',
+    'Bank','Standort','Bereich'
+  ];
+
+  const rows = emps.map(e => {
+    const ps = payMap[e.id] || {};
+    const planH = calcPlanHours(e.id);
+    const uebAmt = e.bruttoGehalt - (e.barGehalt || 0);
+    const barBetrag = ps.bar_betrag != null ? ps.bar_betrag : (e.barGehalt || 0);
+
+    // Urlaubstage im Monat
+    const vacDays = VACS.filter(v => v.empId === e.id && (v.status === 'approved' || v.status === 'pending')
+      && v.from <= mEnd && v.to >= mStart).reduce((s, v) => s + v.days, 0);
+
+    const vn = e.firstName || e.name.split(' ').slice(0, -1).join(' ') || e.name;
+    const nn = e.lastName || e.name.split(' ').pop() || '';
+
+    return [
+      persnr(e.id), csvField(nn), csvField(vn),
+      `${String(mo).padStart(2,'0')}.${yr}`,
+      fmtDE(e.sollStunden), fmtDE(planH),
+      fmtDE(e.bruttoGehalt), fmtDE(e.nettoGehalt), fmtDE(uebAmt), fmtDE(e.barGehalt || 0),
+      e.sickDays || 0, vacDays, e.schuleTage || 0,
+      ps.ueb_status || 'ausstehend', ps.bar_status || 'ausstehend',
+      ps.ue_datum || '', ps.bar_datum || '',
+      fmtDE(barBetrag), csvField(ps.bar_comment || ''),
+      csvField(e.bank), csvField(getLocationName(e.location)), csvField(e.dept)
+    ].join(';');
+  });
+
+  let csv = datevHeader(65, 'Lohndaten OKYU HRM', headers.length) + '\r\n';
+  csv += headers.join(';') + '\r\n';
+  csv += rows.join('\r\n') + '\r\n';
+
+  const label = new Date(yr, mo - 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+  downloadCSV(`EXTF_Lohndaten_${monthStr}.csv`, csv);
+  toast(`📥 Lohndaten exportiert: ${emps.length} Mitarbeiter · ${label}`);
 }
 
 async function renderSalaryHistory(empId) {

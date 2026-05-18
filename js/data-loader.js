@@ -108,6 +108,12 @@ async function loadDataFromSupabase() {
         // Persönlich
         nationality: escapeHtml(e.nationality || ''),
         address: escapeHtml(e.address || ''),
+        // Steuerberater fields (split name + address)
+        firstName: escapeHtml(e.first_name || ''),
+        lastName: escapeHtml(e.last_name || ''),
+        street: escapeHtml(e.street || ''),
+        zip: escapeHtml(e.zip || ''),
+        city: escapeHtml(e.city || ''),
         // Aufenthalt
         residencePermit: escapeHtml(e.residence_permit || ''),
         workPermitUntil: e.work_permit_until || '',

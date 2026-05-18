@@ -131,6 +131,8 @@ async function syncEmployeeField(empId, field, value) {
       taxClass: 'tax_class', taxId: 'tax_id', svNumber: 'sv_number',
       healthInsurance: 'health_insurance', iban: 'iban',
       nationality: 'nationality', address: 'address',
+      firstName: 'first_name', lastName: 'last_name',
+      street: 'street', zip: 'zip', city: 'city',
       residencePermit: 'residence_permit', workPermitUntil: 'work_permit_until',
       barGehalt: 'bar_gehalt', nettoGehalt: 'netto_gehalt'
     };
