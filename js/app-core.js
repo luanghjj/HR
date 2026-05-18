@@ -1476,7 +1476,7 @@ function viewEmp(id){
             const d=new Date(); d.setMonth(d.getMonth()-i);
             const val=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
             const label=d.toLocaleDateString('de-DE',{month:'long',year:'numeric'});
-            return \`<option value="\${val}" \${i===0?'selected':''}>\${label}</option>\`;
+            return '<option value="'+val+'" '+(i===0?'selected':'')+'>'+label+'</option>';
           }).join('')}
         </select>
         <button class="btn btn-primary" style="font-size:.82rem;padding:8px 16px;display:flex;align-items:center;gap:6px" onclick="exportLohndatenCSV(document.getElementById('stbExportMonth').value)">
