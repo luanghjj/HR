@@ -2699,13 +2699,15 @@ async function exportLohndatenCSV(monthStr) {
 
 async function renderSalaryHistory(empId) {
   const el = document.getElementById(`salHistArea_${empId}`);
-  if (!el) return;
+  if (!el) { console.warn('[SalHist] Area not found for emp', empId); return; }
   el.innerHTML = '<span style="color:var(--text-muted);font-size:.78rem">Lädt…</span>';
-  const history = await loadSalaryHistory(empId);
-  if (!history.length) {
-    el.innerHTML = '<span style="color:var(--text-muted);font-size:.78rem">Keine Einträge vorhanden.</span>';
-    return;
-  }
+  try {
+    const history = await loadSalaryHistory(empId);
+    console.log('[SalHist] Loaded', history.length, 'entries for emp', empId);
+    if (!history.length) {
+      el.innerHTML = '<span style="color:var(--text-muted);font-size:.78rem">Keine Einträge vorhanden. Änderungen über "💾 Änderung speichern" werden hier protokolliert.</span>';
+      return;
+    }
   el.innerHTML = `
     <table style="width:100%;border-collapse:collapse;font-size:.8rem">
       <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted)">
@@ -2739,6 +2741,10 @@ async function renderSalaryHistory(empId) {
         }).join('')}
       </tbody>
     </table>`;
+  } catch(err) {
+    console.warn('[SalHist] Error:', err.message);
+    el.innerHTML = '<span style="color:var(--danger);font-size:.78rem">Fehler beim Laden: ' + err.message + '</span>';
+  }
 }
 
 // Update arbitrary employee field
