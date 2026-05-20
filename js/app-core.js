@@ -999,7 +999,7 @@ function renderEmployees(){
   if(!can('seeAllEmployees') && !can('seeOwnDetail')){pg.innerHTML=permBanner('Mitarbeiter-Ansicht ist nur für Manager und Inhaber verfügbar.');return;}
   const isOwnOnly = !can('seeAllEmployees') && can('seeOwnDetail');
   const emps = isOwnOnly ? EMPS.filter(e=>e.id===currentUser.empId) : getVisibleEmps();
-  const isAdmin=can('seeFinancials');
+  const isAdmin = can('seeFinancials') || can('seePayroll');
   const todayStr=isoDate(new Date());
   const empIds=new Set(emps.map(e=>e.id));
   const onVac=VACS.filter(v=>empIds.has(v.empId)&&v.status==='approved'&&v.from<=todayStr&&v.to>=todayStr).length;
@@ -1164,7 +1164,7 @@ function renderEmployees(){
 }
 
 function renderEmpRows(emps){
-  const isAdmin=can('seeFinancials');
+  const isAdmin = can('seeFinancials') || can('seePayroll');
   const _ys1=isoDate(new Date(new Date().getFullYear(),0,1));
   const DEPT_COLORS={'Küche':'#10b981','Service':'#3b4fd2','Bar':'#f97316','Sushi':'#8b5cf6','Ausbildung':'#a29bfe','Verwaltung':'#e11d48'};
   document.getElementById('empTB').innerHTML=emps.map(e=>{
@@ -1215,11 +1215,12 @@ function renderEmpRows(emps){
       </td>
       <td data-col="krank"><span class="${e.sickDays>3?'mit-pill sick':''}" style="${e.sickDays<=3?'font-size:.82rem;color:var(--text-muted)':''}">${e.sickDays}</span></td>
       <td data-col="verspat">${e.lateCount?`<span class="mit-pill late">${e.lateCount}×</span>`:'—'}</td>
-      ${isAdmin?`
+      ${can('seeFinancials') ? `
         <td data-col="schule">${e.schuleTage>0?`<span class="mit-pill schule">${e.schuleTage}T</span>`:'—'}</td>
         <td data-col="plan"><span class="mit-mono" style="color:${sollColor}">${planH}h</span></td>
         <td data-col="soll"><span class="mit-mono">${e.sollStunden}h</span></td>
-        <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
+        <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>` : ''}
+      ${isAdmin ? `
         ${(() => {
           const ps = PAY_STATUS_CACHE[e.id];
           const uebAmt = e.bruttoGehalt - (e.barGehalt||0);

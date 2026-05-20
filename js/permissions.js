@@ -12,7 +12,7 @@ const PERMS = {
     seeAllVacations: true, approveVacations: true, seeAllSick: true,
     seeAllDocs: true, canExport: true, manageAccess: true, markLate: true,
     seeFinancials: true, editVacDays: true, editTraining: true,
-    seeZeiterfassung: true, seeOwnDetail: true,
+    seeZeiterfassung: true, seeOwnDetail: true, seePayroll: true,
   },
   manager: {
     // ── OKYU HRM ──
@@ -21,7 +21,7 @@ const PERMS = {
     seeAllVacations: true, approveVacations: true, seeAllSick: true,
     seeAllDocs: true, canExport: true, manageAccess: false, markLate: true,
     seeFinancials: false, editVacDays: false, editTraining: false,
-    seeZeiterfassung: false, seeOwnDetail: true,
+    seeZeiterfassung: false, seeOwnDetail: true, seePayroll: true,
   },
   mitarbeiter: {
     // ── OKYU HRM ──
@@ -30,7 +30,7 @@ const PERMS = {
     seeAllVacations: false, approveVacations: false, seeAllSick: false,
     seeAllDocs: false, canExport: false, manageAccess: false, markLate: false,
     seeFinancials: false, editVacDays: false, editTraining: false,
-    seeZeiterfassung: false, seeOwnDetail: true,
+    seeZeiterfassung: false, seeOwnDetail: true, seePayroll: false,
   },
   azubi: {
     // ── OKYU HRM ──
@@ -39,7 +39,7 @@ const PERMS = {
     seeAllVacations: false, approveVacations: false, seeAllSick: false,
     seeAllDocs: false, canExport: false, manageAccess: false, markLate: false,
     seeFinancials: false, editVacDays: false, editTraining: false,
-    seeZeiterfassung: false, seeOwnDetail: true,
+    seeZeiterfassung: false, seeOwnDetail: true, seePayroll: false,
   }
 };
 
