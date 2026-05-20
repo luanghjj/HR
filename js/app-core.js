@@ -3701,7 +3701,8 @@ function renderAccess(){
 
 // ═══ CREATE NEW USER MODAL ═══
 function openCreateUserModal() {
-  const locOptions = LOCS.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+  const locOptions = `<option value="all">🌍 Alle Standorte</option>` +
+    LOCS.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
   const deptOptions = [...new Set(DEPTS.map(d => d.name))].sort().map(d => `<option value="${d}">${d}</option>`).join('');
 
   const modal = document.createElement('div');
@@ -3779,17 +3780,7 @@ async function createNewUser() {
   btn.innerHTML = '<span class="ms spin" style="font-size:16px">progress_activity</span> Wird angelegt...';
 
   try {
-    // 1. Create Supabase Auth user
-    const { data: authData, error: authErr } = await sb.auth.signUp({
-      email: email,
-      password: pwd,
-      options: { data: { display_name: name } }
-    });
-    if (authErr) { toast('Auth-Fehler: ' + authErr.message, 'err'); btn.disabled = false; btn.textContent = 'Anlegen'; return; }
-    const uid = authData.user?.id;
-    if (!uid) { toast('Kein User-ID erhalten', 'err'); btn.disabled = false; btn.textContent = 'Anlegen'; return; }
-
-    // 2. Create employee record
+    // 1. Create employee record first (no auth needed)
     const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     const newEmp = {
       name: name,
@@ -3804,7 +3795,30 @@ async function createNewUser() {
       schule_tage: 0, birthday: null, prob_end: null
     };
     const { data: empData, error: empErr } = await sb.from('employees').insert(newEmp).select().single();
-    if (empErr) { toast('Mitarbeiter-Fehler: ' + empErr.message, 'err'); btn.disabled = false; btn.textContent = 'Anlegen'; return; }
+    if (empErr) { toast('Mitarbeiter-Fehler: ' + empErr.message, 'err'); btn.disabled = false; btn.innerHTML = '<span class="ms" style="font-size:16px">check</span> Anlegen'; return; }
+
+    // 2. Try to create Supabase Auth user
+    let uid = null;
+    const { data: authData, error: authErr } = await sb.auth.signUp({
+      email: email,
+      password: pwd,
+      options: { data: { display_name: name } }
+    });
+
+    if (authErr) {
+      if (authErr.message.toLowerCase().includes('rate limit') || authErr.message.toLowerCase().includes('email')) {
+        // Rate limit: create profile without auth_user_id, user can link later
+        console.warn('[Auth] Rate limit hit - creating profile without auth link');
+        uid = 'pending_' + Date.now();
+      } else {
+        // Real error
+        toast('Auth-Fehler: ' + authErr.message, 'err');
+        btn.disabled = false; btn.innerHTML = '<span class="ms" style="font-size:16px">check</span> Anlegen';
+        return;
+      }
+    } else {
+      uid = authData.user?.id || ('pending_' + Date.now());
+    }
 
     // 3. Create user_profile
     const profile = {
@@ -3836,7 +3850,13 @@ async function createNewUser() {
     });
 
     document.getElementById('createUserModal').remove();
-    toast(`✓ ${name} wurde angelegt!`, 'success');
+
+    const isPending = uid.startsWith('pending_');
+    if (isPending) {
+      toast(`✓ ${name} als Mitarbeiter angelegt! ⚠️ E-Mail-Limit: Bitte morgen nochmal anlegen ODER ${name} soll sich selbst registrieren.`, 'warn');
+    } else {
+      toast(`✓ ${name} wurde angelegt! Login: ${email}`, 'success');
+    }
     addNotif('info', 'Neuer Benutzer', `${name} (${email}) wurde als ${role} angelegt`);
     renderAccess();
     updateBadges();
