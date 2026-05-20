@@ -1622,6 +1622,18 @@ function viewEmp(id){
         <button class="ze-pdf-btn" onclick="zeDownloadGesamtPDF(${e.id})"><span class="ms">summarize</span> PDF Gesamt</button>
       </div>
     </div>` : ''}
+  ${currentUser?.role === 'inhaber' ? `
+    <hr style="border-color:var(--danger);opacity:.2;margin:24px 0 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:12px;padding:12px 16px">
+      <div>
+        <div style="font-weight:700;color:var(--danger);font-size:.85rem">⚠️ Mitarbeiter löschen</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">Entfernt ${escapeHtml(e.name)} aus der Mitarbeiterliste. Nicht rückgängig machbar.</div>
+      </div>
+      <button class="btn" style="background:var(--danger);color:#fff;font-size:.8rem;padding:7px 16px;white-space:nowrap"
+        onclick="deleteEmployee(${e.id}, '${escapeHtml(e.name)}')">
+        <span class="ms" style="font-size:.9rem;vertical-align:middle">delete</span> Löschen
+      </button>
+    </div>` : ''}
   `);
 
   // Auto-load Zeiterfassung data if visible
@@ -1631,6 +1643,24 @@ function viewEmp(id){
     renderSalaryHistory(e.id);
     loadAndRenderPayStatus(e.id);
   }, 150);
+}
+
+// ═══ DELETE EMPLOYEE (Inhaber only) ═══
+async function deleteEmployee(empId, empName) {
+  const confirmed = confirm(`⚠️ Mitarbeiter wirklich löschen?\n\n"${empName}" wird dauerhaft aus der Datenbank entfernt.\nDiese Aktion kann NICHT rückgängig gemacht werden!`);
+  if (!confirmed) return;
+  try {
+    const { error } = await sb.from('employees').delete().eq('id', empId);
+    if (error) { toast('❌ Fehler: ' + error.message, 'danger'); return; }
+    // Remove from local array
+    const idx = EMPS.findIndex(x => x.id === empId);
+    if (idx !== -1) EMPS.splice(idx, 1);
+    closeModal();
+    renderEmployees();
+    toast(`✓ "${empName}" wurde gelöscht.`, 'success');
+  } catch(e) {
+    toast('❌ ' + e.message, 'danger');
+  }
 }
 
 // ═══ PAYMENT FILTER (Monat wechseln in Mitarbeitertabelle) ═══
