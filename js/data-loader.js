@@ -120,7 +120,8 @@ async function loadDataFromSupabase() {
         // Zahlung (BAR + Überweisung)
         barGehalt: parseFloat(e.bar_gehalt) || 0,
         nettoGehalt: parseFloat(e.netto_gehalt) || 0,
-        bank: e.bank || ''
+        bank: e.bank || '',
+        personalNr: escapeHtml(e.personal_nr || '')
       }));
     }
 

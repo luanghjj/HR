@@ -134,7 +134,8 @@ async function syncEmployeeField(empId, field, value) {
       firstName: 'first_name', lastName: 'last_name',
       street: 'street', zip: 'zip', city: 'city',
       residencePermit: 'residence_permit', workPermitUntil: 'work_permit_until',
-      barGehalt: 'bar_gehalt', nettoGehalt: 'netto_gehalt'
+      barGehalt: 'bar_gehalt', nettoGehalt: 'netto_gehalt',
+      personalNr: 'personal_nr'
     };
     const col = colMap[field] || field;
     const { error } = await sb.from('employees').update({ [col]: value }).eq('id', empId);

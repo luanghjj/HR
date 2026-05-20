@@ -1113,6 +1113,7 @@ function renderEmployees(){
   <div class="mit-table-card">
     <table class="mit-table" style="width:max-content;min-width:100%;border-collapse:collapse;text-align:left">
         <thead><tr>
+          <th data-col="pnr" style="color:var(--text-muted);font-size:.75rem;min-width:54px">P-Nr</th>
           <th data-col="name">Name & Position</th>
           <th data-col="standort">Standort / Dept.</th>
           <th data-col="urlaub">Resturlaub</th>
@@ -1183,6 +1184,7 @@ function renderEmpRows(emps){
     // Online dot color
     const dotColor=st==='aktiv'||st==='active'?'#22c55e':st==='urlaub'||st==='vacation'?'#f59e0b':'#94a3b8';
     return`<tr class="mit-emp-row">
+      <td data-col="pnr" style="font-family:'Space Mono',monospace;font-size:.72rem;color:var(--text-muted);white-space:nowrap">${e.personalNr || String(e.id).padStart(5,'0')}</td>
       <td data-col="name">
         <div class="mit-emp-cell">
           <div class="mit-emp-dot" style="background:${avatarBg}">
@@ -1418,17 +1420,15 @@ function viewEmp(id){
       <div class="form-group"><label class="form-label">Plan-Stunden (aktueller Monat)</label>
         <div style="font-family:'Space Mono',monospace;font-size:1.1rem;padding:10px 0;color:${planH>=e.sollStunden?'var(--success)':'var(--danger)'}">${planH}h <span style="font-size:.75rem;color:var(--text-muted)">von ${e.sollStunden}h Soll</span></div></div>
       <div class="form-group"><label class="form-label">🏦 Überweisung (€/Monat)</label>
-        <input class="form-input" type="number" step="0.01" id="edUeberweisung" value="${e.bruttoGehalt-(e.barGehalt||0)}" placeholder="0.00" oninput="recalcBrutto(${e.id})"></div>
+        <input class="form-input" type="number" step="0.01" id="edUeberweisung" value="${e.bruttoGehalt-(e.barGehalt||0)}" placeholder="0.00" oninput="recalcNetto(${e.id})"></div>
       <div class="form-group"><label class="form-label">💵 BAR (€/Monat)</label>
-        <input class="form-input" type="number" step="0.01" id="edBar" value="${e.barGehalt||0}" placeholder="0.00" oninput="recalcBrutto(${e.id})"></div>
+        <input class="form-input" type="number" step="0.01" id="edBar" value="${e.barGehalt||0}" placeholder="0.00" oninput="recalcNetto(${e.id})"></div>
       <div class="form-group"><label class="form-label">Brutto Gesamt (berechnet)</label>
         <input class="form-input" type="number" step="0.01" id="edBruttoDisplay" value="${e.bruttoGehalt}" placeholder="0.00"
           style="font-family:'Space Mono',monospace;font-size:1.2rem;font-weight:700;color:var(--success)"
-          oninput="recalcFromBrutto(${e.id})"></div>
-      <div class="form-group"><label class="form-label">Netto Gesamt (berechnet)</label>
-        <input class="form-input" type="number" step="0.01" id="edNetto" value="${e.nettoGehalt||0}" placeholder="0.00"
-          style="font-family:'Space Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--info)"
-          onchange="saveNettoGehalt(${e.id},+this.value)"></div>
+          oninput="recalcHourly(${e.id})"></div>
+      <div class="form-group"><label class="form-label" style="color:var(--info)">Netto Gesamt = Ü + BAR</label>
+        <div id="edNettoDisplay" style="font-family:'Space Mono',monospace;font-size:1.2rem;padding:10px 0;color:var(--info);font-weight:700">${formatEuro((e.bruttoGehalt-(e.barGehalt||0))+(e.barGehalt||0))}</div></div>
       <div class="form-group"><label class="form-label">Gehalt / Stunde (berechnet)</label>
         <div id="edHourlyDisplay" style="font-family:'Space Mono',monospace;font-size:1rem;padding:10px 0;color:var(--text-muted)">${formatEuro(hourly)}/h</div></div>
       <div class="form-group"><label class="form-label">Notiz zur Änderung</label>
@@ -1490,6 +1490,11 @@ function viewEmp(id){
 
   openModalC('Mitarbeiter: '+e.name,`
     <div class="form-grid">
+      <div class="form-group"><label class="form-label" style="color:var(--accent);font-weight:700">🔢 Personal-Nr. <span style="font-size:.68rem;font-weight:400;color:var(--text-muted)">(Steuerberater)</span></label>
+        <input class="form-input" id="edPersonalNr" value="${e.personalNr || String(e.id).padStart(5,'0')}"
+          style="font-family:'Space Mono',monospace;font-weight:700;font-size:1.1rem"
+          placeholder="${String(e.id).padStart(5,'0')}"
+          ${canEdit ? `onchange="updateEmpText(${e.id},'personalNr',this.value)"` : ''} ${ro}></div>
       <div class="form-group"><div class="form-label">Position</div>
         <input class="form-input" value="${e.position}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'position',this.value)"`:''}></div>
       <div class="form-group"><div class="form-label">Standort</div>
@@ -2495,37 +2500,37 @@ function recalcSalary(empId, changed){
 }
 
 // ═══ RECALC BRUTTO (live preview khi nhập BAR / Überweisung) ═══
-function recalcBrutto(empId) {
-  const ub = parseFloat(document.getElementById('edUeberweisung')?.value) || 0;
+// ═══ RECALC NETTO (Ü + BAR = Netto Gesamt) ═══
+function recalcNetto(empId) {
+  const ub  = parseFloat(document.getElementById('edUeberweisung')?.value) || 0;
   const bar = parseFloat(document.getElementById('edBar')?.value) || 0;
-  const total = ub + bar;
-  const soll = parseFloat(document.getElementById('edSoll')?.value) || 0;
-  const hourly = soll > 0 ? Math.round(total / soll * 100) / 100 : 0;
-  const dispB = document.getElementById('edBruttoDisplay');
-  const dispH = document.getElementById('edHourlyDisplay');
-  if (dispB) dispB.value = total;
+  const netto = ub + bar;
+  const dispN = document.getElementById('edNettoDisplay');
+  if (dispN) dispN.textContent = formatEuro(netto);
+  // also update hourly based on current Brutto
+  recalcHourly(empId);
+}
+
+// ═══ RECALC HOURLY (khi nhập Brutto trực tiếp) ═══
+function recalcHourly(empId) {
+  const brutto = parseFloat(document.getElementById('edBruttoDisplay')?.value) || 0;
+  const soll   = parseFloat(document.getElementById('edSoll')?.value) || 0;
+  const hourly = soll > 0 ? Math.round(brutto / soll * 100) / 100 : 0;
+  const dispH  = document.getElementById('edHourlyDisplay');
   if (dispH) dispH.textContent = formatEuro(hourly) + '/h';
 }
 
-// ═══ RECALC FROM BRUTTO (khi nhập Brutto trực tiếp → cập nhật Überweisung) ═══
-function recalcFromBrutto(empId) {
-  const brutto = parseFloat(document.getElementById('edBruttoDisplay')?.value) || 0;
-  const bar = parseFloat(document.getElementById('edBar')?.value) || 0;
-  const ueb = Math.max(0, brutto - bar);
-  const soll = parseFloat(document.getElementById('edSoll')?.value) || 0;
-  const hourly = soll > 0 ? Math.round(brutto / soll * 100) / 100 : 0;
-  const dispU = document.getElementById('edUeberweisung');
-  const dispH = document.getElementById('edHourlyDisplay');
-  if (dispU) dispU.value = ueb;
-  if (dispH) dispH.textContent = formatEuro(hourly) + '/h';
-}
+// ═══ LEGACY (kept for compatibility) ═══
+function recalcBrutto(empId) { recalcNetto(empId); }
+function recalcFromBrutto(empId) { recalcHourly(empId); }
 
 // ═══ SALARY CHANGE (mit History + BAR Split) ═══
 async function saveSalaryChange(empId, oldBrutto, oldBar) {
   const e = EMPS.find(x => x.id === empId); if (!e) return;
   const newUeb = parseFloat(document.getElementById('edUeberweisung')?.value) || 0;
   const newBar = parseFloat(document.getElementById('edBar')?.value) || 0;
-  const newBrutto = parseFloat(document.getElementById('edBruttoDisplay')?.value) || (newUeb + newBar);
+  const newBrutto = parseFloat(document.getElementById('edBruttoDisplay')?.value) || 0;
+  const newNetto = newUeb + newBar;  // Netto = Ü + BAR
   const note = document.getElementById('edSalNote')?.value?.trim() || '';
   const soll = parseFloat(document.getElementById('edSoll')?.value) || e.sollStunden;
 
@@ -2536,9 +2541,11 @@ async function saveSalaryChange(empId, oldBrutto, oldBar) {
   // Update local + DB
   e.bruttoGehalt = newBrutto;
   e.barGehalt = newBar;
+  e.nettoGehalt = newNetto;
   e.sollStunden = soll;
   await syncEmployeeField(empId, 'bruttoGehalt', newBrutto);
   await syncEmployeeField(empId, 'barGehalt', newBar);
+  await syncEmployeeField(empId, 'nettoGehalt', newNetto);
   await syncEmployeeField(empId, 'sollStunden', soll);
 
   // Save to history if amounts changed
@@ -2551,12 +2558,12 @@ async function saveSalaryChange(empId, oldBrutto, oldBar) {
   renderEmployees();
 }
 
-// ═══ NETTO GEHALT (Eingabe vom Steuerberater) ═══
+// ═══ NETTO GEHALT (wird automatisch aus Ü + BAR berechnet) ═══
 async function saveNettoGehalt(empId, value) {
+  // Legacy function – Netto wird jetzt via saveSalaryChange gespeichert
   const e = EMPS.find(x => x.id === empId); if (!e) return;
   e.nettoGehalt = value;
   await syncEmployeeField(empId, 'nettoGehalt', value);
-  toast('✓ Netto Gesamt gespeichert: ' + formatEuro(value));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2632,7 +2639,7 @@ function exportStammdatenCSV() {
     const vn = e.firstName || e.name.split(' ').slice(0, -1).join(' ') || e.name;
     const nn = e.lastName || e.name.split(' ').pop() || '';
     return [
-      persnr(e.id),
+      (e.personalNr || persnr(e.id)),
       csvField(nn), csvField(vn), fmtDateDE(e.birthday),
       csvField(e.street), csvField(e.zip), csvField(e.city), csvField(e.nationality),
       csvField(e.taxClass), csvField(e.taxId), csvField(e.svNumber), csvField(e.healthInsurance),
@@ -2698,7 +2705,7 @@ async function exportLohndatenCSV(monthStr) {
     const nn = e.lastName || e.name.split(' ').pop() || '';
 
     return [
-      persnr(e.id), csvField(nn), csvField(vn),
+      (e.personalNr || persnr(e.id)), csvField(nn), csvField(vn),
       `${String(mo).padStart(2,'0')}.${yr}`,
       fmtDE(e.sollStunden), fmtDE(planH),
       fmtDE(e.bruttoGehalt), fmtDE(e.nettoGehalt), fmtDE(uebAmt), fmtDE(e.barGehalt || 0),
@@ -2738,28 +2745,23 @@ async function renderSalaryHistory(empId) {
       <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted)">
         <th style="text-align:left;padding:4px 6px">Datum</th>
         <th style="text-align:right;padding:4px 6px">Brutto alt</th>
-        <th style="text-align:right;padding:4px 6px">Brutto neu</th>
-        <th style="text-align:right;padding:4px 6px">🏦 Überweisung</th>
-        <th style="text-align:right;padding:4px 6px">💵 BAR</th>
+        <th style="text-align:right;padding:4px 6px">Brutto Gesamt</th>
         <th style="text-align:left;padding:4px 6px">Notiz</th>
         <th style="text-align:left;padding:4px 6px">Von</th>
       </tr></thead>
       <tbody>
         ${history.map(h => {
-          const diff = (h.new_brutto||h.new_amount||0) - (h.old_brutto||h.old_amount||0);
+          const diff = (h.new_brutto||0) - (h.old_brutto||0);
           const diffColor = diff >= 0 ? 'var(--success)' : 'var(--danger)';
           const sign = diff >= 0 ? '+' : '';
           const dt = new Date(h.changed_at).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
-          const newBrutto = h.new_brutto || h.new_amount || 0;
-          const oldBrutto = h.old_brutto || h.old_amount || 0;
-          const newBar = h.new_bar || 0;
-          const newUeb = newBrutto - newBar;
+          const newBrutto = h.new_brutto || 0;
+          const oldBrutto = h.old_brutto || 0;
+          const showDiff = diff !== 0 ? ` <small style="color:${diffColor}">(${sign}${formatEuro(diff)})</small>` : '';
           return `<tr style="border-bottom:1px solid var(--border-light)">
             <td style="padding:5px 6px;color:var(--text-muted)">${dt}</td>
-            <td style="padding:5px 6px;text-align:right;font-family:monospace">${formatEuro(oldBrutto)}</td>
-            <td style="padding:5px 6px;text-align:right;font-family:monospace;font-weight:600;color:${diffColor}">${formatEuro(newBrutto)} <small>(${sign}${formatEuro(diff)})</small></td>
-            <td style="padding:5px 6px;text-align:right;color:var(--accent)">${formatEuro(newUeb)}</td>
-            <td style="padding:5px 6px;text-align:right;color:#b45309">${formatEuro(newBar)}</td>
+            <td style="padding:5px 6px;text-align:right;font-family:monospace;color:var(--text-muted)">${formatEuro(oldBrutto)}</td>
+            <td style="padding:5px 6px;text-align:right;font-family:monospace;font-weight:700;color:var(--success)">${formatEuro(newBrutto)}${showDiff}</td>
             <td style="padding:5px 6px;color:var(--text-muted)">${h.note||'—'}</td>
             <td style="padding:5px 6px;color:var(--text-muted);font-size:.75rem">${h.changed_by||'—'}</td>
           </tr>`;
