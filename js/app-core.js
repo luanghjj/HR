@@ -1250,12 +1250,13 @@ function renderEmpRows(emps){
               </select>`
             : staticBadge(cur);
 
-          // Actual BAR amount this month (override or fallback to bar_gehalt)
-          const barBetragVal = (ps?.bar_betrag != null) ? ps.bar_betrag : barAmt;
+          // Actual BAR amount this month (from gehaelter)
+          const hasGeh = !!ps;
+          const barBetragVal = ps?.bar_betrag || 0;
           const barComment = ps?.bar_comment || '';
 
-          // BAR amount: editable for manager (current, non-closed month)
-          const barAmtCell = barAmt > 0
+          // BAR amount: show when gehaelter record exists
+          const barAmtCell = hasGeh
             ? (canEditBar
                 ? `<input type="number" step="0.01" min="0" value="${barBetragVal}"
                     style="font-size:.75rem;padding:2px 5px;border-radius:5px;border:1px solid var(--border);width:70px;font-family:'Space Mono',monospace;color:#b45309;background:var(--bg-input);font-weight:700"
@@ -1264,8 +1265,8 @@ function renderEmpRows(emps){
                 : `<span class="mit-mono" style="color:#b45309">${formatEuro(barBetragVal)}</span>`)
             : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
 
-          // BAR Kommentar: always-visible input for manager, readonly text for Inhaber
-          const barCmtCell = barAmt > 0
+          // BAR Kommentar
+          const barCmtCell = hasGeh
             ? (canEditBar
                 ? `<input type="text" id="barCmt_${e.id}" value="${barComment.replace(/"/g,'&quot;')}"
                     placeholder="z.B. Vorschuss 150€"
@@ -1275,14 +1276,15 @@ function renderEmpRows(emps){
             : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
 
           // Bank cell: Inhaber dropdown, others text
+          const ueBank = ps?._ue_bank || e.bank || '';
           const BANKS_LIST = ['Commerzbank','Commerzbank Enso','Commerzbank Okyu','Commerzbank Origami','Deutsche Bank','ING','Revolut Enso','Revolut Okyu','Revolut Ultra','Sparkasse','VR Bank','Volksbank'];
           const bankCell = isInhaber
             ? `<select style="font-size:.7rem;padding:2px 5px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);cursor:pointer"
                 onchange="saveEmpBank(${e.id},this.value)">
                 <option value="">— Bank —</option>
-                ${BANKS_LIST.map(b=>`<option value="${b}" ${e.bank===b?'selected':''}>${b}</option>`).join('')}
+                ${BANKS_LIST.map(b=>`<option value="${b}" ${ueBank===b?'selected':''}>${b}</option>`).join('')}
               </select>`
-            : `<span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap">${e.bank || '—'}</span>`;
+            : `<span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap">${ueBank || '—'}</span>`;
 
           const lockedBadge = (isManager && monthClosed) ? '<span style="font-size:.62rem;color:var(--danger)" title="Monat gesperrt">🔒</span>' : '';
 
@@ -1302,13 +1304,13 @@ function renderEmpRows(emps){
           <td data-col="soll"><span class="mit-mono">${e.sollStunden}h</span></td>
           <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>` : ''}
           <td data-col="ueb"><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
-          <td data-col="ueb_st">${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
-          ${isInhaberRole ? `<td data-col="ueb_dat">${uebAmt > 0 ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>` : ''}
+          <td data-col="ueb_st">${hasGeh ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
+          ${isInhaberRole ? `<td data-col="ueb_dat">${hasGeh ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>` : ''}
           <td data-col="bar" id="barAmtCell_${e.id}">${barAmtCell}</td>
           <td data-col="bar_notiz">${barCmtCell}</td>
-          <td data-col="bar_st">${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
+          <td data-col="bar_st">${hasGeh ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
           ${isInhaberRole ? `
-          <td data-col="bar_dat">${barAmt > 0 ? mkDate('bar', barDatumVal, canEditBar) : '—'}</td>
+          <td data-col="bar_dat">${hasGeh ? mkDate('bar', barDatumVal, canEditBar) : '—'}</td>
           <td data-col="bank">${bankCell}</td>
           <td data-col="hourly"><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>` : ''}`;
         })()}
