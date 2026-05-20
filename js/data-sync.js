@@ -223,20 +223,23 @@ async function loadPaymentStatus(empId, monthStr) {
  */
 async function syncPaymentStatus(empId, monthStr, barStatus, uebStatus, barComment) {
   try {
-    const monthDate = monthStr + '-01';
-    const updatedBy = currentUser?.name || currentUser?.email || 'Unbekannt';
-    const payload = {
-      emp_id: empId,
-      month: monthDate,
-      bar_status: barStatus,
-      ueb_status: uebStatus,
-      updated_at: new Date().toISOString(),
-      updated_by: updatedBy
-    };
-    if (barComment !== undefined) payload.bar_comment = barComment;
-    const { error } = await sb.from('payment_status').upsert(payload, { onConflict: 'emp_id,month' });
-    if (error) console.warn('[Sync] PayStatus save:', error.message);
-    else console.log('[Sync] ✓ PayStatus saved:', empId, monthStr);
+    const _mNames = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    const [yr, mo] = monthStr.split('-').map(Number);
+    const monatDE = _mNames[mo - 1] + ' ' + yr;
+    // Map UI status back to gehaelter format
+    const gBarStatus = barStatus === 'bezahlt' ? 'gezahlt' : 'offen';
+    const gUeStatus = uebStatus === 'bezahlt' ? 'ueberwiesen' : 'offen';
+    const ps = PAY_STATUS_CACHE[empId] || {};
+    if (ps._geh_id) {
+      // Update existing gehaelter row
+      const update = { bar_status: gBarStatus, ue_status: gUeStatus };
+      if (barComment !== undefined) update.notiz = barComment;
+      const { error } = await sb.from('gehaelter').update(update).eq('id', ps._geh_id);
+      if (error) console.warn('[Sync] gehaelter update:', error.message);
+      else console.log('[Sync] ✓ gehaelter updated:', empId, monatDE);
+    } else {
+      console.warn('[Sync] No gehaelter row found for emp', empId, monatDE);
+    }
   } catch (e) { console.warn('[Sync]', e.message); }
 }
 
@@ -278,23 +281,17 @@ async function openMonth(monthStr) {
  */
 async function saveBarBetrag(empId, monthStr, barBetrag, barComment) {
   try {
-    const monthDate = monthStr + '-01';
-    const updatedBy = currentUser?.name || currentUser?.email || 'Unbekannt';
     const ps = PAY_STATUS_CACHE[empId] || {};
-    const { error } = await sb.from('payment_status').upsert({
-      emp_id: empId,
-      month: monthDate,
-      bar_status: ps.bar_status || 'ausstehend',
-      ueb_status: ps.ueb_status || 'ausstehend',
-      bar_betrag: barBetrag,
-      bar_comment: barComment,
-      updated_at: new Date().toISOString(),
-      updated_by: updatedBy
-    }, { onConflict: 'emp_id,month' });
-    if (error) console.warn('[Sync] saveBarBetrag:', error.message);
-    else {
-      PAY_STATUS_CACHE[empId] = { ...ps, bar_betrag: barBetrag, bar_comment: barComment };
-      console.log('[Sync] ✓ bar_betrag saved', empId, barBetrag, barComment);
+    if (ps._geh_id) {
+      const update = { bar_tg: barBetrag, notiz: barComment };
+      const { error } = await sb.from('gehaelter').update(update).eq('id', ps._geh_id);
+      if (error) console.warn('[Sync] saveBarBetrag:', error.message);
+      else {
+        PAY_STATUS_CACHE[empId] = { ...ps, bar_betrag: barBetrag, bar_comment: barComment };
+        console.log('[Sync] ✓ bar_betrag saved', empId, barBetrag, barComment);
+      }
+    } else {
+      console.warn('[Sync] No gehaelter row for emp', empId);
     }
   } catch (e) { console.warn('[Sync]', e.message); }
 }
@@ -308,23 +305,17 @@ async function saveBarBetrag(empId, monthStr, barBetrag, barComment) {
  */
 async function savePayDatum(empId, monthStr, type, dateVal) {
   try {
-    const monthDate = monthStr + '-01';
-    const updatedBy = currentUser?.name || currentUser?.email || 'Unbekannt';
     const ps = PAY_STATUS_CACHE[empId] || {};
     const field = type === 'ueb' ? 'ue_datum' : 'bar_datum';
-    const { error } = await sb.from('payment_status').upsert({
-      emp_id: empId,
-      month: monthDate,
-      bar_status: ps.bar_status || 'ausstehend',
-      ueb_status: ps.ueb_status || 'ausstehend',
-      [field]: dateVal || null,
-      updated_at: new Date().toISOString(),
-      updated_by: updatedBy
-    }, { onConflict: 'emp_id,month' });
-    if (error) console.warn('[Sync] savePayDatum:', error.message);
-    else {
-      PAY_STATUS_CACHE[empId] = { ...ps, [field]: dateVal };
-      toast(`✓ ${type === 'ueb' ? 'Ü' : 'BAR'}-Datum: ${dateVal || '—'}`);
+    if (ps._geh_id) {
+      const { error } = await sb.from('gehaelter').update({ [field]: dateVal || '' }).eq('id', ps._geh_id);
+      if (error) console.warn('[Sync] savePayDatum:', error.message);
+      else {
+        PAY_STATUS_CACHE[empId] = { ...ps, [field]: dateVal };
+        toast(`✓ ${type === 'ueb' ? 'Ü' : 'BAR'}-Datum: ${dateVal || '—'}`);
+      }
+    } else {
+      console.warn('[Sync] No gehaelter row for emp', empId);
     }
   } catch (e) { console.warn('[Sync]', e.message); }
 }

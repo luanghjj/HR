@@ -1222,9 +1222,9 @@ function renderEmpRows(emps){
         <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>` : ''}
       ${isAdmin ? `
         ${(() => {
-          const ps = PAY_STATUS_CACHE[e.id];
-          const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
-          const barAmt = e.barGehalt || 0;
+           const ps = PAY_STATUS_CACHE[e.id];
+          const uebAmt = ps?._ueberweisung || (e.bruttoGehalt - (e.barGehalt||0));
+          const barAmt = ps?.bar_betrag || (e.barGehalt || 0);
           const curMonth = new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
           const isInhaber = currentUser?.role === 'inhaber';
           const isManager = currentUser?.role === 'manager';
@@ -1677,13 +1677,32 @@ async function deleteEmployee(empId, empName) {
 
 // ═══ PAYMENT FILTER (Monat wechseln in Mitarbeitertabelle) ═══
 async function reloadPayStatusForMonth(monthStr) {
-  const monthDate = monthStr + '-01';
-  const { data } = await sb.from('payment_status').select('*').eq('month', monthDate);
+  const _mNames = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  const [yr, mo] = monthStr.split('-').map(Number);
+  const monatDE = _mNames[mo - 1] + ' ' + yr;
+  const { data } = await sb.from('gehaelter').select('*').eq('monat', monatDE);
   // Rebuild cache
   Object.keys(PAY_STATUS_CACHE).forEach(k => delete PAY_STATUS_CACHE[k]);
-  if (data) data.forEach(p => { PAY_STATUS_CACHE[p.emp_id] = p; });
+  if (data) data.forEach(p => {
+    PAY_STATUS_CACHE[p.emp_id] = {
+      emp_id: p.emp_id,
+      bar_status: p.bar_status === 'gezahlt' ? 'bezahlt' : (p.bar_status === 'offen' ? 'ausstehend' : p.bar_status),
+      ueb_status: p.ue_status === 'ueberwiesen' || p.ue_status === 'dauerauftrag' ? 'bezahlt' : (p.ue_status === 'offen' ? 'ausstehend' : p.ue_status),
+      bar_betrag: parseFloat(p.bar_tg) || 0,
+      bar_comment: p.notiz || '',
+      ue_datum: p.ue_datum || '',
+      bar_datum: p.bar_datum || '',
+      _geh_id: p.id,
+      _ue_bank: p.ue_bank || '',
+      _ueberweisung: parseFloat(p.ueberweisung) || 0,
+      _gehalt: parseFloat(p.gehalt) || 0,
+      _brutto: parseFloat(p.brutto) || 0,
+      _netto: parseFloat(p.netto) || 0,
+      _ziel_gehalt: parseFloat(p.ziel_gehalt) || 0,
+    };
+  });
   renderEmpRows(getVisibleEmps());
-  toast(`💳 Zahlungsstatus: ${new Date(monthDate).toLocaleDateString('de-DE',{month:'long',year:'numeric'})}`);
+  toast(`💳 Zahlungsstatus: ${monatDE}`);
 }
 
 // ═══ DASHBOARD: ZAHLUNGSÜBERSICHT ═══
@@ -1692,9 +1711,17 @@ async function renderDashPayOverview(monthStr) {
   if (!el) return;
   el.innerHTML = '<span style="color:var(--text-muted);font-size:.82rem">Lädt…</span>';
 
-  const monthDate = monthStr + '-01';
-  const { data: payRows } = await sb.from('payment_status').select('*').eq('month', monthDate);
-  const rows = payRows || [];
+  const _mNames = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  const [yr, mo] = monthStr.split('-').map(Number);
+  const monatDE = _mNames[mo - 1] + ' ' + yr;
+  const { data: payRows } = await sb.from('gehaelter').select('*').eq('monat', monatDE);
+  const rows = (payRows || []).map(p => ({
+    emp_id: p.emp_id,
+    bar_status: p.bar_status === 'gezahlt' ? 'bezahlt' : 'ausstehend',
+    ueb_status: (p.ue_status === 'ueberwiesen' || p.ue_status === 'dauerauftrag') ? 'bezahlt' : 'ausstehend',
+    bar_tg: parseFloat(p.bar_tg) || 0,
+    ueberweisung: parseFloat(p.ueberweisung) || 0,
+  }));
 
   const emps = getVisibleEmps().filter(e => e.bruttoGehalt > 0);
   const totalUeb = emps.filter(e => e.bruttoGehalt - (e.barGehalt||0) > 0).length;
@@ -2713,8 +2740,10 @@ async function exportLohndatenCSV(monthStr) {
   if (!emps.length) { toast('Keine Mitarbeiter mit Gehalt gefunden.', 'warn'); return; }
 
   // Zahlungsstatus für den gewählten Monat laden
-  const monthDate = monthStr + '-01';
-  const { data: payData } = await sb.from('payment_status').select('*').eq('month', monthDate);
+  const _mNames = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+  const [_yr, _mo] = monthStr.split('-').map(Number);
+  const monatDE = _mNames[_mo - 1] + ' ' + _yr;
+  const { data: payData } = await sb.from('gehaelter').select('*').eq('monat', monatDE);
   const payMap = {};
   if (payData) payData.forEach(p => { payMap[p.emp_id] = p; });
 
