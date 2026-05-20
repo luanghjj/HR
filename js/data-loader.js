@@ -333,33 +333,14 @@ async function loadDataFromSupabase() {
 
     console.log(`[Data] ✓ Loaded: ${LOCS.length} locations, ${DEPTS.length} depts, ${EMPS.length} employees, ${VACS.length} vacations, ${SICKS.length} sick leaves, ${DOCS.length} documents, ${CHECKLISTS.length} checklists, ${SAVED_TEMPLATES.length} templates, ${SCHULE_SCHEDULE.length} school days, ${AUSBILDUNGSNACHWEISE.length} training logs, ${AZUBI_BEWERTUNGEN.length} evaluations, ${TIME_RECORDS.length} time records`);
 
-    // Load gehaelter for current month (replaces old payment_status)
-    const _mNames = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+    // Load payment_status for current month (for table display)
     const nowM = new Date();
-    const curMonatDE = _mNames[nowM.getMonth()] + ' ' + nowM.getFullYear();
-    const { data: payData } = await sb.from('gehaelter')
-      .select('*').eq('monat', curMonatDE);
+    const curMonth = nowM.getFullYear() + '-' + String(nowM.getMonth()+1).padStart(2,'0') + '-01';
+    const { data: payData } = await sb.from('payment_status')
+      .select('*').eq('month', curMonth);
     if (payData) {
       Object.keys(PAY_STATUS_CACHE).forEach(k => delete PAY_STATUS_CACHE[k]);
-      payData.forEach(p => {
-        PAY_STATUS_CACHE[p.emp_id] = {
-          emp_id: p.emp_id,
-          bar_status: p.bar_status === 'gezahlt' ? 'bezahlt' : (p.bar_status === 'offen' ? 'ausstehend' : p.bar_status),
-          ueb_status: p.ue_status === 'ueberwiesen' || p.ue_status === 'dauerauftrag' ? 'bezahlt' : (p.ue_status === 'offen' ? 'ausstehend' : p.ue_status),
-          bar_betrag: parseFloat(p.bar_tg) || 0,
-          bar_comment: p.notiz || '',
-          ue_datum: p.ue_datum || '',
-          bar_datum: p.bar_datum || '',
-          // Keep gehaelter fields for reference
-          _geh_id: p.id,
-          _ue_bank: p.ue_bank || '',
-          _ueberweisung: parseFloat(p.ueberweisung) || 0,
-          _gehalt: parseFloat(p.gehalt) || 0,
-          _brutto: parseFloat(p.brutto) || 0,
-          _netto: parseFloat(p.netto) || 0,
-          _ziel_gehalt: parseFloat(p.ziel_gehalt) || 0,
-        };
-      });
+      payData.forEach(p => { PAY_STATUS_CACHE[p.emp_id] = p; });
     }
 
     // Load closed_months (safe: table may not exist yet)

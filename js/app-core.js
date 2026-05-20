@@ -1222,9 +1222,9 @@ function renderEmpRows(emps){
         <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>` : ''}
       ${isAdmin ? `
         ${(() => {
-           const ps = PAY_STATUS_CACHE[e.id];
-          const uebAmt = ps?._ueberweisung || (e.bruttoGehalt - (e.barGehalt||0));
-          const barAmt = ps?.bar_betrag || (e.barGehalt || 0);
+          const ps = PAY_STATUS_CACHE[e.id];
+          const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
+          const barAmt = e.barGehalt || 0;
           const curMonth = new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
           const isInhaber = currentUser?.role === 'inhaber';
           const isManager = currentUser?.role === 'manager';
@@ -1250,13 +1250,12 @@ function renderEmpRows(emps){
               </select>`
             : staticBadge(cur);
 
-          // Actual BAR amount this month (from gehaelter)
-          const hasGeh = !!ps;
-          const barBetragVal = ps?.bar_betrag || 0;
+          // Actual BAR amount this month (override or fallback to bar_gehalt)
+          const barBetragVal = (ps?.bar_betrag != null) ? ps.bar_betrag : barAmt;
           const barComment = ps?.bar_comment || '';
 
-          // BAR amount: show when gehaelter record exists
-          const barAmtCell = hasGeh
+          // BAR amount: editable for manager (current, non-closed month)
+          const barAmtCell = barAmt > 0
             ? (canEditBar
                 ? `<input type="number" step="0.01" min="0" value="${barBetragVal}"
                     style="font-size:.75rem;padding:2px 5px;border-radius:5px;border:1px solid var(--border);width:70px;font-family:'Space Mono',monospace;color:#b45309;background:var(--bg-input);font-weight:700"
@@ -1265,8 +1264,8 @@ function renderEmpRows(emps){
                 : `<span class="mit-mono" style="color:#b45309">${formatEuro(barBetragVal)}</span>`)
             : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
 
-          // BAR Kommentar
-          const barCmtCell = hasGeh
+          // BAR Kommentar: always-visible input for manager, readonly text for Inhaber
+          const barCmtCell = barAmt > 0
             ? (canEditBar
                 ? `<input type="text" id="barCmt_${e.id}" value="${barComment.replace(/"/g,'&quot;')}"
                     placeholder="z.B. Vorschuss 150€"
@@ -1276,15 +1275,14 @@ function renderEmpRows(emps){
             : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
 
           // Bank cell: Inhaber dropdown, others text
-          const ueBank = ps?._ue_bank || e.bank || '';
           const BANKS_LIST = ['Commerzbank','Commerzbank Enso','Commerzbank Okyu','Commerzbank Origami','Deutsche Bank','ING','Revolut Enso','Revolut Okyu','Revolut Ultra','Sparkasse','VR Bank','Volksbank'];
           const bankCell = isInhaber
             ? `<select style="font-size:.7rem;padding:2px 5px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);cursor:pointer"
                 onchange="saveEmpBank(${e.id},this.value)">
                 <option value="">— Bank —</option>
-                ${BANKS_LIST.map(b=>`<option value="${b}" ${ueBank===b?'selected':''}>${b}</option>`).join('')}
+                ${BANKS_LIST.map(b=>`<option value="${b}" ${e.bank===b?'selected':''}>${b}</option>`).join('')}
               </select>`
-            : `<span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap">${ueBank || '—'}</span>`;
+            : `<span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap">${e.bank || '—'}</span>`;
 
           const lockedBadge = (isManager && monthClosed) ? '<span style="font-size:.62rem;color:var(--danger)" title="Monat gesperrt">🔒</span>' : '';
 
@@ -1304,13 +1302,13 @@ function renderEmpRows(emps){
           <td data-col="soll"><span class="mit-mono">${e.sollStunden}h</span></td>
           <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>` : ''}
           <td data-col="ueb"><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
-          <td data-col="ueb_st">${hasGeh ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
-          ${isInhaberRole ? `<td data-col="ueb_dat">${hasGeh ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>` : ''}
+          <td data-col="ueb_st">${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
+          ${isInhaberRole ? `<td data-col="ueb_dat">${uebAmt > 0 ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>` : ''}
           <td data-col="bar" id="barAmtCell_${e.id}">${barAmtCell}</td>
           <td data-col="bar_notiz">${barCmtCell}</td>
-          <td data-col="bar_st">${hasGeh ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
+          <td data-col="bar_st">${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
           ${isInhaberRole ? `
-          <td data-col="bar_dat">${hasGeh ? mkDate('bar', barDatumVal, canEditBar) : '—'}</td>
+          <td data-col="bar_dat">${barAmt > 0 ? mkDate('bar', barDatumVal, canEditBar) : '—'}</td>
           <td data-col="bank">${bankCell}</td>
           <td data-col="hourly"><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>` : ''}`;
         })()}
@@ -1679,32 +1677,13 @@ async function deleteEmployee(empId, empName) {
 
 // ═══ PAYMENT FILTER (Monat wechseln in Mitarbeitertabelle) ═══
 async function reloadPayStatusForMonth(monthStr) {
-  const _mNames = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-  const [yr, mo] = monthStr.split('-').map(Number);
-  const monatDE = _mNames[mo - 1] + ' ' + yr;
-  const { data } = await sb.from('gehaelter').select('*').eq('monat', monatDE);
+  const monthDate = monthStr + '-01';
+  const { data } = await sb.from('payment_status').select('*').eq('month', monthDate);
   // Rebuild cache
   Object.keys(PAY_STATUS_CACHE).forEach(k => delete PAY_STATUS_CACHE[k]);
-  if (data) data.forEach(p => {
-    PAY_STATUS_CACHE[p.emp_id] = {
-      emp_id: p.emp_id,
-      bar_status: p.bar_status === 'gezahlt' ? 'bezahlt' : (p.bar_status === 'offen' ? 'ausstehend' : p.bar_status),
-      ueb_status: p.ue_status === 'ueberwiesen' || p.ue_status === 'dauerauftrag' ? 'bezahlt' : (p.ue_status === 'offen' ? 'ausstehend' : p.ue_status),
-      bar_betrag: parseFloat(p.bar_tg) || 0,
-      bar_comment: p.notiz || '',
-      ue_datum: p.ue_datum || '',
-      bar_datum: p.bar_datum || '',
-      _geh_id: p.id,
-      _ue_bank: p.ue_bank || '',
-      _ueberweisung: parseFloat(p.ueberweisung) || 0,
-      _gehalt: parseFloat(p.gehalt) || 0,
-      _brutto: parseFloat(p.brutto) || 0,
-      _netto: parseFloat(p.netto) || 0,
-      _ziel_gehalt: parseFloat(p.ziel_gehalt) || 0,
-    };
-  });
+  if (data) data.forEach(p => { PAY_STATUS_CACHE[p.emp_id] = p; });
   renderEmpRows(getVisibleEmps());
-  toast(`💳 Zahlungsstatus: ${monatDE}`);
+  toast(`💳 Zahlungsstatus: ${new Date(monthDate).toLocaleDateString('de-DE',{month:'long',year:'numeric'})}`);
 }
 
 // ═══ DASHBOARD: ZAHLUNGSÜBERSICHT ═══
@@ -1713,17 +1692,9 @@ async function renderDashPayOverview(monthStr) {
   if (!el) return;
   el.innerHTML = '<span style="color:var(--text-muted);font-size:.82rem">Lädt…</span>';
 
-  const _mNames = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-  const [yr, mo] = monthStr.split('-').map(Number);
-  const monatDE = _mNames[mo - 1] + ' ' + yr;
-  const { data: payRows } = await sb.from('gehaelter').select('*').eq('monat', monatDE);
-  const rows = (payRows || []).map(p => ({
-    emp_id: p.emp_id,
-    bar_status: p.bar_status === 'gezahlt' ? 'bezahlt' : 'ausstehend',
-    ueb_status: (p.ue_status === 'ueberwiesen' || p.ue_status === 'dauerauftrag') ? 'bezahlt' : 'ausstehend',
-    bar_tg: parseFloat(p.bar_tg) || 0,
-    ueberweisung: parseFloat(p.ueberweisung) || 0,
-  }));
+  const monthDate = monthStr + '-01';
+  const { data: payRows } = await sb.from('payment_status').select('*').eq('month', monthDate);
+  const rows = payRows || [];
 
   const emps = getVisibleEmps().filter(e => e.bruttoGehalt > 0);
   const totalUeb = emps.filter(e => e.bruttoGehalt - (e.barGehalt||0) > 0).length;
@@ -2742,10 +2713,8 @@ async function exportLohndatenCSV(monthStr) {
   if (!emps.length) { toast('Keine Mitarbeiter mit Gehalt gefunden.', 'warn'); return; }
 
   // Zahlungsstatus für den gewählten Monat laden
-  const _mNames = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
-  const [_yr, _mo] = monthStr.split('-').map(Number);
-  const monatDE = _mNames[_mo - 1] + ' ' + _yr;
-  const { data: payData } = await sb.from('gehaelter').select('*').eq('monat', monatDE);
+  const monthDate = monthStr + '-01';
+  const { data: payData } = await sb.from('payment_status').select('*').eq('month', monthDate);
   const payMap = {};
   if (payData) payData.forEach(p => { payMap[p.emp_id] = p; });
 
