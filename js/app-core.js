@@ -1121,7 +1121,7 @@ function renderEmployees(){
           <th data-col="verspat">Verspätungen</th>
           ${isAdmin ? (currentUser?.role==='inhaber'
             ? '<th data-col="schule">Schule</th><th data-col="plan">Plan Std.</th><th data-col="soll">Soll Std.</th><th data-col="brutto">Brutto</th><th data-col="ueb" style="color:var(--accent)">🏦 Überweisung</th><th data-col="ueb_st">Ü-Status</th><th data-col="ueb_dat" style="font-size:.75rem;color:var(--text-muted)">Ü-Datum</th><th data-col="bar" style="color:#b45309">💵 BAR</th><th data-col="bar_notiz" style="font-size:.75rem;color:#b45309">BAR-Notiz</th><th data-col="bar_st">BAR-Status</th><th data-col="bar_dat" style="font-size:.75rem;color:var(--text-muted)">BAR-Datum</th><th data-col="bank" style="font-size:.75rem">🏦 Bank</th><th data-col="hourly">€/Std.</th>'
-            : '<th data-col="ueb" style="color:var(--accent)">🏦 Überweisung</th><th data-col="ueb_st">Ü-Status</th><th data-col="bar" style="color:#b45309">💵 BAR</th><th data-col="bar_notiz" style="font-size:.75rem;color:#b45309">BAR-Notiz</th><th data-col="bar_st">BAR-Status</th>'
+            : '<th data-col="brutto">Brutto</th><th data-col="ueb" style="color:var(--accent)">🏦 Überweisung</th><th data-col="ueb_st">Ü-Status</th><th data-col="ueb_dat" style="font-size:.75rem;color:var(--text-muted)">Ü-Datum</th><th data-col="bar" style="color:#b45309">💵 BAR</th><th data-col="bar_notiz" style="font-size:.75rem;color:#b45309">BAR-Notiz</th><th data-col="bar_st">BAR-Status</th><th data-col="bar_dat" style="font-size:.75rem;color:var(--text-muted)">BAR-Datum</th><th data-col="bank" style="font-size:.75rem">🏦 Bank</th>'
           ) : ''}
           <th data-col="status" class="tc">Status</th>
           <th data-col="actions"></th>
@@ -1300,18 +1300,17 @@ function renderEmpRows(emps){
           ${isInhaberRole ? `
           <td data-col="schule">${e.schuleTage>0?`<span class="mit-pill schule">${e.schuleTage}T`:'—'}</span></td>
           <td data-col="plan"><span class="mit-mono" style="color:${sollColor}">${planH}h</span></td>
-          <td data-col="soll"><span class="mit-mono">${e.sollStunden}h</span></td>
-          <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>` : ''}
+          <td data-col="soll"><span class="mit-mono">${e.sollStunden}h</span></td>` : ''}
+          <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
           <td data-col="ueb"><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
           <td data-col="ueb_st">${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
-          ${isInhaberRole ? `<td data-col="ueb_dat">${uebAmt > 0 ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>` : ''}
+          <td data-col="ueb_dat">${uebAmt > 0 ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>
           <td data-col="bar" id="barAmtCell_${e.id}">${barAmtCell}</td>
           <td data-col="bar_notiz">${barCmtCell}</td>
           <td data-col="bar_st">${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
-          ${isInhaberRole ? `
           <td data-col="bar_dat">${barAmt > 0 ? mkDate('bar', barDatumVal, canEditBar) : '—'}</td>
           <td data-col="bank">${bankCell}</td>
-          <td data-col="hourly"><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>` : ''}`;
+          ${isInhaberRole ? `<td data-col="hourly"><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>` : ''}`;
         })()}
       `:''}
       <td data-col="status" class="tc">${statusHTML}</td>
