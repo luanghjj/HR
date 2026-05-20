@@ -1119,10 +1119,21 @@ function renderEmployees(){
           <th data-col="urlaub">Resturlaub</th>
           <th data-col="krank">Kranktage</th>
           <th data-col="verspat">Verspätungen</th>
-          ${isAdmin ? (currentUser?.role==='inhaber'
-            ? '<th data-col="schule">Schule</th><th data-col="plan">Plan Std.</th><th data-col="soll">Soll Std.</th><th data-col="brutto">Brutto</th><th data-col="ueb" style="color:var(--accent)">🏦 Überweisung</th><th data-col="ueb_st">Ü-Status</th><th data-col="ueb_dat" style="font-size:.75rem;color:var(--text-muted)">Ü-Datum</th><th data-col="bar" style="color:#b45309">💵 BAR</th><th data-col="bar_notiz" style="font-size:.75rem;color:#b45309">BAR-Notiz</th><th data-col="bar_st">BAR-Status</th><th data-col="bar_dat" style="font-size:.75rem;color:var(--text-muted)">BAR-Datum</th><th data-col="bank" style="font-size:.75rem">🏦 Bank</th><th data-col="hourly">€/Std.</th>'
-            : '<th data-col="brutto">Brutto</th><th data-col="ueb" style="color:var(--accent)">🏦 Überweisung</th><th data-col="ueb_st">Ü-Status</th><th data-col="ueb_dat" style="font-size:.75rem;color:var(--text-muted)">Ü-Datum</th><th data-col="bar" style="color:#b45309">💵 BAR</th><th data-col="bar_notiz" style="font-size:.75rem;color:#b45309">BAR-Notiz</th><th data-col="bar_st">BAR-Status</th><th data-col="bar_dat" style="font-size:.75rem;color:var(--text-muted)">BAR-Datum</th><th data-col="bank" style="font-size:.75rem">🏦 Bank</th>'
-          ) : ''}
+          ${isAdmin ? `
+            <th data-col="gehalt">Gehalt</th>
+            <th data-col="ges_brutto">Ges.-Brutto</th>
+            <th data-col="netto_val">Netto</th>
+            <th data-col="ueb" style="color:var(--accent)">🏦 Überw.</th>
+            <th data-col="ueb_st">Ü-Status</th>
+            <th data-col="ueb_dat" style="font-size:.75rem;color:var(--text-muted)">Ü-Datum</th>
+            <th data-col="bar" style="color:#b45309">💵 BAR/TG</th>
+            <th data-col="bar_st">B-Status</th>
+            <th data-col="bar_dat" style="font-size:.75rem;color:var(--text-muted)">BAR-Datum</th>
+            <th data-col="summe">Summe</th>
+            <th data-col="ziel" style="color:var(--accent)">Ziel★</th>
+            <th data-col="diff">Diff</th>
+            <th data-col="notiz" style="font-size:.75rem">Notiz</th>
+          ` : ''}
           <th data-col="status" class="tc">Status</th>
           <th data-col="actions"></th>
         </tr></thead>
@@ -1296,21 +1307,24 @@ function renderEmpRows(emps){
             : (val ? `<span style="font-size:.7rem;color:var(--text-muted);font-family:'Space Mono',monospace">${val}</span>` : '<span style="color:var(--text-muted);font-size:.7rem">—</span>');
 
           const isInhaberRole = currentUser?.role === 'inhaber';
+          const summe = uebAmt + barAmt;
+          const ziel = (e.nettoGehalt || 0) + (e.barGehalt || 0);
+          const diff = summe - ziel;
+          const diffColor = diff > 0 ? '#059669' : diff < 0 ? '#dc2626' : 'var(--text-muted)';
           return `
-          ${isInhaberRole ? `
-          <td data-col="schule">${e.schuleTage>0?`<span class="mit-pill schule">${e.schuleTage}T`:'—'}</span></td>
-          <td data-col="plan"><span class="mit-mono" style="color:${sollColor}">${planH}h</span></td>
-          <td data-col="soll"><span class="mit-mono">${e.sollStunden}h</span></td>` : ''}
-          <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
+          <td data-col="gehalt"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>
+          <td data-col="ges_brutto"><span class="mit-mono">${e.gesBrutto > 0 ? formatEuro(e.gesBrutto) : '—'}</span></td>
+          <td data-col="netto_val"><span class="mit-mono">${e.actualNetto > 0 ? formatEuro(e.actualNetto) : '—'}</span></td>
           <td data-col="ueb"><span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span></td>
           <td data-col="ueb_st">${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
           <td data-col="ueb_dat">${uebAmt > 0 ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>
           <td data-col="bar" id="barAmtCell_${e.id}">${barAmtCell}</td>
-          <td data-col="bar_notiz">${barCmtCell}</td>
           <td data-col="bar_st">${barAmt > 0 ? mkSel('bar', ps?.bar_status||'ausstehend', canEditBar) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}${lockedBadge}</td>
           <td data-col="bar_dat">${barAmt > 0 ? mkDate('bar', barDatumVal, canEditBar) : '—'}</td>
-          <td data-col="bank">${bankCell}</td>
-          ${isInhaberRole ? `<td data-col="hourly"><span class="mit-mono hourly">${formatEuro(hourly)}/h</span></td>` : ''}`;
+          <td data-col="summe"><span class="mit-mono" style="font-weight:700">${summe > 0 ? formatEuro(summe) : '—'}</span></td>
+          <td data-col="ziel"><span class="mit-mono" style="color:var(--accent)">${ziel > 0 ? formatEuro(ziel) : '—'}</span></td>
+          <td data-col="diff"><span class="mit-mono" style="color:${diffColor};font-weight:700">${ziel > 0 ? formatEuro(diff) : '—'}</span></td>
+          <td data-col="notiz">${barCmtCell}</td>`;
         })()}
       `:''}
       <td data-col="status" class="tc">${statusHTML}</td>
@@ -1336,10 +1350,11 @@ function filterEmpsByDept(dept,btn){
 // ═══ COLUMN TOGGLE (Spalten ausblenden) ═══
 const MIT_COL_LABELS = {
   name:'Name & Position', standort:'Standort', urlaub:'Resturlaub', krank:'Kranktage', verspat:'Verspätungen',
-  schule:'Schule', plan:'Plan Std.', soll:'Soll Std.', brutto:'Brutto',
-  ueb:'Überweisung', ueb_st:'Ü-Status', ueb_dat:'Ü-Datum',
-  bar:'BAR', bar_notiz:'BAR-Notiz', bar_st:'BAR-Status', bar_dat:'BAR-Datum',
-  bank:'Bank', hourly:'€/Std.', status:'Status', actions:'Aktionen'
+  gehalt:'Gehalt', ges_brutto:'Ges.-Brutto', netto_val:'Netto',
+  ueb:'Überw.', ueb_st:'Ü-Status', ueb_dat:'Ü-Datum',
+  bar:'BAR/TG', bar_st:'B-Status', bar_dat:'BAR-Datum',
+  summe:'Summe', ziel:'Ziel★', diff:'Diff', notiz:'Notiz',
+  status:'Status', actions:'Aktionen'
 };
 const MIT_COL_FIXED = ['name','actions']; // always visible
 
