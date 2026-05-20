@@ -1223,7 +1223,7 @@ function renderEmpRows(emps){
       ${isAdmin ? `
         ${(() => {
           const ps = PAY_STATUS_CACHE[e.id];
-          const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
+          const uebAmt = e.nettoGehalt - (e.barGehalt||0);
           const barAmt = e.barGehalt || 0;
           const curMonth = new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
           const isInhaber = currentUser?.role === 'inhaber';
@@ -1697,7 +1697,7 @@ async function renderDashPayOverview(monthStr) {
   const rows = payRows || [];
 
   const emps = getVisibleEmps().filter(e => e.bruttoGehalt > 0);
-  const totalUeb = emps.filter(e => e.bruttoGehalt - (e.barGehalt||0) > 0).length;
+  const totalUeb = emps.filter(e => e.nettoGehalt - (e.barGehalt||0) > 0).length;
   const totalBar = emps.filter(e => (e.barGehalt||0) > 0).length;
 
   const uebBez = rows.filter(r => r.ueb_status === 'bezahlt').length;
@@ -1717,7 +1717,7 @@ async function renderDashPayOverview(monthStr) {
   // Per-employee list (only emps with bar or überweisung)
   const empRows = emps.map(e => {
     const ps = rows.find(r => r.emp_id === e.id);
-    const uebAmt = e.bruttoGehalt - (e.barGehalt||0);
+    const uebAmt = e.nettoGehalt - (e.barGehalt||0);
     const barAmt = e.barGehalt || 0;
     const uebSt = ps?.ueb_status || 'ausstehend';
     const barSt = ps?.bar_status || 'ausstehend';
@@ -2736,7 +2736,7 @@ async function exportLohndatenCSV(monthStr) {
   const rows = emps.map(e => {
     const ps = payMap[e.id] || {};
     const planH = calcPlanHours(e.id);
-    const uebAmt = e.bruttoGehalt - (e.barGehalt || 0);
+    const uebAmt = e.nettoGehalt - (e.barGehalt || 0);
     const barBetrag = ps.bar_betrag != null ? ps.bar_betrag : (e.barGehalt || 0);
 
     // Urlaubstage im Monat
