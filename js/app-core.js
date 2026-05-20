@@ -1230,9 +1230,9 @@ function renderEmpRows(emps){
           const isManager = currentUser?.role === 'manager';
           const monthClosed = isMonthClosed(curMonth);
 
-          // Inhaber: alles editierbar. Manager: nur BAR im aktuellen, nicht-gesperrten Monat
-          const canEditUeb = isInhaber;
-          const canEditBar = isInhaber ? true : (isManager && !monthClosed);
+          // Use permission system: gm_edit_status / gm_edit_bar
+          const canEditUeb = can('gm_edit_status') || isInhaber;
+          const canEditBar = can('gm_edit_bar') || isInhaber || (isManager && !monthClosed);
 
           const selStyle = (st) => `style="font-size:.68rem;padding:2px 5px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-weight:600;outline:none;`
             + (st==='bezahlt' ? `background:rgba(16,185,129,.12);color:#059669"` : `background:rgba(245,158,11,.08);color:#d97706"`);
@@ -1276,7 +1276,8 @@ function renderEmpRows(emps){
 
           // Bank cell: Inhaber dropdown, others text
           const BANKS_LIST = ['Commerzbank','Commerzbank Enso','Commerzbank Okyu','Commerzbank Origami','Deutsche Bank','ING','Revolut Enso','Revolut Okyu','Revolut Ultra','Sparkasse','VR Bank','Volksbank'];
-          const bankCell = isInhaber
+          const canEditBank = can('gm_edit_values') || isInhaber;
+          const bankCell = canEditBank
             ? `<select style="font-size:.7rem;padding:2px 5px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);cursor:pointer"
                 onchange="saveEmpBank(${e.id},this.value)">
                 <option value="">— Bank —</option>
