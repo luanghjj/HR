@@ -1226,11 +1226,6 @@ function renderEmpRows(emps){
       </td>
       <td data-col="krank"><span class="${e.sickDays>3?'mit-pill sick':''}" style="${e.sickDays<=3?'font-size:.82rem;color:var(--text-muted)':''}">${e.sickDays}</span></td>
       <td data-col="verspat">${e.lateCount?`<span class="mit-pill late">${e.lateCount}×</span>`:'—'}</td>
-      ${can('seeFinancials') ? `
-        <td data-col="schule">${e.schuleTage>0?`<span class="mit-pill schule">${e.schuleTage}T</span>`:'—'}</td>
-        <td data-col="plan"><span class="mit-mono" style="color:${sollColor}">${planH}h</span></td>
-        <td data-col="soll"><span class="mit-mono">${e.sollStunden}h</span></td>
-        <td data-col="brutto"><span class="mit-mono salary">${formatEuro(e.bruttoGehalt)}</span></td>` : ''}
       ${isAdmin ? `
         ${(() => {
           const ps = PAY_STATUS_CACHE[e.id];
