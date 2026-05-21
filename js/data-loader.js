@@ -122,6 +122,7 @@ async function loadDataFromSupabase() {
         nettoGehalt: parseFloat(e.netto_gehalt) || 0,
         gesBrutto: parseFloat(e.ges_brutto) || 0,
         actualNetto: parseFloat(e.netto) || 0,
+        zielGehalt: parseFloat(e.ziel_gehalt) || 0,
         bank: e.bank || '',
         personalNr: escapeHtml(e.personal_nr || '')
       }));

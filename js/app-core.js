@@ -1303,7 +1303,7 @@ function renderEmpRows(emps){
 
           const isInhaberRole = currentUser?.role === 'inhaber';
           const summe = uebAmt + barAmt;
-          const ziel = ps?.ziel_gehalt || 0;
+          const ziel = ps?.ziel_gehalt || e.zielGehalt || 0;
           const diff = summe - ziel;
           const diffColor = diff > 0 ? '#059669' : diff < 0 ? '#dc2626' : 'var(--text-muted)';
           return `
