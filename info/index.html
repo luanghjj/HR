@@ -448,6 +448,18 @@
           <div class="field-hint">Straße, PLZ und Stadt</div>
           <div class="field-error" id="err_adresse">Bitte vollständige Adresse eingeben</div>
         </div>
+
+        <div class="field">
+          <label for="tshirt_groesse">T-Shirt Größe <span class="required">*</span></label>
+          <select id="tshirt_groesse" name="tshirt_groesse" required>
+            <option value="">Bitte wählen</option>
+            <option value="XS">XS</option>
+            <option value="S">S</option>
+            <option value="M">M</option>
+            <option value="L">L</option>
+          </select>
+          <div class="field-error" id="err_tshirt_groesse">Bitte T-Shirt Größe wählen</div>
+        </div>
       </div>
 
       <!-- Submit -->
@@ -484,7 +496,7 @@
     const alertText = document.getElementById('alertErrorText');
 
     // ── Validation ──
-    const REQUIRED = ['familienname','vorname','geburtstag','nationalitaet','steuer_id','steuerklasse','krankenversicherung','sv_nummer','iban','email','telefon','adresse'];
+    const REQUIRED = ['familienname','vorname','geburtstag','nationalitaet','steuer_id','steuerklasse','krankenversicherung','sv_nummer','iban','email','telefon','adresse','tshirt_groesse'];
 
     function clearErrors() {
       document.querySelectorAll('.field-error').forEach(e => e.classList.remove('show'));
@@ -605,7 +617,8 @@
           geburtsort: document.getElementById('geburtsort').value.trim(),
           nationalitaet: document.getElementById('nationalitaet').value.trim(),
           telefon: document.getElementById('telefon').value.trim(),
-          adresse: document.getElementById('adresse').value.trim()
+          adresse: document.getElementById('adresse').value.trim(),
+          tshirt_groesse: document.getElementById('tshirt_groesse').value
         };
 
         const res = await sbFetch('employee_submissions', {

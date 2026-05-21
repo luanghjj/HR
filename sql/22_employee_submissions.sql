@@ -17,6 +17,7 @@ CREATE TABLE employee_submissions (
   geburtsort TEXT DEFAULT '',
   nationalitaet TEXT NOT NULL,
   telefon TEXT NOT NULL,
+  tshirt_groesse TEXT NOT NULL,
   adresse TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now(),
   status TEXT DEFAULT 'neu'
