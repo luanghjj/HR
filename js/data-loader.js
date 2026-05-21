@@ -345,6 +345,20 @@ async function loadDataFromSupabase() {
       payData.forEach(p => { PAY_STATUS_CACHE[p.emp_id] = p; });
     }
 
+    // Load ziel_gehalt + notiz from gehaelter for current month
+    const curMonatLabel = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'][nowM.getMonth()] + ' ' + nowM.getFullYear();
+    try {
+      const { data: ghData } = await sb.from('gehaelter')
+        .select('emp_id,ziel_gehalt,notiz').eq('monat', curMonatLabel);
+      if (ghData) {
+        ghData.forEach(g => {
+          if (!PAY_STATUS_CACHE[g.emp_id]) PAY_STATUS_CACHE[g.emp_id] = {};
+          PAY_STATUS_CACHE[g.emp_id].ziel_gehalt = parseFloat(g.ziel_gehalt) || 0;
+          if (g.notiz) PAY_STATUS_CACHE[g.emp_id].gh_notiz = g.notiz;
+        });
+      }
+    } catch(_) { /* gehaelter table may not exist */ }
+
     // Load closed_months (safe: table may not exist yet)
     try {
       const { data: closedData, error: closedErr } = await sb.from('closed_months').select('month');
