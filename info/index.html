@@ -431,6 +431,12 @@
         </div>
 
         <div class="field">
+          <label for="email">E-Mail-Adresse <span class="required">*</span></label>
+          <input type="email" id="email" name="email" placeholder="z.B. max.mueller@email.de" required>
+          <div class="field-error" id="err_email">Bitte gültige E-Mail-Adresse eingeben</div>
+        </div>
+
+        <div class="field">
           <label for="telefon">Telefonnummer <span class="required">*</span></label>
           <input type="tel" id="telefon" name="telefon" placeholder="z.B. 0176 12345678" required>
           <div class="field-error" id="err_telefon">Bitte Telefonnummer eingeben</div>
@@ -478,7 +484,7 @@
     const alertText = document.getElementById('alertErrorText');
 
     // ── Validation ──
-    const REQUIRED = ['familienname','vorname','geburtstag','nationalitaet','steuer_id','steuerklasse','krankenversicherung','sv_nummer','iban','telefon','adresse'];
+    const REQUIRED = ['familienname','vorname','geburtstag','nationalitaet','steuer_id','steuerklasse','krankenversicherung','sv_nummer','iban','email','telefon','adresse'];
 
     function clearErrors() {
       document.querySelectorAll('.field-error').forEach(e => e.classList.remove('show'));
@@ -508,6 +514,13 @@
       const sid = document.getElementById('steuer_id').value.replace(/\s/g, '');
       if (sid && !/^\d{11}$/.test(sid)) {
         showFieldError('steuer_id', 'Steuer-ID muss genau 11 Ziffern haben');
+        ok = false;
+      }
+
+      // Email format
+      const email = document.getElementById('email').value.trim();
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showFieldError('email', 'Bitte gültige E-Mail-Adresse eingeben');
         ok = false;
       }
 
@@ -587,6 +600,7 @@
           krankenversicherung: document.getElementById('krankenversicherung').value.trim(),
           sv_nummer: document.getElementById('sv_nummer').value.trim(),
           iban: document.getElementById('iban').value.replace(/\s/g, '').toUpperCase(),
+          email: document.getElementById('email').value.trim(),
           geburtstag: document.getElementById('geburtstag').value,
           geburtsort: document.getElementById('geburtsort').value.trim(),
           nationalitaet: document.getElementById('nationalitaet').value.trim(),

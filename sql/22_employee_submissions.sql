@@ -12,6 +12,7 @@ CREATE TABLE employee_submissions (
   krankenversicherung TEXT NOT NULL,
   sv_nummer TEXT NOT NULL,
   iban TEXT NOT NULL,
+  email TEXT NOT NULL,
   geburtstag DATE NOT NULL,
   geburtsort TEXT DEFAULT '',
   nationalitaet TEXT NOT NULL,
