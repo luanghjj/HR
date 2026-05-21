@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mitarbeiter Informationen</title>
+  <meta name="description" content="Formular zur Erfassung der Mitarbeiterdaten">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f8f9fb;
+      --card: #ffffff;
+      --border: #e2e5ea;
+      --border-focus: #6366f1;
+      --text: #1a1d23;
+      --text-secondary: #5f6571;
+      --text-muted: #9ca0aa;
+      --accent: #6366f1;
+      --accent-light: #eef2ff;
+      --danger: #ef4444;
+      --danger-bg: #fef2f2;
+      --success: #10b981;
+      --success-bg: #ecfdf5;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+      --shadow-lg: 0 10px 25px rgba(0,0,0,.08), 0 4px 10px rgba(0,0,0,.04);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    .page-header {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      padding: 2.5rem 1.5rem 3.5rem;
+      text-align: center;
+      color: #fff;
+      position: relative;
+    }
+    .page-header::after {
+      content: '';
+      position: absolute;
+      bottom: -24px;
+      left: 0; right: 0;
+      height: 48px;
+      background: var(--bg);
+      border-radius: 24px 24px 0 0;
+    }
+    .page-header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.35rem;
+    }
+    .page-header p {
+      font-size: 0.88rem;
+      opacity: 0.85;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+    .header-icon {
+      width: 52px; height: 52px;
+      background: rgba(255,255,255,0.18);
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      margin-bottom: 0.75rem;
+      backdrop-filter: blur(8px);
+    }
+
+    /* ── Main Container ── */
+    .container {
+      max-width: 560px;
+      margin: -16px auto 3rem;
+      padding: 0 1rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Section Cards ── */
+    .form-section {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+      transition: box-shadow 0.2s;
+    }
+    .form-section:hover {
+      box-shadow: var(--shadow-lg);
+    }
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      margin-bottom: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section-title .icon {
+      width: 28px; height: 28px;
+      background: var(--accent-light);
+      border-radius: 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+    }
+
+    /* ── Form Fields ── */
+    .field {
+      margin-bottom: 1rem;
+    }
+    .field:last-child {
+      margin-bottom: 0;
+    }
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 0.3rem;
+      letter-spacing: 0.01em;
+    }
+    label .required {
+      color: var(--danger);
+      margin-left: 2px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      color: var(--text);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    }
+    input::placeholder, textarea::placeholder {
+      color: var(--text-muted);
+    }
+    input.error, select.error, textarea.error {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%235f6571' viewBox='0 0 16 16'%3E%3Cpath d='M8 11.4 2.3 5.7l1.4-1.4L8 8.6l4.3-4.3 1.4 1.4z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.8rem center;
+      padding-right: 2.2rem;
+    }
+    .field-hint {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+    .field-error {
+      font-size: 0.72rem;
+      color: var(--danger);
+      margin-top: 0.25rem;
+      display: none;
+    }
+    .field-error.show {
+      display: block;
+    }
+
+    /* ── Submit Button ── */
+    .submit-wrap {
+      margin-top: 0.5rem;
+    }
+    .btn-submit {
+      width: 100%;
+      padding: 0.85rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: inherit;
+      color: #fff;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+      box-shadow: 0 4px 14px rgba(79,70,229,0.35);
+      letter-spacing: 0.01em;
+    }
+    .btn-submit:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(79,70,229,0.4);
+    }
+    .btn-submit:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .btn-submit .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Alert Banner ── */
+    .alert {
+      padding: 0.85rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 500;
+      margin-bottom: 1rem;
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .alert.show { display: flex; }
+    .alert-error {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border: 1px solid rgba(239,68,68,0.15);
+    }
+    .alert-success {
+      background: var(--success-bg);
+      color: #065f46;
+      border: 1px solid rgba(16,185,129,0.15);
+    }
+
+    /* ── Success Screen ── */
+    .success-screen {
+      display: none;
+      text-align: center;
+      padding: 3rem 1.5rem;
+    }
+    .success-screen.show {
+      display: block;
+    }
+    .success-icon {
+      width: 80px; height: 80px;
+      background: var(--success-bg);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.2rem;
+      margin-bottom: 1.25rem;
+      animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes pop {
+      0% { transform: scale(0); }
+      100% { transform: scale(1); }
+    }
+    .success-screen h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+    .success-screen p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+
+    /* ── Footer ── */
+    .page-footer {
+      text-align: center;
+      padding: 1.5rem 1rem 2rem;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .page-header { padding: 2rem 1rem 3rem; }
+      .page-header h1 { font-size: 1.3rem; }
+      .field-row { grid-template-columns: 1fr; gap: 1rem; }
+      .form-section { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="page-header">
+    <div class="header-icon">📋</div>
+    <h1>Mitarbeiter Informationen</h1>
+    <p>Bitte füllen Sie das Formular vollständig aus. Ihre Daten werden vertraulich behandelt.</p>
+  </header>
+
+  <!-- Form -->
+  <main class="container" id="formContainer">
+
+    <div class="alert alert-error" id="alertError">
+      <span>⚠️</span>
+      <span id="alertErrorText"></span>
+    </div>
+
+    <form id="infoForm" novalidate>
+
+      <!-- Persönliche Daten -->
+      <div class="form-section">
+        <div class="section-title">
+          <span class="icon">👤</span>
+          Persönliche Daten
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="familienname">Familienname <span class="required">*</span></label>
+            <input type="text" id="familienname" name="familienname" placeholder="z.B. Müller" required>
+            <div class="field-error" id="err_familienname">Bitte Familienname eingeben</div>
+          </div>
+          <div class="field">
+            <label for="vorname">Vorname <span class="required">*</span></label>
+            <input type="text" id="vorname" name="vorname" placeholder="z.B. Max" required>
+            <div class="field-error" id="err_vorname">Bitte Vorname eingeben</div>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="geburtstag">Geburtsdatum <span class="required">*</span></label>
+            <input type="date" id="geburtstag" name="geburtstag" required>
+            <div class="field-error" id="err_geburtstag">Bitte Geburtsdatum eingeben</div>
+          </div>
+          <div class="field">
+            <label for="geburtsort">Geburtsort</label>
+            <input type="text" id="geburtsort" name="geburtsort" placeholder="z.B. Berlin">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="nationalitaet">Nationalität <span class="required">*</span></label>
+          <input type="text" id="nationalitaet" name="nationalitaet" placeholder="z.B. Deutsch" required>
+          <div class="field-error" id="err_nationalitaet">Bitte Nationalität eingeben</div>
+        </div>
+      </div>
+
+      <!-- Steuer & Versicherung -->
+      <div class="form-section">
+        <div class="section-title">
+          <span class="icon">🏛️</span>
+          Steuer & Versicherung
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="steuer_id">Steuer-ID <span class="required">*</span></label>
+            <input type="text" id="steuer_id" name="steuer_id" placeholder="12345678901" maxlength="11" inputmode="numeric" required>
+            <div class="field-hint">11-stellige Nummer</div>
+            <div class="field-error" id="err_steuer_id">Bitte gültige 11-stellige Steuer-ID eingeben</div>
+          </div>
+          <div class="field">
+            <label for="steuerklasse">Steuerklasse <span class="required">*</span></label>
+            <select id="steuerklasse" name="steuerklasse" required>
+              <option value="">Bitte wählen</option>
+              <option value="1">Klasse 1</option>
+              <option value="2">Klasse 2</option>
+              <option value="3">Klasse 3</option>
+              <option value="4">Klasse 4</option>
+              <option value="5">Klasse 5</option>
+              <option value="6">Klasse 6</option>
+            </select>
+            <div class="field-error" id="err_steuerklasse">Bitte Steuerklasse wählen</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="krankenversicherung">Krankenversicherung <span class="required">*</span></label>
+          <input type="text" id="krankenversicherung" name="krankenversicherung" placeholder="z.B. AOK Baden-Württemberg" required>
+          <div class="field-error" id="err_krankenversicherung">Bitte Krankenversicherung eingeben</div>
+        </div>
+
+        <div class="field">
+          <label for="sv_nummer">SV-Nummer <span class="required">*</span></label>
+          <input type="text" id="sv_nummer" name="sv_nummer" placeholder="z.B. 12 010190 A 123" required>
+          <div class="field-hint">Sozialversicherungsnummer</div>
+          <div class="field-error" id="err_sv_nummer">Bitte SV-Nummer eingeben</div>
+        </div>
+
+        <div class="field">
+          <label for="iban">IBAN <span class="required">*</span></label>
+          <input type="text" id="iban" name="iban" placeholder="DE89 3704 0044 0532 0130 00" required>
+          <div class="field-error" id="err_iban">Bitte gültige IBAN eingeben</div>
+        </div>
+      </div>
+
+      <!-- Kontaktdaten -->
+      <div class="form-section">
+        <div class="section-title">
+          <span class="icon">📱</span>
+          Kontaktdaten
+        </div>
+
+        <div class="field">
+          <label for="telefon">Telefonnummer <span class="required">*</span></label>
+          <input type="tel" id="telefon" name="telefon" placeholder="z.B. 0176 12345678" required>
+          <div class="field-error" id="err_telefon">Bitte Telefonnummer eingeben</div>
+        </div>
+
+        <div class="field">
+          <label for="adresse">Adresse <span class="required">*</span></label>
+          <textarea id="adresse" name="adresse" placeholder="Straße und Hausnummer&#10;PLZ Stadt" rows="3" required></textarea>
+          <div class="field-hint">Straße, PLZ und Stadt</div>
+          <div class="field-error" id="err_adresse">Bitte vollständige Adresse eingeben</div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="submit-wrap">
+        <button type="submit" class="btn-submit" id="btnSubmit">
+          Absenden
+        </button>
+      </div>
+
+    </form>
+  </main>
+
+  <!-- Success Screen -->
+  <div class="container">
+    <div class="success-screen" id="successScreen">
+      <div class="success-icon">✅</div>
+      <h2>Vielen Dank!</h2>
+      <p>Deine Daten wurden erfolgreich übermittelt. Du kannst dieses Fenster jetzt schließen.</p>
+    </div>
+  </div>
+
+  <footer class="page-footer">
+    Ihre Daten werden vertraulich behandelt und ausschließlich für die Personalverwaltung verwendet.
+  </footer>
+
+  <script>
+    // ── Supabase Config ──
+    const SB_URL = 'https://zkxsyipyjqikqxswpbks.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpreHN5aXB5anFpa3F4c3dwYmtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MzgxOTMsImV4cCI6MjA5MTIxNDE5M30.oodwUnavIkmHS6W08OwpAoxxFoBPcJ6ZOizOQkaE5PY';
+
+    const form = document.getElementById('infoForm');
+    const btn = document.getElementById('btnSubmit');
+    const alertEl = document.getElementById('alertError');
+    const alertText = document.getElementById('alertErrorText');
+
+    // ── Validation ──
+    const REQUIRED = ['familienname','vorname','geburtstag','nationalitaet','steuer_id','steuerklasse','krankenversicherung','sv_nummer','iban','telefon','adresse'];
+
+    function clearErrors() {
+      document.querySelectorAll('.field-error').forEach(e => e.classList.remove('show'));
+      document.querySelectorAll('input,select,textarea').forEach(e => e.classList.remove('error'));
+      alertEl.classList.remove('show');
+    }
+
+    function showFieldError(name, msg) {
+      const el = document.getElementById('err_' + name);
+      const input = document.getElementById(name);
+      if (el) { if (msg) el.textContent = msg; el.classList.add('show'); }
+      if (input) input.classList.add('error');
+    }
+
+    function validate() {
+      clearErrors();
+      let ok = true;
+
+      for (const name of REQUIRED) {
+        const el = document.getElementById(name);
+        if (!el) continue;
+        const val = el.value.trim();
+        if (!val) { showFieldError(name); ok = false; }
+      }
+
+      // Steuer-ID: 11 digits
+      const sid = document.getElementById('steuer_id').value.replace(/\s/g, '');
+      if (sid && !/^\d{11}$/.test(sid)) {
+        showFieldError('steuer_id', 'Steuer-ID muss genau 11 Ziffern haben');
+        ok = false;
+      }
+
+      // IBAN: basic DE check (DE + 20 chars)
+      const iban = document.getElementById('iban').value.replace(/\s/g, '').toUpperCase();
+      if (iban && iban.length < 15) {
+        showFieldError('iban', 'Bitte gültige IBAN eingeben');
+        ok = false;
+      }
+
+      return ok;
+    }
+
+    // ── Supabase helpers ──
+    async function sbFetch(path, opts = {}) {
+      const res = await fetch(SB_URL + '/rest/v1/' + path, {
+        headers: {
+          'apikey': SB_KEY,
+          'Authorization': 'Bearer ' + SB_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': opts.prefer || 'return=minimal',
+          ...opts.headers
+        },
+        method: opts.method || 'GET',
+        body: opts.body ? JSON.stringify(opts.body) : undefined
+      });
+      return res;
+    }
+
+    async function checkDuplicate(steuerId) {
+      const res = await sbFetch(`employee_submissions?steuer_id=eq.${encodeURIComponent(steuerId)}&select=id&limit=1`);
+      if (!res.ok) return false;
+      const data = await res.json();
+      return data.length > 0;
+    }
+
+    // ── Submit ──
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!validate()) {
+        // Scroll to first error
+        const firstErr = document.querySelector('.field-error.show');
+        if (firstErr) firstErr.closest('.field')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      // Cooldown check
+      const lastSubmit = localStorage.getItem('info_last_submit');
+      if (lastSubmit && Date.now() - parseInt(lastSubmit) < 30000) {
+        alertText.textContent = 'Bitte warten Sie einen Moment, bevor Sie erneut absenden.';
+        alertEl.classList.add('show');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Wird gesendet...';
+
+      try {
+        const steuerId = document.getElementById('steuer_id').value.replace(/\s/g, '');
+
+        // Check duplicate
+        const isDupe = await checkDuplicate(steuerId);
+        if (isDupe) {
+          showFieldError('steuer_id', 'Diese Steuer-ID wurde bereits eingereicht.');
+          btn.disabled = false;
+          btn.textContent = 'Absenden';
+          document.getElementById('steuer_id').scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+
+        // Collect data
+        const payload = {
+          familienname: document.getElementById('familienname').value.trim(),
+          vorname: document.getElementById('vorname').value.trim(),
+          steuer_id: steuerId,
+          steuerklasse: document.getElementById('steuerklasse').value,
+          krankenversicherung: document.getElementById('krankenversicherung').value.trim(),
+          sv_nummer: document.getElementById('sv_nummer').value.trim(),
+          iban: document.getElementById('iban').value.replace(/\s/g, '').toUpperCase(),
+          geburtstag: document.getElementById('geburtstag').value,
+          geburtsort: document.getElementById('geburtsort').value.trim(),
+          nationalitaet: document.getElementById('nationalitaet').value.trim(),
+          telefon: document.getElementById('telefon').value.trim(),
+          adresse: document.getElementById('adresse').value.trim()
+        };
+
+        const res = await sbFetch('employee_submissions', {
+          method: 'POST',
+          body: payload,
+          prefer: 'return=minimal'
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          if (err.code === '23505') {
+            showFieldError('steuer_id', 'Diese Steuer-ID wurde bereits eingereicht.');
+            btn.disabled = false;
+            btn.textContent = 'Absenden';
+            return;
+          }
+          throw new Error(err.message || 'Server-Fehler');
+        }
+
+        // Success
+        localStorage.setItem('info_last_submit', Date.now().toString());
+        document.getElementById('formContainer').style.display = 'none';
+        document.getElementById('successScreen').classList.add('show');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      } catch (err) {
+        alertText.textContent = 'Fehler beim Senden: ' + err.message;
+        alertEl.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Absenden';
+      }
+    });
+
+    // ── Live validation: clear error on input ──
+    document.querySelectorAll('input, select, textarea').forEach(el => {
+      el.addEventListener('input', () => {
+        el.classList.remove('error');
+        const errEl = document.getElementById('err_' + el.name);
+        if (errEl) errEl.classList.remove('show');
+      });
+    });
+
+    // ── Auto-format IBAN ──
+    document.getElementById('iban').addEventListener('input', function() {
+      let v = this.value.replace(/\s/g, '').toUpperCase();
+      // Add spaces every 4 chars
+      v = v.replace(/(.{4})/g, '$1 ').trim();
+      this.value = v;
+    });
+  </script>
+</body>
+</html>
