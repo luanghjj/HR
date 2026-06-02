@@ -387,6 +387,17 @@
   background: rgba(var(--accent-rgb), .05) !important;
 }
 
+/* Horizontal scroll wrapper for submissions table */
+.subs-scroll-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
 /* ── Mobile responsive (≤ 900px) ─────────────────────────── */
 @media (max-width: 900px) {
   .aushilfe-header {

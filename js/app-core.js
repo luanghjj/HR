@@ -3646,8 +3646,8 @@ function buildAushilfeSubmissionsList() {
           <div class="empty-state-icon">👥</div>
           <div class="empty-state-text">Keine Einträge</div>
         </div>` : `
-        <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border)">
-          <table class="table" style="min-width:1100px">
+        <div class="subs-scroll-wrap">
+          <table class="table" style="min-width:1100px;border:none">
             <thead>
               <tr>
                 <th style="white-space:nowrap">Name</th>

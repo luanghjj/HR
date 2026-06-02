@@ -391,6 +391,8 @@
   flex: 1;
   padding: 28px 32px;
   overflow-y: auto;
+  overflow-x: auto;
+  min-width: 0;
 }
 
 .page {
