@@ -412,24 +412,33 @@ async function loadDataFromSupabase() {
     // Load employee_submissions (Aushilfe worker list for admin view)
     try {
       const { data: subs, error: subsErr } = await sb.from('employee_submissions')
-        .select('id, vorname, familienname, telefon, email, iban, steuerklasse, status, created_at')
+        .select('*')
         .order('created_at', { ascending: false });
       if (!subsErr && subs) {
         AUSHILFE_SUBMISSIONS.length = 0;
         subs.forEach(s => AUSHILFE_SUBMISSIONS.push({
-          id: s.id,
-          vorname: s.vorname,
-          familienname: s.familienname,
-          telefon: s.telefon,
-          email: s.email,
-          iban: s.iban,
-          steuerklasse: s.steuerklasse,
-          status: s.status || 'neu',
-          createdAt: s.created_at
+          id:               s.id,
+          vorname:          s.vorname,
+          familienname:     s.familienname,
+          telefon:          s.telefon,
+          email:            s.email,
+          iban:             s.iban,
+          steuerklasse:     s.steuerklasse,
+          steuer_id:        s.steuer_id,
+          sv_nummer:        s.sv_nummer,
+          krankenversicherung: s.krankenversicherung,
+          geburtstag:       s.geburtstag,
+          geburtsort:       s.geburtsort || '',
+          nationalitaet:    s.nationalitaet,
+          tshirt_groesse:   s.tshirt_groesse,
+          adresse:          s.adresse,
+          status:           s.status || 'neu',
+          createdAt:        s.created_at
         }));
         console.log('[Data] ✓ ' + AUSHILFE_SUBMISSIONS.length + ' Aushilfe submissions loaded');
       }
     } catch (_) { /* employee_submissions may not exist */ }
+
 
     // Run auto-checkout after data load
 

@@ -3604,13 +3604,21 @@ function buildAushilfeSubmissionsList() {
 
   const rows = filtered.map(s => `
     <tr class="sub-row" onclick="openAushilfeSubmissionModal(${s.id})" title="Details anzeigen">
-      <td><strong>${s.vorname} ${s.familienname}</strong></td>
-      <td><a href="tel:${s.telefon}" onclick="event.stopPropagation()" style="color:var(--accent)">${s.telefon}</a></td>
-      <td><a href="mailto:${s.email}" onclick="event.stopPropagation()" style="color:var(--accent);font-size:.82rem">${s.email}</a></td>
-      <td style="font-family:'Space Mono',monospace;font-size:.78rem">${s.steuerklasse}</td>
-      <td style="font-family:'Space Mono',monospace;font-size:.72rem">${s.iban ? s.iban.substring(0,8) + '…' : '—'}</td>
+      <td style="white-space:nowrap"><strong>${s.vorname} ${s.familienname}</strong></td>
+      <td style="white-space:nowrap"><a href="tel:${s.telefon}" onclick="event.stopPropagation()" style="color:var(--accent)">${s.telefon}</a></td>
+      <td style="white-space:nowrap"><a href="mailto:${s.email}" onclick="event.stopPropagation()" style="color:var(--accent);font-size:.82rem">${s.email}</a></td>
+      <td style="white-space:nowrap;font-size:.78rem">${s.geburtstag ? new Date(s.geburtstag).toLocaleDateString('de-DE') : '—'}</td>
+      <td style="white-space:nowrap;font-size:.78rem">${s.geburtsort || '—'}</td>
+      <td style="white-space:nowrap;font-size:.78rem">${s.nationalitaet || '—'}</td>
+      <td style="white-space:nowrap;font-size:.78rem">${s.adresse || '—'}</td>
+      <td style="white-space:nowrap;font-family:'Space Mono',monospace;font-size:.76rem">${s.steuerklasse || '—'}</td>
+      <td style="white-space:nowrap;font-family:'Space Mono',monospace;font-size:.75rem">${s.steuer_id || '—'}</td>
+      <td style="white-space:nowrap;font-family:'Space Mono',monospace;font-size:.75rem">${s.sv_nummer || '—'}</td>
+      <td style="white-space:nowrap;font-size:.78rem">${s.krankenversicherung || '—'}</td>
+      <td style="white-space:nowrap;font-family:'Space Mono',monospace;font-size:.75rem">${s.iban || '—'}</td>
+      <td style="white-space:nowrap;font-size:.78rem">${s.tshirt_groesse || '—'}</td>
       <td>${statusBadge(s.status)}</td>
-      <td style="font-size:.78rem;color:var(--text-muted)">${new Date(s.createdAt).toLocaleDateString('de-DE')}</td>
+      <td style="white-space:nowrap;font-size:.78rem;color:var(--text-muted)">${new Date(s.createdAt).toLocaleDateString('de-DE')}</td>
     </tr>`).join('');
 
   const filterBtns = ['all','neu','aktiv','inaktiv'].map(f => `
@@ -3628,7 +3636,7 @@ function buildAushilfeSubmissionsList() {
             <span class="ms" style="font-size:1.1rem;color:var(--accent)">group</span>
             Aushilfe-Mitarbeiter
           </div>
-          <div class="aushilfe-subtitle">Eingereichte Informationsformulare (employee_submissions)</div>
+          <div class="aushilfe-subtitle">Eingereichte Informationsformulare · ${AUSHILFE_SUBMISSIONS.length} Einträge · <em style="color:var(--text-muted);font-size:.8em">← Tabelle scrollbar →</em></div>
         </div>
         <div class="sc2-dept-pills">${filterBtns}</div>
       </div>
@@ -3638,17 +3646,25 @@ function buildAushilfeSubmissionsList() {
           <div class="empty-state-icon">👥</div>
           <div class="empty-state-text">Keine Einträge</div>
         </div>` : `
-        <div class="table-wrap">
-          <table class="table">
+        <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border)">
+          <table class="table" style="min-width:1100px">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Telefon</th>
-                <th>E-Mail</th>
-                <th>StKl.</th>
-                <th>IBAN</th>
-                <th>Status</th>
-                <th>Eingereicht</th>
+                <th style="white-space:nowrap">Name</th>
+                <th style="white-space:nowrap">Telefon</th>
+                <th style="white-space:nowrap">E-Mail</th>
+                <th style="white-space:nowrap">Geburtstag</th>
+                <th style="white-space:nowrap">Geburtsort</th>
+                <th style="white-space:nowrap">Nationalität</th>
+                <th style="white-space:nowrap">Adresse</th>
+                <th style="white-space:nowrap">St.Kl.</th>
+                <th style="white-space:nowrap">Steuer-ID</th>
+                <th style="white-space:nowrap">SV-Nr.</th>
+                <th style="white-space:nowrap">Krankenvers.</th>
+                <th style="white-space:nowrap">IBAN</th>
+                <th style="white-space:nowrap">T-Shirt</th>
+                <th style="white-space:nowrap">Status</th>
+                <th style="white-space:nowrap">Eingereicht</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -3663,11 +3679,25 @@ function buildAushilfeSubmissionsList() {
 function openAushilfeSubmissionModal(subId) {
   const s = AUSHILFE_SUBMISSIONS.find(x => x.id === subId);
   if (!s) return;
+  const fmt = (v) => v || '—';
+  const fmtDate = (v) => v ? new Date(v).toLocaleDateString('de-DE') : '—';
   openModal(`${s.vorname} ${s.familienname}`, `
-    <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;flex-direction:column;gap:8px">
       <div class="aushilfe-modal-row"><span class="ms">person</span><div>
         <div class="aushilfe-modal-label">Vollständiger Name</div>
         <div class="aushilfe-modal-val">${s.vorname} ${s.familienname}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">cake</span><div>
+        <div class="aushilfe-modal-label">Geburtstag</div>
+        <div class="aushilfe-modal-val">${fmtDate(s.geburtstag)}${s.geburtsort ? ' · ' + s.geburtsort : ''}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">flag</span><div>
+        <div class="aushilfe-modal-label">Nationalität</div>
+        <div class="aushilfe-modal-val">${fmt(s.nationalitaet)}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">home</span><div>
+        <div class="aushilfe-modal-label">Adresse</div>
+        <div class="aushilfe-modal-val" style="font-size:.85rem">${fmt(s.adresse)}</div>
       </div></div>
       <div class="aushilfe-modal-row"><span class="ms">phone</span><div>
         <div class="aushilfe-modal-label">Telefon</div>
@@ -3677,13 +3707,26 @@ function openAushilfeSubmissionModal(subId) {
         <div class="aushilfe-modal-label">E-Mail</div>
         <div class="aushilfe-modal-val"><a href="mailto:${s.email}" style="color:var(--accent)">${s.email}</a></div>
       </div></div>
+      <hr style="border-color:var(--border);margin:2px 0">
+      <div class="aushilfe-modal-row"><span class="ms">receipt_long</span><div>
+        <div class="aushilfe-modal-label">Steuerklasse / Steuer-ID</div>
+        <div class="aushilfe-modal-val" style="font-family:'Space Mono',monospace">${fmt(s.steuerklasse)} &nbsp;·&nbsp; ${fmt(s.steuer_id)}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">badge</span><div>
+        <div class="aushilfe-modal-label">SV-Nummer</div>
+        <div class="aushilfe-modal-val" style="font-family:'Space Mono',monospace;font-size:.85rem">${fmt(s.sv_nummer)}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">local_hospital</span><div>
+        <div class="aushilfe-modal-label">Krankenversicherung</div>
+        <div class="aushilfe-modal-val">${fmt(s.krankenversicherung)}</div>
+      </div></div>
       <div class="aushilfe-modal-row"><span class="ms">account_balance</span><div>
         <div class="aushilfe-modal-label">IBAN</div>
-        <div class="aushilfe-modal-val" style="font-family:'Space Mono',monospace;font-size:.85rem">${s.iban || '—'}</div>
+        <div class="aushilfe-modal-val" style="font-family:'Space Mono',monospace;font-size:.82rem;word-break:break-all">${fmt(s.iban)}</div>
       </div></div>
-      <div class="aushilfe-modal-row"><span class="ms">receipt_long</span><div>
-        <div class="aushilfe-modal-label">Steuerklasse</div>
-        <div class="aushilfe-modal-val">${s.steuerklasse || '—'}</div>
+      <div class="aushilfe-modal-row"><span class="ms">checkroom</span><div>
+        <div class="aushilfe-modal-label">T-Shirt Größe</div>
+        <div class="aushilfe-modal-val">${fmt(s.tshirt_groesse)}</div>
       </div></div>
       <div class="aushilfe-modal-row"><span class="ms">calendar_today</span><div>
         <div class="aushilfe-modal-label">Eingereicht am</div>
