@@ -30,3 +30,7 @@ let azubiTab = 'plan';
 let TIME_RECORDS = [];
 let activeCheckIn = null; // Current open check-in for this user
 let checkInTimer = null;  // Interval for live timer
+
+// Aushilfe Planung
+let AUSHILFE_SLOTS = [];
+let aushilfePlanungMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);

@@ -582,3 +582,66 @@ async function syncDeleteTemplate(templateId) {
     else console.log('[Sync] ✓ Template deleted:', templateId);
   } catch (e) { console.warn('[Sync] Template delete:', e.message); }
 }
+
+// ═══ AUSHILFE SLOTS ═══
+
+/**
+ * Create a new Aushilfe slot in Supabase
+ * @param {Object} slot - { location, date, shiftLabel, shiftFrom, shiftTo, dept, note }
+ * @returns {Object|null} created slot data
+ */
+async function syncCreateAushilfeSlot(slot) {
+  try {
+    const { data, error } = await sb.from('aushilfe_slots').insert({
+      location:    slot.location,
+      slot_date:   slot.date,
+      shift_label: slot.shiftLabel,
+      shift_from:  slot.shiftFrom,
+      shift_to:    slot.shiftTo,
+      dept:        slot.dept,
+      note:        slot.note || '',
+      status:      'open',
+      created_by:  (await sb.auth.getUser())?.data?.user?.id || null
+    }).select().single();
+    if (error) {
+      console.warn('[Sync] Create Aushilfe slot error:', error.message);
+      return null;
+    }
+    console.log('[Sync] ✓ Aushilfe slot created:', data.id);
+    return data;
+  } catch (e) {
+    console.warn('[Sync] Aushilfe slot create:', e.message);
+    return null;
+  }
+}
+
+/**
+ * Delete an Aushilfe slot from Supabase
+ * @param {string} slotId - UUID
+ */
+async function syncDeleteAushilfeSlot(slotId) {
+  try {
+    const { error } = await sb.from('aushilfe_slots').delete().eq('id', slotId);
+    if (error) console.warn('[Sync] Delete Aushilfe slot error:', error.message);
+    else console.log('[Sync] ✓ Aushilfe slot deleted:', slotId);
+  } catch (e) { console.warn('[Sync] Aushilfe slot delete:', e.message); }
+}
+
+/**
+ * Clear booking from an Aushilfe slot (reset to 'open')
+ * @param {string} slotId - UUID
+ */
+async function syncClearAushilfeBooking(slotId) {
+  try {
+    const { error } = await sb.from('aushilfe_slots').update({
+      status:         'open',
+      aushilfe_name:  null,
+      aushilfe_phone: null,
+      aushilfe_email: null,
+      aushilfe_note:  null
+    }).eq('id', slotId);
+    if (error) console.warn('[Sync] Clear Aushilfe booking error:', error.message);
+    else console.log('[Sync] ✓ Aushilfe booking cleared:', slotId);
+  } catch (e) { console.warn('[Sync] Aushilfe booking clear:', e.message); }
+}
+

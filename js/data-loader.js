@@ -367,6 +367,39 @@ async function loadDataFromSupabase() {
       if (!closedErr && closedData) closedData.forEach(r => CLOSED_MONTHS.add(r.month));
     } catch(_) { /* table not yet created – ignore */ }
 
+    // Load Aushilfe slots (current + future, 3 months ahead)
+    const aushilfeStart = new Date();
+    aushilfeStart.setDate(1); // Start of this month
+    const aushilfeEnd = new Date();
+    aushilfeEnd.setMonth(aushilfeEnd.getMonth() + 3);
+    try {
+      const { data: slots, error: slotsErr } = await sb.from('aushilfe_slots')
+        .select('*')
+        .gte('slot_date', aushilfeStart.toISOString().split('T')[0])
+        .lte('slot_date', aushilfeEnd.toISOString().split('T')[0])
+        .order('slot_date');
+      if (!slotsErr && slots) {
+        AUSHILFE_SLOTS.length = 0;
+        slots.forEach(s => AUSHILFE_SLOTS.push({
+          id: s.id,
+          location: s.location,
+          date: s.slot_date,
+          shiftLabel: s.shift_label,
+          shiftFrom: s.shift_from,
+          shiftTo: s.shift_to,
+          dept: s.dept,
+          note: s.note || '',
+          status: s.status,
+          aushilfeName: s.aushilfe_name || '',
+          aushilfePhone: s.aushilfe_phone || '',
+          aushilfeEmail: s.aushilfe_email || '',
+          aushilfeNote: s.aushilfe_note || '',
+          createdAt: s.created_at
+        }));
+        console.log('[Data] ✓ ' + AUSHILFE_SLOTS.length + ' Aushilfe slots loaded');
+      }
+    } catch (_) { /* table may not exist yet */ }
+
     // Run auto-checkout after data load
     await runAutoCheckout();
 

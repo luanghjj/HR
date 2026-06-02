@@ -41,6 +41,7 @@ function buildSidebar(){
   if(showSchedule || showVacation || showSick){
     sectionStart('planung', 'Planung');
     if(showSchedule) html+=`<div class="nav-item" onclick="navigate('schedule',this)">${mi('calendar_month')} Arbeitsplan</div>`;
+    if(can('editSchedules')) html+=`<div class="nav-item" onclick="navigate('aushilfe_planung',this)">${mi('groups')} Aushilfe Planung</div>`;
     if(showVacation) html+=`<div class="nav-item" onclick="navigate('vacation',this)">${mi('beach_access')} ${can('seeAllVacations')?'Urlaubsplan':'Mein Urlaub'}<span class="nav-badge" id="vacBadge" style="display:none">0</span></div>`;
     if(showSick) html+=`<div class="nav-item" onclick="navigate('sick',this)">${mi('medical_services')} ${can('seeAllSick')?'Krankmeldungen':'Meine Krankmeldungen'}<span class="nav-badge" id="sickBadge" style="display:none">0</span></div>`;
     sectionEnd();
@@ -126,7 +127,7 @@ function renderPage(p){
   const c=document.getElementById('contentArea');
 
   c.innerHTML='<div class="page active" id="page-'+p+'"></div>';
-  ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung,qr_generator:renderQrGenerator,locations:renderLocations})[p]?.();
+  ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,aushilfe_planung:renderAushilfePlanung,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung,qr_generator:renderQrGenerator,locations:renderLocations})[p]?.();
 }
 
 // ═══ SHIFTS (loaded from Supabase via data-loader.js) ═══
@@ -3443,6 +3444,399 @@ function copyWeek(){const ws2=getWeekStart(scheduleDate);const nw=new Date(ws2);
 function deleteShift(id){const s=SHIFTS.find(x=>x.id===id);if(!s)return;if(!confirm(`${s.empName}: ${s.label} (${formatDateDE(s.date)}) löschen?`))return;SHIFTS=SHIFTS.filter(x=>x.id!==id);syncDeleteShift(id);toast('Schicht gelöscht','warn');renderSchedule();}
 function exportPDF(){if(!can('canExport'))return;const pc=document.getElementById('schedC').innerHTML;const lbl=document.getElementById('schedLabel').textContent;const w=window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>Arbeitsplan</title><style>body{font-family:'Segoe UI',Arial,sans-serif;padding:24px;color:#222}h1{font-size:20px}h2{font-size:14px;color:#666;font-weight:normal;margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;border:1px solid #ddd;font-size:12px;text-align:left}th{background:#f5f5f5;font-weight:700;text-transform:uppercase;font-size:10px}.shift-block{padding:3px 6px;border-radius:3px;font-size:11px;margin:2px 0;background:#f0f0f0;border-left:3px solid #666}.shift-block.kitchen{border-left-color:#e17055;background:#fef3ef}.shift-block.service{border-left-color:#74b9ff;background:#eef5ff}.shift-block.bar{border-left-color:#00b894;background:#eefaf6}.shift-block.is-sick{border-left-color:#d63031;background:#ffeaea}.shift-block.is-vacation{border-left-color:#0984e3;background:#eaf2ff}.shift-block.is-late{border-right:3px solid #e84393}.shift-name{font-weight:600}.shift-time{font-size:10px;color:#888}.shift-actions{display:none}.table-wrap{border:none}.table-header{display:none}.late-marker{color:#e84393;font-size:9px}.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}.cal-day{border:1px solid #ddd;padding:4px;min-height:50px;font-size:11px}.cal-day-header{font-size:10px;font-weight:700;text-align:center;padding:4px;background:#f5f5f5}.cal-day-num{font-weight:700}.cal-event{font-size:9px;padding:1px 4px;background:#eef;border-radius:2px;margin-top:2px}@media print{body{padding:0}}</style></head><body><h1>Arbeitsplan – ${currentUser.role==='inhaber'?'Alle Standorte':getLocationName(currentUser.location)}</h1><h2>${lbl}</h2>${pc}<script>window.print();<\/script></body></html>`);w.document.close();}
+
+// ═══ AUSHILFE PLANUNG ═══
+
+function renderAushilfePlanung() {
+  const pg = document.getElementById('page-aushilfe_planung');
+  if (!can('editSchedules')) {
+    pg.innerHTML = permBanner('Kein Zugriff auf Aushilfe Planung');
+    return;
+  }
+
+  const y = aushilfePlanungMonth.getFullYear();
+  const m = aushilfePlanungMonth.getMonth();
+  const monthLabel = MONTHS_DE[m] + ' ' + y;
+
+  // Filter slots for current month + location
+  const locFilter = currentLocation === 'all' ? null : currentLocation;
+  const slots = AUSHILFE_SLOTS.filter(s => {
+    const sd = new Date(s.date);
+    const matchMonth = sd.getFullYear() === y && sd.getMonth() === m;
+    const matchLoc = !locFilter || s.location === locFilter;
+    return matchMonth && matchLoc;
+  });
+
+  // Collect unique shift labels from this month's slots + templates
+  const slotLabels = [...new Set(slots.map(s => s.shiftLabel))];
+  const allLabels = [...new Set([...slotLabels, ...SHIFT_TEMPLATES.map(t => t.label)])];
+
+  // Build day columns for this month
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const days = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push(new Date(y, m, d));
+  }
+
+  // Build grid HTML
+  const DOW_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  let gridHtml = buildAushilfeGrid(days, slots, allLabels, DOW_SHORT);
+
+  pg.innerHTML = `
+    <div class="aushilfe-page">
+      <!-- Header -->
+      <div class="aushilfe-header">
+        <div>
+          <h2 class="aushilfe-title">Aushilfe Planung</h2>
+          <div class="aushilfe-subtitle">Offene Schichten für externe Aushilfen verwalten</div>
+        </div>
+        <div class="aushilfe-header-actions">
+          <a href="/aushilfe" target="_blank" class="btn btn-secondary" id="aushilfePublicLink" title="Öffentliche Seite öffnen">
+            <span class="ms" style="font-size:1rem">open_in_new</span> Öffentliche Seite
+          </a>
+          <button class="btn btn-primary" id="aushilfeAddBtn" onclick="openAushilfeSlotModal()" title="Neuen Slot erstellen">
+            <span class="ms" style="font-size:1rem">add</span> Slot hinzufügen
+          </button>
+        </div>
+      </div>
+
+      <!-- Month navigation -->
+      <div class="aushilfe-nav-bar">
+        <button class="sc2-nav-btn" onclick="aushilfeMonthNav(-1)" title="Vorheriger Monat">
+          <span class="ms">chevron_left</span>
+        </button>
+        <span class="aushilfe-month-label">${monthLabel}</span>
+        <button class="sc2-nav-btn" onclick="aushilfeMonthNav(1)" title="Nächster Monat">
+          <span class="ms">chevron_right</span>
+        </button>
+        <div class="aushilfe-legend">
+          <span class="aushilfe-legend-dot open"></span><span>Offen</span>
+          <span class="aushilfe-legend-dot booked"></span><span>Gebucht</span>
+        </div>
+      </div>
+
+      <!-- Stats bar -->
+      <div class="aushilfe-stats">
+        <div class="aushilfe-stat-chip">
+          <span class="ms" style="font-size:1rem;color:var(--accent)">event_available</span>
+          <span><strong>${slots.length}</strong> Slots</span>
+        </div>
+        <div class="aushilfe-stat-chip">
+          <span class="ms" style="font-size:1rem;color:var(--success)">check_circle</span>
+          <span><strong>${slots.filter(s => s.status === 'booked').length}</strong> Gebucht</span>
+        </div>
+        <div class="aushilfe-stat-chip">
+          <span class="ms" style="font-size:1rem;color:var(--warning)">schedule</span>
+          <span><strong>${slots.filter(s => s.status === 'open').length}</strong> Offen</span>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div class="aushilfe-grid-wrap">
+        ${gridHtml}
+      </div>
+
+      ${slots.length === 0 ? `
+        <div class="empty-state">
+          <div class="empty-state-icon">📋</div>
+          <div class="empty-state-text">Keine Aushilfe-Slots in ${monthLabel}</div>
+          <div class="empty-state-sub">Klicke auf "Slot hinzufügen" um eine offene Schicht zu erstellen.</div>
+          <button class="btn btn-primary" onclick="openAushilfeSlotModal()" style="margin-top:16px">
+            <span class="ms">add</span> Slot hinzufügen
+          </button>
+        </div>` : ''}
+    </div>
+  `;
+}
+
+/**
+ * Build the Aushilfe grid HTML (rows = shift labels, cols = days)
+ */
+function buildAushilfeGrid(days, slots, allLabels, DOW_SHORT) {
+  if (days.length === 0) return '';
+
+  // Header row: day cells
+  let headerCells = `<div class="ag-corner"></div>`;
+  days.forEach(d => {
+    const dow = DOW_SHORT[d.getDay()];
+    const dd = String(d.getDate()).padStart(2, '0');
+    const isToday = isoDate(d) === isoDate(new Date());
+    headerCells += `
+      <div class="ag-day-header ${isToday ? 'is-today' : ''}">
+        <div class="ag-day-dow">${dow}</div>
+        <div class="ag-day-num">${dd}</div>
+      </div>`;
+  });
+
+  // Body rows: one per shift label
+  let bodyRows = '';
+  allLabels.forEach(label => {
+    let cells = `<div class="ag-row-label">${label}</div>`;
+    days.forEach(d => {
+      const dateStr = isoDate(d);
+      const slot = slots.find(s => s.date === dateStr && s.shiftLabel === label);
+      if (!slot) {
+        cells += `<div class="ag-cell empty" onclick="openAushilfeSlotModal('${dateStr}','${label}')" title="Slot für ${label} am ${dateStr} erstellen">
+          <span class="ag-cell-add ms">add</span>
+        </div>`;
+      } else if (slot.status === 'open') {
+        cells += `<div class="ag-cell open" onclick="openAushilfeSlotInfo('${slot.id}')" title="${slot.shiftFrom}–${slot.shiftTo} · ${slot.dept}">
+          <div class="ag-cell-time">${slot.shiftFrom}–${slot.shiftTo}</div>
+          <div class="ag-cell-dept">${slot.dept}</div>
+          <div class="ag-cell-badge open">Offen</div>
+        </div>`;
+      } else {
+        const initials = slot.aushilfeName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        cells += `<div class="ag-cell booked" onclick="openAushilfeBookingInfo('${slot.id}')" title="${slot.aushilfeName} · ${slot.shiftFrom}–${slot.shiftTo}">
+          <div class="ag-cell-avatar">${initials}</div>
+          <div class="ag-cell-name">${slot.aushilfeName.split(' ')[0]}</div>
+          <div class="ag-cell-badge booked">Gebucht</div>
+        </div>`;
+      }
+    });
+    bodyRows += `<div class="ag-row">${cells}</div>`;
+  });
+
+  if (!bodyRows) return '';
+
+  return `<div class="ag-grid" style="grid-template-columns: 110px repeat(${days.length}, minmax(72px, 1fr))">
+    <div class="ag-header">${headerCells}</div>
+    ${bodyRows}
+  </div>`;
+}
+
+function aushilfeMonthNav(dir) {
+  aushilfePlanungMonth.setMonth(aushilfePlanungMonth.getMonth() + dir);
+  renderAushilfePlanung();
+}
+
+// ── Modal: Create Slot ─────────────────────────────────────
+function openAushilfeSlotModal(preDate, preLabel) {
+  const today = isoDate(new Date());
+  const deptOpts = [...new Set(EMPS.map(e => e.dept).filter(Boolean))].sort()
+    .map(d => `<option value="${d}">${d}</option>`).join('');
+  const locOpts = LOCS.map(l => `<option value="${l.id}" ${l.id === currentLocation ? 'selected' : ''}>${l.name}</option>`).join('');
+  const tmplOpts = SHIFT_TEMPLATES.map(t => `<option value="${t.label}" data-from="${t.from}" data-to="${t.to}">${t.label} (${t.from}–${t.to})</option>`).join('');
+
+  openModal('Aushilfe-Slot erstellen', `
+    <form id="aushilfeSlotForm" style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group">
+        <label for="asDate">Datum *</label>
+        <input id="asDate" type="date" class="form-input" value="${preDate || today}" min="${today}" required>
+      </div>
+      <div class="form-group">
+        <label for="asLoc">Standort *</label>
+        <select id="asLoc" class="form-select">${locOpts}</select>
+      </div>
+      <div class="form-group">
+        <label for="asTmpl">Schicht *</label>
+        <select id="asTmpl" class="form-select" onchange="applyAushilfeTemplate(this)">
+          ${tmplOpts}
+        </select>
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="form-group" style="flex:1">
+          <label for="asFrom">Von *</label>
+          <input id="asFrom" type="time" class="form-input" value="${SHIFT_TEMPLATES[0]?.from || '09:00'}" required>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label for="asTo">Bis *</label>
+          <input id="asTo" type="time" class="form-input" value="${SHIFT_TEMPLATES[0]?.to || '17:00'}" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="asDept">Bereich *</label>
+        <select id="asDept" class="form-select">${deptOpts}</select>
+      </div>
+      <div class="form-group">
+        <label for="asNote">Notiz für Aushilfe</label>
+        <textarea id="asNote" class="form-input" rows="2" placeholder="z.B. Erfahrung im Service erforderlich"></textarea>
+      </div>
+    </form>
+  `, `
+    <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+    <button class="btn btn-primary" onclick="saveAushilfeSlot()">
+      <span class="ms">save</span> Slot speichern
+    </button>
+  `);
+
+  // Pre-select label if provided
+  if (preLabel) {
+    const sel = document.getElementById('asTmpl');
+    if (sel) {
+      const opt = [...sel.options].find(o => o.value === preLabel);
+      if (opt) { sel.value = preLabel; applyAushilfeTemplate(sel); }
+    }
+  }
+}
+
+function applyAushilfeTemplate(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  const from = opt.dataset.from;
+  const to = opt.dataset.to;
+  if (from) document.getElementById('asFrom').value = from;
+  if (to)   document.getElementById('asTo').value   = to;
+}
+
+async function saveAushilfeSlot() {
+  const date  = document.getElementById('asDate')?.value;
+  const loc   = document.getElementById('asLoc')?.value;
+  const label = document.getElementById('asTmpl')?.value;
+  const from  = document.getElementById('asFrom')?.value;
+  const to    = document.getElementById('asTo')?.value;
+  const dept  = document.getElementById('asDept')?.value;
+  const note  = document.getElementById('asNote')?.value?.trim() || '';
+
+  if (!date || !loc || !label || !from || !to || !dept) {
+    toast('Bitte alle Pflichtfelder ausfüllen', 'warn');
+    return;
+  }
+
+  const slot = { location: loc, date, shiftLabel: label, shiftFrom: from, shiftTo: to, dept, note };
+  const data = await syncCreateAushilfeSlot(slot);
+  if (!data) {
+    toast('Fehler beim Speichern', 'err');
+    return;
+  }
+
+  // Add to local state
+  AUSHILFE_SLOTS.push({
+    id: data.id,
+    location: data.location,
+    date: data.slot_date,
+    shiftLabel: data.shift_label,
+    shiftFrom: data.shift_from,
+    shiftTo: data.shift_to,
+    dept: data.dept,
+    note: data.note || '',
+    status: 'open',
+    aushilfeName: '',
+    aushilfePhone: '',
+    aushilfeEmail: '',
+    aushilfeNote: '',
+    createdAt: data.created_at
+  });
+
+  closeModal();
+  toast('✅ Aushilfe-Slot erstellt');
+  renderAushilfePlanung();
+}
+
+// ── Modal: Open Slot Info (admin view) ────────────────────
+function openAushilfeSlotInfo(slotId) {
+  const slot = AUSHILFE_SLOTS.find(s => s.id === slotId);
+  if (!slot) return;
+  const d = new Date(slot.date);
+  const dayName = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][d.getDay()];
+
+  openModal('Aushilfe-Slot (Offen)', `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="aushilfe-modal-row"><span class="ms">calendar_today</span><div>
+        <div class="aushilfe-modal-label">Datum</div>
+        <div class="aushilfe-modal-val">${dayName}, ${formatDateDE(slot.date)}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">schedule</span><div>
+        <div class="aushilfe-modal-label">Schicht</div>
+        <div class="aushilfe-modal-val">${slot.shiftLabel} · ${slot.shiftFrom}–${slot.shiftTo}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">restaurant</span><div>
+        <div class="aushilfe-modal-label">Bereich</div>
+        <div class="aushilfe-modal-val">${slot.dept}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">location_on</span><div>
+        <div class="aushilfe-modal-label">Standort</div>
+        <div class="aushilfe-modal-val">${getLocationName(slot.location)}</div>
+      </div></div>
+      ${slot.note ? `<div class="aushilfe-modal-row"><span class="ms">sticky_note_2</span><div>
+        <div class="aushilfe-modal-label">Notiz</div>
+        <div class="aushilfe-modal-val" style="color:var(--text-muted)">${slot.note}</div>
+      </div></div>` : ''}
+      <div style="padding:12px;background:rgba(var(--warning-rgb),.08);border-radius:10px;color:var(--warning);font-size:.85rem;text-align:center">
+        ⏳ Noch keine Anmeldung
+      </div>
+    </div>
+  `, `
+    <button class="btn btn-danger" onclick="deleteAushilfeSlot('${slotId}')">
+      <span class="ms">delete</span> Slot löschen
+    </button>
+    <button class="btn btn-secondary" onclick="closeModal()">Schließen</button>
+  `);
+}
+
+// ── Modal: Booking Info (Aushilfe details) ─────────────────
+function openAushilfeBookingInfo(slotId) {
+  const slot = AUSHILFE_SLOTS.find(s => s.id === slotId);
+  if (!slot) return;
+  const d = new Date(slot.date);
+  const dayName = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][d.getDay()];
+
+  openModal('Aushilfe – Buchungsdetails', `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="aushilfe-modal-row"><span class="ms">calendar_today</span><div>
+        <div class="aushilfe-modal-label">Datum</div>
+        <div class="aushilfe-modal-val">${dayName}, ${formatDateDE(slot.date)}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">schedule</span><div>
+        <div class="aushilfe-modal-label">Schicht</div>
+        <div class="aushilfe-modal-val">${slot.shiftLabel} · ${slot.shiftFrom}–${slot.shiftTo}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">restaurant</span><div>
+        <div class="aushilfe-modal-label">Bereich</div>
+        <div class="aushilfe-modal-val">${slot.dept}</div>
+      </div></div>
+      <hr style="border-color:var(--border);margin:4px 0">
+      <div class="aushilfe-modal-row"><span class="ms">person</span><div>
+        <div class="aushilfe-modal-label">Name</div>
+        <div class="aushilfe-modal-val"><strong>${slot.aushilfeName}</strong></div>
+      </div></div>
+      ${slot.aushilfePhone ? `<div class="aushilfe-modal-row"><span class="ms">phone</span><div>
+        <div class="aushilfe-modal-label">Telefon</div>
+        <div class="aushilfe-modal-val"><a href="tel:${slot.aushilfePhone}" style="color:var(--accent)">${slot.aushilfePhone}</a></div>
+      </div></div>` : ''}
+      ${slot.aushilfeEmail ? `<div class="aushilfe-modal-row"><span class="ms">mail</span><div>
+        <div class="aushilfe-modal-label">E-Mail</div>
+        <div class="aushilfe-modal-val"><a href="mailto:${slot.aushilfeEmail}" style="color:var(--accent)">${slot.aushilfeEmail}</a></div>
+      </div></div>` : ''}
+      ${slot.aushilfeNote ? `<div class="aushilfe-modal-row"><span class="ms">chat_bubble</span><div>
+        <div class="aushilfe-modal-label">Notiz von Aushilfe</div>
+        <div class="aushilfe-modal-val" style="color:var(--text-muted)">${slot.aushilfeNote}</div>
+      </div></div>` : ''}
+      <div style="padding:10px 14px;background:rgba(var(--success-rgb),.08);border-radius:10px;color:var(--success);font-size:.85rem;font-weight:600;text-align:center">
+        ✅ Buchung bestätigt
+      </div>
+    </div>
+  `, `
+    <button class="btn btn-danger" onclick="clearAushilfeBooking('${slotId}')">
+      <span class="ms">cancel</span> Buchung löschen
+    </button>
+    <button class="btn btn-secondary" onclick="closeModal()">Schließen</button>
+  `);
+}
+
+async function deleteAushilfeSlot(slotId) {
+  if (!confirm('Diesen Slot wirklich löschen?')) return;
+  await syncDeleteAushilfeSlot(slotId);
+  AUSHILFE_SLOTS = AUSHILFE_SLOTS.filter(s => s.id !== slotId);
+  closeModal();
+  toast('Slot gelöscht', 'warn');
+  renderAushilfePlanung();
+}
+
+async function clearAushilfeBooking(slotId) {
+  if (!confirm('Buchung wirklich entfernen? Der Slot wird wieder auf "Offen" gesetzt.')) return;
+  await syncClearAushilfeBooking(slotId);
+  const slot = AUSHILFE_SLOTS.find(s => s.id === slotId);
+  if (slot) {
+    slot.status = 'open';
+    slot.aushilfeName = '';
+    slot.aushilfePhone = '';
+    slot.aushilfeEmail = '';
+    slot.aushilfeNote = '';
+  }
+  closeModal();
+  toast('Buchung entfernt', 'warn');
+  renderAushilfePlanung();
+}
 
 // ═══ VACATION ═══
 function renderVacation(){

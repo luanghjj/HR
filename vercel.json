@@ -3,6 +3,9 @@
   "outputDirectory": ".",
   "cleanUrls": false,
   "trailingSlash": false,
+  "rewrites": [
+    { "source": "/aushilfe", "destination": "/aushilfe.html" }
+  ],
   "headers": [
     {
       "source": "/js/(.*).js",

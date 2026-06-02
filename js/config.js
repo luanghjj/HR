@@ -18,6 +18,7 @@ const PAGE_TITLES = {
   employees: 'Mitarbeiter',
   departments: 'Bereiche',
   schedule: 'Arbeitsplan',
+  aushilfe_planung: 'Aushilfe Planung',
   vacation: 'Urlaubsplan',
   sick: 'Krankmeldungen',
   documents: 'Unterlagen',
