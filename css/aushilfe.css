@@ -94,9 +94,19 @@
 /* ── Aushilfe Grid ────────────────────────────────────────── */
 .aushilfe-grid-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--bg-card);
+  /* Same formula as .subs-scroll-wrap */
+  width: calc(100vw - var(--sidebar-w) - 64px);
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .aushilfe-grid-wrap {
+    width: calc(100vw - 32px);
+  }
 }
 
 .ag-grid {
