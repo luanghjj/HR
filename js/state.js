@@ -34,3 +34,7 @@ let checkInTimer = null;  // Interval for live timer
 // Aushilfe Planung
 let AUSHILFE_SLOTS = [];
 let aushilfePlanungMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let AUSHILFE_SUBMISSIONS = [];       // from employee_submissions table
+let AUSHILFE_MAX_SHIFTS_PER_WEEK = 1; // configurable by owner, default 1
+let aushilfeSubmissionsFilter = 'all'; // filter for submissions list
+

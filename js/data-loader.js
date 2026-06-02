@@ -400,7 +400,39 @@ async function loadDataFromSupabase() {
       }
     } catch (_) { /* table may not exist yet */ }
 
+    // Load Aushilfe settings (max shifts per week)
+    try {
+      const { data: settings } = await sb.from('aushilfe_settings').select('*').single();
+      if (settings) {
+        AUSHILFE_MAX_SHIFTS_PER_WEEK = settings.max_shifts_per_week || 1;
+        console.log('[Data] ✓ Aushilfe max shifts/week:', AUSHILFE_MAX_SHIFTS_PER_WEEK);
+      }
+    } catch (_) { /* table may not exist yet, use default 1 */ }
+
+    // Load employee_submissions (Aushilfe worker list for admin view)
+    try {
+      const { data: subs, error: subsErr } = await sb.from('employee_submissions')
+        .select('id, vorname, familienname, telefon, email, iban, steuerklasse, status, created_at')
+        .order('created_at', { ascending: false });
+      if (!subsErr && subs) {
+        AUSHILFE_SUBMISSIONS.length = 0;
+        subs.forEach(s => AUSHILFE_SUBMISSIONS.push({
+          id: s.id,
+          vorname: s.vorname,
+          familienname: s.familienname,
+          telefon: s.telefon,
+          email: s.email,
+          iban: s.iban,
+          steuerklasse: s.steuerklasse,
+          status: s.status || 'neu',
+          createdAt: s.created_at
+        }));
+        console.log('[Data] ✓ ' + AUSHILFE_SUBMISSIONS.length + ' Aushilfe submissions loaded');
+      }
+    } catch (_) { /* employee_submissions may not exist */ }
+
     // Run auto-checkout after data load
+
     await runAutoCheckout();
 
     return true;

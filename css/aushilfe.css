@@ -311,6 +311,83 @@
 }
 
 /* ── Mobile responsive (≤ 900px) ─────────────────────────── */
+
+/* ── Settings Card ────────────────────────────────────────── */
+.aushilfe-settings-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  background: rgba(var(--accent-rgb), .06);
+  border: 1px solid rgba(var(--accent-rgb), .2);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.aushilfe-settings-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.aushilfe-settings-label {
+  font-size: .92rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.aushilfe-settings-sub {
+  font-size: .78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.aushilfe-settings-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Submissions Section ───────────────────────────────────── */
+.aushilfe-subs-section {
+  margin-top: 32px;
+  border-top: 2px solid var(--border);
+  padding-top: 24px;
+}
+
+.aushilfe-subs-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.aushilfe-subs-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+/* Clickable table rows */
+.sub-row {
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.sub-row:hover td {
+  background: rgba(var(--accent-rgb), .05) !important;
+}
+
+/* ── Mobile responsive (≤ 900px) ─────────────────────────── */
 @media (max-width: 900px) {
   .aushilfe-header {
     flex-direction: column;
@@ -319,6 +396,10 @@
   .aushilfe-header-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+  .aushilfe-settings-card {
+    flex-direction: column;
+    align-items: flex-start;
   }
   .aushilfe-stats {
     gap: 8px;
@@ -330,4 +411,8 @@
   .ag-cell {
     min-height: 56px;
   }
+  .aushilfe-subs-header {
+    flex-direction: column;
+  }
 }
+

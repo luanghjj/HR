@@ -3482,8 +3482,29 @@ function renderAushilfePlanung() {
   const DOW_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   let gridHtml = buildAushilfeGrid(days, slots, allLabels, DOW_SHORT);
 
+  // Build submissions list HTML
+  const subsHtml = buildAushilfeSubmissionsList();
+
   pg.innerHTML = `
     <div class="aushilfe-page">
+      <!-- Settings Card -->
+      <div class="aushilfe-settings-card">
+        <div class="aushilfe-settings-left">
+          <span class="ms" style="font-size:1.1rem;color:var(--accent)">tune</span>
+          <div>
+            <div class="aushilfe-settings-label">Max. Schichten pro Woche</div>
+            <div class="aushilfe-settings-sub">Wie viele Schichten darf eine Aushilfe pro Woche buchen?</div>
+          </div>
+        </div>
+        <div class="aushilfe-settings-right">
+          <input id="aushilfeMaxShifts" type="number" min="1" max="7" value="${AUSHILFE_MAX_SHIFTS_PER_WEEK}"
+            class="form-input" style="width:70px;text-align:center;font-family:'Space Mono',monospace;font-size:1rem;font-weight:700">
+          <button class="btn btn-primary" onclick="saveAushilfeMaxShifts()" title="Speichern">
+            <span class="ms" style="font-size:1rem">save</span> Speichern
+          </button>
+        </div>
+      </div>
+
       <!-- Header -->
       <div class="aushilfe-header">
         <div>
@@ -3545,9 +3566,134 @@ function renderAushilfePlanung() {
             <span class="ms">add</span> Slot hinzufügen
           </button>
         </div>` : ''}
+
+      <!-- Aushilfe Mitarbeiterliste (from employee_submissions) -->
+      ${subsHtml}
     </div>
   `;
 }
+
+/**
+ * Save max shifts per week setting
+ */
+async function saveAushilfeMaxShifts() {
+  const input = document.getElementById('aushilfeMaxShifts');
+  const val = parseInt(input?.value) || 1;
+  if (val < 1 || val > 7) {
+    toast('Bitte einen Wert zwischen 1 und 7 eingeben', 'warn');
+    return;
+  }
+  const ok = await syncSaveAushilfeMaxShifts(val);
+  if (ok) toast(`✅ Max. ${val} Schicht${val > 1 ? 'en' : ''} pro Woche gespeichert`);
+  else toast('Fehler beim Speichern', 'err');
+}
+
+/**
+ * Build the Aushilfe submissions list HTML (bottom of page)
+ */
+function buildAushilfeSubmissionsList() {
+  const filtered = aushilfeSubmissionsFilter === 'all'
+    ? AUSHILFE_SUBMISSIONS
+    : AUSHILFE_SUBMISSIONS.filter(s => s.status === aushilfeSubmissionsFilter);
+
+  const statusBadge = (s) => {
+    const map = { neu: ['#f59e0b','Neu'], aktiv: ['var(--success)','Aktiv'], inaktiv: ['var(--text-muted)','Inaktiv'] };
+    const [color, label] = map[s] || ['var(--text-muted)', s];
+    return `<span style="background:${color}22;color:${color};font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:5px;text-transform:uppercase">${label}</span>`;
+  };
+
+  const rows = filtered.map(s => `
+    <tr class="sub-row" onclick="openAushilfeSubmissionModal(${s.id})" title="Details anzeigen">
+      <td><strong>${s.vorname} ${s.familienname}</strong></td>
+      <td><a href="tel:${s.telefon}" onclick="event.stopPropagation()" style="color:var(--accent)">${s.telefon}</a></td>
+      <td><a href="mailto:${s.email}" onclick="event.stopPropagation()" style="color:var(--accent);font-size:.82rem">${s.email}</a></td>
+      <td style="font-family:'Space Mono',monospace;font-size:.78rem">${s.steuerklasse}</td>
+      <td style="font-family:'Space Mono',monospace;font-size:.72rem">${s.iban ? s.iban.substring(0,8) + '…' : '—'}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td style="font-size:.78rem;color:var(--text-muted)">${new Date(s.createdAt).toLocaleDateString('de-DE')}</td>
+    </tr>`).join('');
+
+  const filterBtns = ['all','neu','aktiv','inaktiv'].map(f => `
+    <button class="sc2-dept-pill${aushilfeSubmissionsFilter === f ? ' active' : ''}"
+      onclick="aushilfeSubmissionsFilter='${f}';renderAushilfePlanung()">
+      ${f === 'all' ? 'Alle' : f.charAt(0).toUpperCase() + f.slice(1)}
+      ${f === 'all' ? `(${AUSHILFE_SUBMISSIONS.length})` : `(${AUSHILFE_SUBMISSIONS.filter(s => s.status === f).length})`}
+    </button>`).join('');
+
+  return `
+    <div class="aushilfe-subs-section">
+      <div class="aushilfe-subs-header">
+        <div>
+          <div class="aushilfe-subs-title">
+            <span class="ms" style="font-size:1.1rem;color:var(--accent)">group</span>
+            Aushilfe-Mitarbeiter
+          </div>
+          <div class="aushilfe-subtitle">Eingereichte Informationsformulare (employee_submissions)</div>
+        </div>
+        <div class="sc2-dept-pills">${filterBtns}</div>
+      </div>
+
+      ${filtered.length === 0 ? `
+        <div class="empty-state" style="padding:32px">
+          <div class="empty-state-icon">👥</div>
+          <div class="empty-state-text">Keine Einträge</div>
+        </div>` : `
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Telefon</th>
+                <th>E-Mail</th>
+                <th>StKl.</th>
+                <th>IBAN</th>
+                <th>Status</th>
+                <th>Eingereicht</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`}
+    </div>`;
+}
+
+/**
+ * Show full details of an employee submission in a modal
+ */
+function openAushilfeSubmissionModal(subId) {
+  const s = AUSHILFE_SUBMISSIONS.find(x => x.id === subId);
+  if (!s) return;
+  openModal(`${s.vorname} ${s.familienname}`, `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="aushilfe-modal-row"><span class="ms">person</span><div>
+        <div class="aushilfe-modal-label">Vollständiger Name</div>
+        <div class="aushilfe-modal-val">${s.vorname} ${s.familienname}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">phone</span><div>
+        <div class="aushilfe-modal-label">Telefon</div>
+        <div class="aushilfe-modal-val"><a href="tel:${s.telefon}" style="color:var(--accent)">${s.telefon}</a></div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">mail</span><div>
+        <div class="aushilfe-modal-label">E-Mail</div>
+        <div class="aushilfe-modal-val"><a href="mailto:${s.email}" style="color:var(--accent)">${s.email}</a></div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">account_balance</span><div>
+        <div class="aushilfe-modal-label">IBAN</div>
+        <div class="aushilfe-modal-val" style="font-family:'Space Mono',monospace;font-size:.85rem">${s.iban || '—'}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">receipt_long</span><div>
+        <div class="aushilfe-modal-label">Steuerklasse</div>
+        <div class="aushilfe-modal-val">${s.steuerklasse || '—'}</div>
+      </div></div>
+      <div class="aushilfe-modal-row"><span class="ms">calendar_today</span><div>
+        <div class="aushilfe-modal-label">Eingereicht am</div>
+        <div class="aushilfe-modal-val">${new Date(s.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}</div>
+      </div></div>
+    </div>
+  `, `<button class="btn btn-secondary" onclick="closeModal()">Schließen</button>`);
+}
+
+
 
 /**
  * Build the Aushilfe grid HTML (rows = shift labels, cols = days)

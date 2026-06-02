@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════
 // OKYU HRM – Aushilfe Public Page Logic
 // Loads open slots from Supabase (anonymous), renders list,
-// handles self-registration form.
+// handles self-registration form with weekly limit enforcement.
 // ═══════════════════════════════════════════════════════════
 
 const SUPABASE_URL  = 'https://zkxsyipyjqikqxswpbks.supabase.co';
@@ -9,40 +9,48 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-const MONTHS_DE = ['Januar','Februar','März','April','Mai','Juni',
+const MONTHS_DE  = ['Januar','Februar','März','April','Mai','Juni',
   'Juli','August','September','Oktober','November','Dezember'];
-const DAYS_FULL = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
 const DAYS_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
 // App state
-let allSlots = [];
-let locations = [];
-let activeFormSlotId = null;
+let allSlots          = [];
+let locations         = [];
+let activeFormSlotId  = null;
+let maxShiftsPerWeek  = 1; // loaded from aushilfe_settings
 
 // ── Bootstrap ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  await Promise.all([loadLocations(), loadSlots()]);
+  await Promise.all([loadSettings(), loadLocations(), loadSlots()]);
   buildFilterOptions();
+  renderLimitBanner();
   renderSlots();
-  // Real-time: refresh when a slot gets booked
+
+  // Real-time: hide slot instantly when someone else books it
   sb.channel('aushilfe_rt')
     .on('postgres_changes', {
       event: 'UPDATE', schema: 'public', table: 'aushilfe_slots'
     }, (payload) => {
       const updated = payload.new;
       const idx = allSlots.findIndex(s => s.id === updated.id);
-      if (idx !== -1) {
-        if (updated.status === 'booked') {
-          // Remove from public list immediately
-          allSlots.splice(idx, 1);
-          renderSlots();
-        }
+      if (idx !== -1 && updated.status === 'booked') {
+        allSlots.splice(idx, 1);
+        renderSlots();
+        showPubToast('ℹ️ Eine Schicht wurde gerade vergeben.');
       }
     })
     .subscribe();
 });
 
-// ── Load Data ─────────────────────────────────────────────
+// ── Load Settings ─────────────────────────────────────────
+async function loadSettings() {
+  try {
+    const { data } = await sb.from('aushilfe_settings').select('max_shifts_per_week').single();
+    if (data) maxShiftsPerWeek = data.max_shifts_per_week || 1;
+  } catch (_) { /* use default 1 */ }
+}
+
+// ── Load Locations ────────────────────────────────────────
 async function loadLocations() {
   try {
     const { data, error } = await sb.from('locations').select('id, name');
@@ -60,6 +68,7 @@ async function loadLocations() {
   } catch (e) { console.warn('[Pub] loadLocations:', e.message); }
 }
 
+// ── Load Slots ────────────────────────────────────────────
 async function loadSlots() {
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -96,12 +105,52 @@ async function loadSlots() {
   }
 }
 
+// ── Weekly limit banner ───────────────────────────────────
+function renderLimitBanner() {
+  const banner = document.getElementById('limitBanner');
+  if (!banner) return;
+  const plural = maxShiftsPerWeek === 1 ? 'Schicht' : 'Schichten';
+  banner.innerHTML = `
+    <span class="ms" style="font-size:1.1rem">info</span>
+    Du kannst maximal <strong>${maxShiftsPerWeek} ${plural} pro Woche</strong> buchen.
+  `;
+  banner.style.display = 'flex';
+}
+
+// ── Check weekly bookings by phone ────────────────────────
+async function getWeeklyBookingCount(phone) {
+  try {
+    // Get start and end of current ISO week (Mon–Sun)
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun
+    const diffToMon = (day === 0 ? -6 : 1 - day);
+    const mon = new Date(now);
+    mon.setDate(now.getDate() + diffToMon);
+    mon.setHours(0, 0, 0, 0);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    sun.setHours(23, 59, 59, 999);
+
+    const monStr = mon.toISOString().split('T')[0];
+    const sunStr = sun.toISOString().split('T')[0];
+
+    const { data, error } = await sb.from('aushilfe_slots')
+      .select('id')
+      .eq('status', 'booked')
+      .eq('aushilfe_phone', phone)
+      .gte('slot_date', monStr)
+      .lte('slot_date', sunStr);
+
+    if (error) return 0;
+    return (data || []).length;
+  } catch (_) { return 0; }
+}
+
 // ── Filters ───────────────────────────────────────────────
 function buildFilterOptions() {
   const monthSel = document.getElementById('filterMonth');
   if (!monthSel) return;
 
-  // Collect unique year-month combos from slots
   const monthSet = new Set(allSlots.map(s => s.date.substring(0, 7)));
   const monthArr = [...monthSet].sort();
 
@@ -114,19 +163,15 @@ function buildFilterOptions() {
     monthSel.appendChild(opt);
   });
 
-  // Default: select current month
   const nowYM = new Date().toISOString().substring(0, 7);
   if (monthArr.includes(nowYM)) monthSel.value = nowYM;
 }
 
-function applyFilters() {
-  renderSlots();
-}
+function applyFilters() { renderSlots(); }
 
 function getFilteredSlots() {
   const loc   = document.getElementById('filterLoc')?.value  || 'all';
   const month = document.getElementById('filterMonth')?.value || 'all';
-
   return allSlots.filter(s => {
     const matchLoc   = loc   === 'all' || s.location === loc;
     const matchMonth = month === 'all' || s.date.startsWith(month);
@@ -163,9 +208,7 @@ function renderSlots() {
   Object.keys(groups).sort().forEach(ym => {
     const [y, m] = ym.split('-');
     html += `<div class="month-group-header">${MONTHS_DE[parseInt(m) - 1]} ${y}</div>`;
-    groups[ym].forEach(slot => {
-      html += buildSlotCard(slot);
-    });
+    groups[ym].forEach(slot => { html += buildSlotCard(slot); });
   });
   html += '</div>';
 
@@ -173,10 +216,10 @@ function renderSlots() {
 }
 
 function buildSlotCard(slot) {
-  const d   = new Date(slot.date + 'T12:00:00');
-  const dow  = DAYS_SHORT[d.getDay()];
-  const day  = d.getDate();
-  const mon  = MONTHS_DE[d.getMonth()].substring(0, 3);
+  const d      = new Date(slot.date + 'T12:00:00');
+  const dow    = DAYS_SHORT[d.getDay()];
+  const day    = d.getDate();
+  const mon    = MONTHS_DE[d.getMonth()].substring(0, 3);
   const locName = locations.find(l => l.id === slot.location)?.name || slot.location;
 
   return `
@@ -259,18 +302,14 @@ function buildSlotCard(slot) {
 
 // ── Form Toggle ───────────────────────────────────────────
 function toggleRegForm(slotId) {
-  // Close previously open form
   if (activeFormSlotId && activeFormSlotId !== slotId) {
     const prev = document.getElementById('form-' + activeFormSlotId);
     if (prev) prev.classList.remove('open');
   }
-
   const form = document.getElementById('form-' + slotId);
   if (!form) return;
   const isOpen = form.classList.toggle('open');
   activeFormSlotId = isOpen ? slotId : null;
-
-  // Scroll to form
   if (isOpen) {
     setTimeout(() => form.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
   }
@@ -278,18 +317,18 @@ function toggleRegForm(slotId) {
 
 // ── Submit Registration ───────────────────────────────────
 async function submitRegistration(slotId) {
-  const nameEl  = document.getElementById('fn-' + slotId);
-  const phoneEl = document.getElementById('fp-' + slotId);
-  const emailEl = document.getElementById('fe-' + slotId);
-  const noteEl  = document.getElementById('fno-' + slotId);
+  const nameEl    = document.getElementById('fn-'       + slotId);
+  const phoneEl   = document.getElementById('fp-'       + slotId);
+  const emailEl   = document.getElementById('fe-'       + slotId);
+  const noteEl    = document.getElementById('fno-'      + slotId);
   const submitBtn = document.getElementById('btnSubmit-' + slotId);
 
-  const name  = nameEl?.value?.trim() || '';
+  const name  = nameEl?.value?.trim()  || '';
   const phone = phoneEl?.value?.trim() || '';
   const email = emailEl?.value?.trim() || '';
-  const note  = noteEl?.value?.trim() || '';
+  const note  = noteEl?.value?.trim()  || '';
 
-  // Validation
+  // Basic validation
   if (!name) {
     showPubToast('❌ Bitte deinen Namen eingeben');
     nameEl?.focus();
@@ -302,38 +341,54 @@ async function submitRegistration(slotId) {
   }
 
   // Disable button to prevent double-submit
-  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Wird gespeichert…'; }
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Wird geprüft…'; }
 
   try {
-    // Confirm slot is still open
+    // ── Check weekly booking limit ──────────────────────────
+    const weeklyCount = await getWeeklyBookingCount(phone);
+    if (weeklyCount >= maxShiftsPerWeek) {
+      const plural = maxShiftsPerWeek === 1 ? 'Schicht' : 'Schichten';
+      showPubToast(`⚠️ Du hast bereits ${weeklyCount} von max. ${maxShiftsPerWeek} ${plural} diese Woche gebucht.`, 5000);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span class="ms">check_circle</span> Verbindlich anmelden';
+      }
+      return;
+    }
+
+    // ── Confirm slot is still open ──────────────────────────
     const { data: check, error: checkErr } = await sb.from('aushilfe_slots')
       .select('status').eq('id', slotId).single();
 
     if (checkErr || !check || check.status !== 'open') {
       showPubToast('⚠️ Diese Schicht wurde bereits vergeben. Bitte wähle eine andere.');
-      // Remove card from view
       allSlots = allSlots.filter(s => s.id !== slotId);
       renderSlots();
       return;
     }
 
-    // Book the slot
+    if (submitBtn) submitBtn.textContent = 'Wird gespeichert…';
+
+    // ── Book the slot ───────────────────────────────────────
     const { error } = await sb.from('aushilfe_slots').update({
       status:         'booked',
       aushilfe_name:  name,
       aushilfe_phone: phone,
       aushilfe_email: email || null,
-      aushilfe_note:  note || null
+      aushilfe_note:  note  || null
     }).eq('id', slotId);
 
     if (error) {
       console.warn('[Pub] submit:', error.message);
       showPubToast('❌ Fehler beim Speichern. Bitte nochmal versuchen.');
-      if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<span class="ms">check_circle</span> Verbindlich anmelden'; }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span class="ms">check_circle</span> Verbindlich anmelden';
+      }
       return;
     }
 
-    // Show success inside card
+    // ── Success ─────────────────────────────────────────────
     const card = document.getElementById('card-' + slotId);
     if (card) {
       const slot = allSlots.find(s => s.id === slotId);
@@ -341,25 +396,25 @@ async function submitRegistration(slotId) {
         <div class="success-state">
           <div class="state-icon">✅</div>
           <div class="state-title">Erfolgreich angemeldet!</div>
-          <div class="state-sub">Du wurdest für <strong>${slot?.shiftLabel || 'die Schicht'} am ${formatDate(slot?.date || '')}</strong> eingetragen.<br>Wir freuen uns auf dich!</div>
+          <div class="state-sub">Du wurdest für <strong>${slot?.shiftLabel || 'die Schicht'} am ${formatDate(slot?.date || '')}</strong> eingetragen.<br>Wir freuen uns auf dich! 🎉</div>
         </div>`;
     }
 
-    // Remove from list after short delay
     setTimeout(() => {
       allSlots = allSlots.filter(s => s.id !== slotId);
-      if (card) card.style.opacity = '0';
-      setTimeout(() => {
-        if (card) card.remove();
-      }, 400);
-    }, 2000);
+      if (card) { card.style.transition = 'opacity .4s'; card.style.opacity = '0'; }
+      setTimeout(() => { if (card) card.remove(); }, 400);
+    }, 2500);
 
     showPubToast('✅ Anmeldung bestätigt!');
 
   } catch (e) {
     console.warn('[Pub] submitRegistration:', e.message);
     showPubToast('❌ Netzwerkfehler. Bitte nochmal versuchen.');
-    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<span class="ms">check_circle</span> Verbindlich anmelden'; }
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<span class="ms">check_circle</span> Verbindlich anmelden';
+    }
   }
 }
 
@@ -382,7 +437,7 @@ function showError(msg) {
 }
 
 let toastTimer = null;
-function showPubToast(msg, duration = 3000) {
+function showPubToast(msg, duration = 3500) {
   const el = document.getElementById('pub-toast');
   if (!el) return;
   el.textContent = msg;

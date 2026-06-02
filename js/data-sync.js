@@ -645,3 +645,30 @@ async function syncClearAushilfeBooking(slotId) {
   } catch (e) { console.warn('[Sync] Aushilfe booking clear:', e.message); }
 }
 
+/**
+ * Save Aushilfe max shifts per week setting to Supabase
+ * @param {number} maxShifts
+ */
+async function syncSaveAushilfeMaxShifts(maxShifts) {
+  try {
+    const updatedBy = currentUser?.name || currentUser?.email || 'Inhaber';
+    const { error } = await sb.from('aushilfe_settings').upsert({
+      id: 1,
+      max_shifts_per_week: maxShifts,
+      updated_at: new Date().toISOString(),
+      updated_by: updatedBy
+    }, { onConflict: 'id' });
+    if (error) {
+      console.warn('[Sync] Aushilfe settings error:', error.message);
+      return false;
+    }
+    AUSHILFE_MAX_SHIFTS_PER_WEEK = maxShifts;
+    console.log('[Sync] ✓ Aushilfe max shifts saved:', maxShifts);
+    return true;
+  } catch (e) {
+    console.warn('[Sync] Aushilfe settings:', e.message);
+    return false;
+  }
+}
+
+
