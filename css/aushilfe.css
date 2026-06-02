@@ -394,8 +394,15 @@
   border-radius: 12px;
   border: 1px solid var(--border);
   display: block;
-  width: 100%;
+  /* width = viewport - sidebar - content padding */
+  width: calc(100vw - var(--sidebar-w) - 64px);
   max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .subs-scroll-wrap {
+    width: calc(100vw - 32px);
+  }
 }
 
 /* ── Mobile responsive (≤ 900px) ─────────────────────────── */
