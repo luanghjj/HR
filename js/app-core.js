@@ -2628,9 +2628,13 @@ function recalcNetto(empId) {
   const ub  = parseFloat(document.getElementById('edUeberweisung')?.value) || 0;
   const bar = parseFloat(document.getElementById('edBar')?.value) || 0;
   const netto = ub + bar;
+  // Netto display
   const dispN = document.getElementById('edNettoDisplay');
   if (dispN) dispN.textContent = formatEuro(netto);
-  // also update hourly based on current Brutto
+  // Brutto = Ü + BAR (also update the editable brutto field)
+  const dispB = document.getElementById('edBruttoDisplay');
+  if (dispB) dispB.value = netto;
+  // also update hourly
   recalcHourly(empId);
 }
 
@@ -2657,7 +2661,8 @@ async function saveSalaryChange(empId, oldBrutto, oldBar) {
   const note = document.getElementById('edSalNote')?.value?.trim() || '';
   const soll = parseFloat(document.getElementById('edSoll')?.value) || e.sollStunden;
 
-  if (newBrutto === oldBrutto && newBar === oldBar && soll === e.sollStunden) {
+  const oldUeb = oldBrutto - (oldBar || 0);
+  if (newBrutto === oldBrutto && newBar === oldBar && newUeb === oldUeb && soll === e.sollStunden) {
     toast('Keine Änderung festgestellt.', 'warn'); return;
   }
 
