@@ -1313,7 +1313,7 @@ function renderEmpRows(emps){
           <td data-col="netto_val"><span class="mit-mono">${e.actualNetto > 0 ? formatEuro(e.actualNetto) : '—'}</span></td>
           <td data-col="ueb">
             <span class="mit-mono" style="color:var(--accent)">${uebAmt > 0 ? formatEuro(uebAmt) : '—'}</span>
-            ${uebAmt > 0 && e.bank ? `<div style="font-size:.63rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;font-style:italic">🏦 ${e.bank}</div>` : ''}
+            ${uebAmt > 0 ? `<div style="margin-top:3px">${bankCell}</div>` : ''}
           </td>
           <td data-col="ueb_st">${uebAmt > 0 ? mkSel('ueb', ps?.ueb_status||'ausstehend', canEditUeb) : '<span style="color:var(--text-muted);font-size:.75rem">—</span>'}</td>
           <td data-col="ueb_dat">${uebAmt > 0 ? mkDate('ueb', ueDatumVal, canEditUeb) : '—'}</td>
