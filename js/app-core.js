@@ -1725,27 +1725,76 @@ async function renderDashPayOverview(monthStr) {
 
   const pct = (a,b) => b > 0 ? Math.round(a/b*100) : 0;
 
-  // Per-employee list (only emps with bar or überweisung)
-  const empRows = emps.map(e => {
+  // ── Überweisung grouped by bank ──────────────────────────
+  const uebEmps = emps.filter(e => Math.max(0, e.bruttoGehalt - (e.barGehalt||0)) > 0);
+  const bankGroups = {};
+  uebEmps.forEach(e => {
+    const bank = e.bank || '— Keine Bank —';
+    if (!bankGroups[bank]) bankGroups[bank] = [];
+    bankGroups[bank].push(e);
+  });
+
+  const bStatus = (st) => st === 'bezahlt'
+    ? '<span style="background:rgba(16,185,129,.15);color:#059669;font-size:.68rem;padding:2px 7px;border-radius:4px;font-weight:700">✅ Bezahlt</span>'
+    : '<span style="background:rgba(245,158,11,.1);color:#d97706;font-size:.68rem;padding:2px 7px;border-radius:4px;font-weight:700">⏳ Offen</span>';
+
+  const bankSectionsHtml = Object.keys(bankGroups).sort().map(bank => {
+    const bankEmps = bankGroups[bank];
+    const bankTotal = bankEmps.reduce((s,e) => s + Math.max(0, e.bruttoGehalt-(e.barGehalt||0)), 0);
+    const bankPaidTotal = bankEmps
+      .filter(e => rows.find(r => r.emp_id===e.id && r.ueb_status==='bezahlt'))
+      .reduce((s,e) => s + Math.max(0, e.bruttoGehalt-(e.barGehalt||0)), 0);
+    const allPaid = bankPaidTotal >= bankTotal && bankTotal > 0;
+
+    const bankRows = bankEmps.map(e => {
+      const ps = rows.find(r => r.emp_id === e.id);
+      const uebAmt = Math.max(0, e.bruttoGehalt - (e.barGehalt||0));
+      const uebSt = ps?.ueb_status || 'ausstehend';
+      return `<tr style="border-bottom:1px solid var(--border-light)">
+        <td style="padding:5px 10px;font-size:.82rem;font-weight:600">${e.name}</td>
+        <td style="padding:5px 10px;font-size:.82rem;font-family:monospace;color:var(--accent);text-align:right">${formatEuro(uebAmt)}</td>
+        <td style="padding:5px 10px;text-align:center">${bStatus(uebSt)}</td>
+      </tr>`;
+    }).join('');
+
+    return `
+      <div style="margin-bottom:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:rgba(99,102,241,.07);border-bottom:1px solid var(--border)">
+          <span style="font-weight:700;font-size:.85rem">🏦 ${bank}</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-family:'Space Mono',monospace;font-size:.88rem;color:var(--accent);font-weight:700">${formatEuro(bankTotal)}</span>
+            ${allPaid
+              ? '<span style="background:rgba(16,185,129,.15);color:#059669;font-size:.7rem;padding:2px 8px;border-radius:5px;font-weight:700">✅ Erledigt</span>'
+              : `<span style="background:rgba(245,158,11,.1);color:#d97706;font-size:.7rem;padding:2px 8px;border-radius:5px;font-weight:700">⏳ ${formatEuro(bankTotal-bankPaidTotal)} offen</span>`}
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse">
+          <tbody>${bankRows}</tbody>
+          <tfoot><tr style="background:rgba(0,0,0,.03)">
+            <td style="padding:5px 10px;font-size:.78rem;color:var(--text-muted);font-weight:600">Gesamt</td>
+            <td style="padding:5px 10px;font-family:monospace;font-size:.85rem;font-weight:800;text-align:right;color:var(--accent)">${formatEuro(bankTotal)}</td>
+            <td></td>
+          </tr></tfoot>
+        </table>
+      </div>`;
+  }).join('');
+
+  // ── BAR employees table ───────────────────────────────────
+  const barEmps = emps.filter(e => (e.barGehalt||0) > 0);
+  const barRowsHtml = barEmps.map(e => {
     const ps = rows.find(r => r.emp_id === e.id);
-    const uebAmt = e.nettoGehalt || (e.bruttoGehalt - (e.barGehalt||0));
     const barAmt = e.barGehalt || 0;
-    const uebSt = ps?.ueb_status || 'ausstehend';
     const barSt = ps?.bar_status || 'ausstehend';
-    const b = (st) => st==='bezahlt'
-      ? '<span style="background:rgba(16,185,129,.15);color:#059669;font-size:.68rem;padding:1px 6px;border-radius:4px;font-weight:600">✅</span>'
-      : '<span style="background:rgba(245,158,11,.1);color:#d97706;font-size:.68rem;padding:1px 6px;border-radius:4px;font-weight:600">⏳</span>';
     return `<tr style="border-bottom:1px solid var(--border-light)">
-      <td style="padding:6px 8px;font-size:.82rem;font-weight:600">${e.name}</td>
-      <td style="padding:6px 8px;font-size:.82rem;font-family:monospace;color:var(--accent)">${uebAmt>0?formatEuro(uebAmt):'—'}</td>
-      <td style="padding:6px 8px">${uebAmt>0?b(uebSt):'—'}</td>
-      <td style="padding:6px 8px;font-size:.82rem;font-family:monospace;color:#b45309">${barAmt>0?formatEuro(barAmt):'—'}</td>
-      <td style="padding:6px 8px">${barAmt>0?b(barSt):'—'}</td>
+      <td style="padding:5px 10px;font-size:.82rem;font-weight:600">${e.name}</td>
+      <td style="padding:5px 10px;font-size:.82rem;font-family:monospace;color:#b45309;text-align:right">${formatEuro(barAmt)}</td>
+      <td style="padding:5px 10px;text-align:center">${bStatus(barSt)}</td>
     </tr>`;
   }).join('');
 
   el.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+    <!-- Summary cards -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
       <div style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:14px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <span style="font-size:1.2rem">🏦</span>
@@ -1777,16 +1826,34 @@ async function renderDashPayOverview(monthStr) {
         </div>
       </div>
     </div>
-    <table style="width:100%;border-collapse:collapse;font-size:.82rem">
-      <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted)">
-        <th style="text-align:left;padding:5px 8px">Mitarbeiter</th>
-        <th style="text-align:right;padding:5px 8px">🏦 Überweisung</th>
-        <th style="padding:5px 8px">Status</th>
-        <th style="text-align:right;padding:5px 8px">💵 BAR</th>
-        <th style="padding:5px 8px">Status</th>
-      </tr></thead>
-      <tbody>${empRows}</tbody>
-    </table>`;
+
+    <!-- Überweisung by bank -->
+    <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">
+      🏦 Überweisung nach Bank
+    </div>
+    ${bankSectionsHtml || '<div style="color:var(--text-muted);font-size:.82rem;padding:8px">Keine Überweisungen</div>'}
+
+    <!-- BAR section -->
+    ${barEmps.length > 0 ? `
+    <div style="font-size:.8rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin:16px 0 10px">
+      💵 Bar-Auszahlung
+    </div>
+    <div style="border:1px solid rgba(180,83,9,.2);border-radius:10px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:rgba(180,83,9,.06);border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:7px 10px;font-size:.78rem;color:var(--text-muted)">Mitarbeiter</th>
+          <th style="text-align:right;padding:7px 10px;font-size:.78rem;color:var(--text-muted)">Betrag</th>
+          <th style="text-align:center;padding:7px 10px;font-size:.78rem;color:var(--text-muted)">Status</th>
+        </tr></thead>
+        <tbody>${barRowsHtml}</tbody>
+        <tfoot><tr style="background:rgba(0,0,0,.03)">
+          <td style="padding:5px 10px;font-size:.78rem;color:var(--text-muted);font-weight:600">Gesamt</td>
+          <td style="padding:5px 10px;font-family:monospace;font-size:.85rem;font-weight:800;text-align:right;color:#b45309">${formatEuro(totalBarSum)}</td>
+          <td></td>
+        </tr></tfoot>
+      </table>
+    </div>` : ''}`;
+
 }
 
 // ═══ ZAHLUNGSSTATUS ═══
