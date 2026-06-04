@@ -105,9 +105,24 @@ function buildLocationSelect(){
   if(can('seeAllLocations')){
     sel.innerHTML='<option value="all">Alle Standorte</option>'+LOCS.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
     sel.style.display='';
+  } else if(currentUser.role==='manager'){
+    // Manager: show only their assigned standorts as individual options
+    const userLocs = (currentUser.location||'').split(',').map(l=>l.trim()).filter(Boolean);
+    sel.innerHTML = userLocs.map(locId=>{
+      const l=LOCS.find(x=>x.id===locId);
+      return `<option value="${locId}">${l?l.name:locId}</option>`;
+    }).join('');
+    sel.style.display = userLocs.length > 1 ? '' : '';
   } else {
     sel.innerHTML=`<option value="${currentUser.location}">${getLocationName(currentUser.location)}</option>`;
     sel.style.display=currentUser.role==='mitarbeiter'?'none':'';
+  }
+  // Set currentLocation to first assigned loc if not yet set or out of scope
+  if(currentUser.role==='manager'){
+    const userLocs=(currentUser.location||'').split(',').map(l=>l.trim()).filter(Boolean);
+    if(!userLocs.includes(currentLocation) && currentLocation!=='all'){
+      currentLocation=userLocs[0]||currentUser.location;
+    }
   }
   sel.value=currentLocation;
 }
@@ -1340,7 +1355,7 @@ function renderEmpRows(emps){
 
 function filterEmps(q){const emps=getVisibleEmps().filter(e=>e.name.toLowerCase().includes(q.toLowerCase())||e.dept.toLowerCase().includes(q.toLowerCase()));renderEmpRows(emps);}
 function filterEmpsByDept(dept,btn){
-  document.querySelectorAll('.emp-filter-pill').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.mit-dept-pill').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
   const emps=dept==='all'?getVisibleEmps():getVisibleEmps().filter(e=>e.dept===dept);
   renderEmpRows(emps);
@@ -3142,7 +3157,17 @@ function renderSchedule(){
     <div class="sc2-filter-left">
       <span class="sc2-filter-label">Bereich</span>
       <button class="sc2-dept-pill${scheduleDept==='all'?' active':''}" onclick="scheduleDept='all';renderSchedule()">Alle</button>
-      ${[...new Set(DEPTS.map(d=>d.name))].sort().map(d=>`<button class="sc2-dept-pill${scheduleDept===d?' active':''}" onclick="scheduleDept='${d}';renderSchedule()">${d}</button>`).join('')}
+      ${(()=>{
+        // Filter DEPTS by current visible location
+        let visD = DEPTS;
+        if(currentUser.location !== 'all') {
+          visD = DEPTS.filter(d => empHasLoc({location: d.location}, currentUser.location));
+        }
+        if(currentLocation && currentLocation !== 'all') {
+          visD = visD.filter(d => d.location === currentLocation);
+        }
+        return [...new Set(visD.map(d=>d.name))].sort().map(d=>`<button class="sc2-dept-pill${scheduleDept===d?' active':''}" onclick="scheduleDept='${d}';renderSchedule()">${d}</button>`).join('');
+      })()}
     </div>
     <div class="sc2-filter-right">
       <span class="ms" style="font-size:1rem">sort</span> Sortieren nach:
