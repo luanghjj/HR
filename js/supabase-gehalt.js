@@ -1,19 +1,43 @@
 // ═══════════════════════════════════════════════════════════
-// OKYU HRM – Supabase Client for GehaltsManager DB
-// Separate DB: emtvtmdequrnmhpdeqrv.supabase.co
-// Used for: Lohnabrechnung integration in Mitarbeiter Detail
+// OKYU HRM – GehaltsManager (Lohnabrechnung) Bridge
+// ───────────────────────────────────────────────────────────
+// Lohndaten liegen in einer SEPARATEN Supabase-DB (GehaltsManager).
+// Wir lesen sie NICHT mehr direkt aus dem Frontend (kein zweiter
+// anon/service Key im Browser). Stattdessen ruft das Frontend die
+// Edge Function `gehalt-proxy` (auf dem HR-Projekt) auf, die den
+// GehaltsManager-Key serverseitig als Secret hält.
 // ═══════════════════════════════════════════════════════════
 
-const GEHALT_URL  = 'https://emtvtmdequrnmhpdeqrv.supabase.co';
-const GEHALT_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtdHZ0bWRlcXVybm1ocGRlcXJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4ODk2MjksImV4cCI6MjA5MDQ2NTYyOX0.Y0tfpHYhVS98ACU9c5Tpi_qpCaFzCkKWlCzBV8ExHls';
+/**
+ * Lohndaten eines Mitarbeiters über die Edge Function laden (read-only).
+ * @param {Object} opts
+ * @param {string} [opts.name]   - Mitarbeitername (z.B. "Nguyen, Hai My")
+ * @param {number} [opts.persNr] - Personalnummer (zuverlässigster Match)
+ * @returns {Promise<Array>} Array von Lohn-Zeilen (gehaelter rows) oder []
+ */
+async function fetchGehaltData({ name, persNr } = {}) {
+  // Use the logged-in HR session token so the Edge Function can verify the caller
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session?.access_token;
 
-/** Lazy-init: returns the sbGehalt client, creating it if needed */
-function getSbGehalt() {
-  if (window._sbGehalt) return window._sbGehalt;
-  if (!window.supabase?.createClient) {
-    console.warn('[sbGehalt] supabase-js not loaded yet');
-    return null;
+  const headers = {
+    'Content-Type': 'application/json',
+    'apikey': SUPABASE_ANON_KEY,
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/gehalt-proxy`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name, persNr }),
+  });
+
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const j = await res.json(); if (j.error) msg = j.error; } catch (_) {}
+    throw new Error(msg);
   }
-  window._sbGehalt = window.supabase.createClient(GEHALT_URL, GEHALT_ANON);
-  return window._sbGehalt;
+
+  const json = await res.json();
+  return json.rows || [];
 }

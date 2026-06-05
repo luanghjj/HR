@@ -2929,39 +2929,14 @@ async function renderEmpLohnabrechnung(empId, empName) {
   const el = document.getElementById(`lohnAbrArea_${empId}`);
   if (!el) return;
 
-  const sbG = getSbGehalt();
-  if (!sbG) {
-    el.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">⚠️ GehaltsManager DB nicht verfügbar.</span>';
-    return;
-  }
-
   el.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Lädt…</span>';
 
   try {
-    // Try matching by name — GehaltsManager may use different format
-    // First try exact match, then try partial on each word
+    // Load via Edge Function proxy — GehaltsManager key stays server-side (read-only).
+    // Name format matches HRM ("Nachname, Vorname"); the proxy also does a
+    // per-part wildcard fallback for reversed/short names.
     const nameTrimmed = empName.trim();
-    let { data, error } = await sbG.from('gehaelter')
-      .select('monat,betrieb,brutto,netto,ueberweisung,bar_tg,ue_status,bar_status,ue_datum,bar_datum,gehalt,notiz')
-      .ilike('name', nameTrimmed)
-      .order('monat', { ascending: false })
-      .limit(60);
-
-    if (error) throw error;
-
-    // Fallback: partial match on last name (first word before comma or space)
-    if (!data || !data.length) {
-      const parts = nameTrimmed.replace(/,/g, ' ').trim().split(/\s+/).filter(Boolean);
-      // Try each name part (≥2 chars) as wildcard — catches short Vietnamese names
-      for (const part of parts.filter(p => p.length >= 2)) {
-        const res = await sbG.from('gehaelter')
-          .select('monat,betrieb,brutto,netto,ueberweisung,bar_tg,ue_status,bar_status,ue_datum,bar_datum,gehalt,notiz')
-          .ilike('name', `%${part}%`)
-          .order('monat', { ascending: false })
-          .limit(60);
-        if (res.data?.length) { data = res.data; break; }
-      }
-    }
+    const data = await fetchGehaltData({ name: nameTrimmed });
 
     if (!data || !data.length) {
       el.innerHTML = `<span style="color:var(--text-muted);font-size:.8rem">Keine Lohndaten in GehaltsManager gefunden.<br><span style="font-size:.7rem;opacity:.7">Gesucht: "${nameTrimmed}"</span></span>`;
