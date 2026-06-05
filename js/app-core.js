@@ -2952,8 +2952,8 @@ async function renderEmpLohnabrechnung(empId, empName) {
     // Fallback: partial match on last name (first word before comma or space)
     if (!data || !data.length) {
       const parts = nameTrimmed.replace(/,/g, ' ').trim().split(/\s+/).filter(Boolean);
-      // Try each significant name part (>3 chars) as wildcard
-      for (const part of parts.filter(p => p.length > 3)) {
+      // Try each name part (≥2 chars) as wildcard — catches short Vietnamese names
+      for (const part of parts.filter(p => p.length >= 2)) {
         const res = await sbG.from('gehaelter')
           .select('monat,betrieb,brutto,netto,ueberweisung,bar_tg,ue_status,bar_status,ue_datum,bar_datum,gehalt,notiz')
           .ilike('name', `%${part}%`)
