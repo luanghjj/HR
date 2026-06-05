@@ -2938,16 +2938,33 @@ async function renderEmpLohnabrechnung(empId, empName) {
   el.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Lädt…</span>';
 
   try {
-    // Fetch last 6 months of salary records for this employee by name
-    const { data, error } = await sbG.from('gehaelter')
+    // Try matching by name — GehaltsManager may use different format
+    // First try exact match, then try partial on each word
+    const nameTrimmed = empName.trim();
+    let { data, error } = await sbG.from('gehaelter')
       .select('monat,betrieb,brutto,netto,ueberweisung,bar_tg,ue_status,bar_status,ue_datum,bar_datum,gehalt,notiz')
-      .ilike('name', empName.trim())
+      .ilike('name', nameTrimmed)
       .order('monat', { ascending: false })
       .limit(60);
 
     if (error) throw error;
+
+    // Fallback: partial match on last name (first word before comma or space)
     if (!data || !data.length) {
-      el.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Keine Lohndaten in GehaltsManager gefunden.</span>';
+      const parts = nameTrimmed.replace(/,/g, ' ').trim().split(/\s+/).filter(Boolean);
+      // Try each significant name part (>3 chars) as wildcard
+      for (const part of parts.filter(p => p.length > 3)) {
+        const res = await sbG.from('gehaelter')
+          .select('monat,betrieb,brutto,netto,ueberweisung,bar_tg,ue_status,bar_status,ue_datum,bar_datum,gehalt,notiz')
+          .ilike('name', `%${part}%`)
+          .order('monat', { ascending: false })
+          .limit(60);
+        if (res.data?.length) { data = res.data; break; }
+      }
+    }
+
+    if (!data || !data.length) {
+      el.innerHTML = `<span style="color:var(--text-muted);font-size:.8rem">Keine Lohndaten in GehaltsManager gefunden.<br><span style="font-size:.7rem;opacity:.7">Gesucht: "${nameTrimmed}"</span></span>`;
       return;
     }
 
