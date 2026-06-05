@@ -1480,6 +1480,12 @@ function viewEmp(id){
     <h4 style="margin-bottom:8px">📋 Gehaltshistorie</h4>
     <div id="salHistArea_${e.id}" style="font-size:.82rem;color:var(--text-muted)">Wird geladen…</div>
     <hr style="border-color:var(--border);margin:16px 0">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <h4 style="margin:0">💰 Lohnabrechnung</h4>
+      <span style="font-size:.68rem;background:rgba(99,102,241,.1);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:600">GehaltsManager</span>
+    </div>
+    <div id="lohnAbrArea_${e.id}"><span style="color:var(--text-muted);font-size:.8rem">Wird geladen…</span></div>
+    <hr style="border-color:var(--border);margin:16px 0">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
       <h4 style="margin:0">💳 Zahlungsstatus</h4>
       <select class="form-select" id="payStatusMonth_${e.id}" style="width:auto;font-size:.82rem;padding:4px 8px"
@@ -1683,6 +1689,7 @@ function viewEmp(id){
   if(isAdmin) setTimeout(()=>{
     renderSalaryHistory(e.id);
     loadAndRenderPayStatus(e.id);
+    renderEmpLohnabrechnung(e.id, e.name);
   }, 150);
 }
 
@@ -2914,6 +2921,155 @@ async function renderSalaryHistory(empId) {
   } catch(err) {
     console.warn('[SalHist] Error:', err.message);
     el.innerHTML = '<span style="color:var(--danger);font-size:.78rem">Fehler beim Laden: ' + err.message + '</span>';
+  }
+}
+
+// ═══ LOHNABRECHNUNG (GehaltsManager DB integration) ═══
+async function renderEmpLohnabrechnung(empId, empName) {
+  const el = document.getElementById(`lohnAbrArea_${empId}`);
+  if (!el) return;
+
+  const sbG = getSbGehalt();
+  if (!sbG) {
+    el.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">⚠️ GehaltsManager DB nicht verfügbar.</span>';
+    return;
+  }
+
+  el.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Lädt…</span>';
+
+  try {
+    // Fetch last 6 months of salary records for this employee by name
+    const { data, error } = await sbG.from('gehaelter')
+      .select('monat,betrieb,brutto,netto,ueberweisung,bar_tg,ue_status,bar_status,ue_datum,bar_datum,gehalt,notiz')
+      .ilike('name', empName.trim())
+      .order('monat', { ascending: false })
+      .limit(60);
+
+    if (error) throw error;
+    if (!data || !data.length) {
+      el.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Keine Lohndaten in GehaltsManager gefunden.</span>';
+      return;
+    }
+
+    // Get distinct betriebe for this employee
+    const betriebe = [...new Set(data.map(d => d.betrieb))].sort();
+    // Latest month
+    const latestMonat = data[0].monat;
+    const latestData  = data.filter(d => d.monat === latestMonat);
+
+    // ── Betrieb color map ─────────────────────────────
+    const betriebColors = {
+      'Origami': { bg: 'rgba(99,102,241,.08)', border: 'rgba(99,102,241,.25)', badge: 'var(--accent)' },
+      'OMoi':    { bg: 'rgba(16,185,129,.07)', border: 'rgba(16,185,129,.2)',  badge: '#059669' },
+      'Enso':    { bg: 'rgba(245,158,11,.07)', border: 'rgba(245,158,11,.2)',  badge: '#d97706' },
+      'Okyu':    { bg: 'rgba(239,68,68,.07)',  border: 'rgba(239,68,68,.2)',   badge: '#dc2626' },
+    };
+    const getColor = (b) => betriebColors[b] || { bg: 'rgba(156,163,175,.08)', border: 'rgba(156,163,175,.2)', badge: '#6b7280' };
+
+    const statusBadge = (st) => st === 'bezahlt' || st === 'erledigt'
+      ? '<span style="background:rgba(16,185,129,.15);color:#059669;font-size:.65rem;padding:1px 6px;border-radius:4px;font-weight:700">✅ Bezahlt</span>'
+      : '<span style="background:rgba(245,158,11,.1);color:#d97706;font-size:.65rem;padding:1px 6px;border-radius:4px;font-weight:700">⏳ Offen</span>';
+
+    // ── Latest month: one card per betrieb ────────────
+    const totalBrutto = latestData.reduce((s,d) => s + (d.brutto||0), 0);
+    const totalNetto  = latestData.reduce((s,d) => s + (d.netto||0), 0);
+    const totalUeb    = latestData.reduce((s,d) => s + (d.ueberweisung||0), 0);
+    const totalBar    = latestData.reduce((s,d) => s + (d.bar_tg||0), 0);
+    const monatLabel  = (() => {
+      const [y,m] = latestMonat.split('-');
+      return new Date(+y, +m-1, 1).toLocaleDateString('de-DE', {month:'long', year:'numeric'});
+    })();
+
+    // Build salary cards (1 or 2+ betriebe)
+    const cardsHtml = latestData.map((d, i) => {
+      const c = getColor(d.betrieb);
+      const isLast = i === latestData.length - 1;
+      return `
+        <div style="flex:1;min-width:180px;background:${c.bg};border:1px solid ${c.border};border-radius:12px;padding:14px;position:relative">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="background:${c.badge};color:#fff;font-size:.68rem;padding:2px 8px;border-radius:5px;font-weight:700">${d.betrieb}</span>
+            <span style="font-size:.7rem;color:var(--text-muted)">${monatLabel}</span>
+          </div>
+          <div style="margin-bottom:6px">
+            <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:1px">Brutto</div>
+            <div style="font-family:'Space Mono',monospace;font-weight:800;font-size:1.05rem;color:var(--text-primary)">${formatEuro(d.brutto||0)}</div>
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:1px">Netto</div>
+            <div style="font-family:'Space Mono',monospace;font-weight:700;font-size:.95rem;color:${c.badge}">${formatEuro(d.netto||0)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;font-size:.72rem">
+            ${(d.ueberweisung||0) > 0 ? `<div style="display:flex;justify-content:space-between"><span>🏦 Überweisung</span><span style="font-family:monospace">${formatEuro(d.ueberweisung)}</span></div>` : ''}
+            ${(d.bar_tg||0) > 0 ? `<div style="display:flex;justify-content:space-between"><span>💵 Bar</span><span style="font-family:monospace">${formatEuro(d.bar_tg)}</span></div>` : ''}
+            <div style="display:flex;justify-content:space-between;margin-top:2px">
+              <span>Ü-Status</span>${statusBadge(d.ue_status)}
+            </div>
+            ${(d.bar_tg||0) > 0 ? `<div style="display:flex;justify-content:space-between"><span>Bar-Status</span>${statusBadge(d.bar_status)}</div>` : ''}
+          </div>
+        </div>
+        ${!isLast ? `<div style="display:flex;align-items:center;padding-top:20px;flex-shrink:0">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="width:1px;height:20px;background:var(--border)"></div>
+            <span style="font-size:.75rem;font-weight:800;color:var(--text-muted);background:var(--card-bg,#1e2130);border:1px solid var(--border);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center">+</span>
+            <div style="width:1px;height:20px;background:var(--border)"></div>
+          </div>
+        </div>` : ''}`;
+    }).join('');
+
+    // Total card (only if more than 1 betrieb)
+    const totalCard = latestData.length > 1 ? `
+      <div style="margin-top:12px;background:rgba(99,102,241,.05);border:1.5px solid rgba(99,102,241,.2);border-radius:12px;padding:12px 16px">
+        <div style="font-size:.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">∑ Gesamt (${latestData.length} Betriebe)</div>
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <div><div style="font-size:.68rem;color:var(--text-muted)">Brutto</div><div style="font-family:'Space Mono',monospace;font-weight:800;font-size:1.1rem">${formatEuro(totalBrutto)}</div></div>
+          <div><div style="font-size:.68rem;color:var(--text-muted)">Netto</div><div style="font-family:'Space Mono',monospace;font-weight:800;font-size:1.1rem;color:var(--accent)">${formatEuro(totalNetto)}</div></div>
+          ${totalUeb > 0 ? `<div><div style="font-size:.68rem;color:var(--text-muted)">🏦 Überweisung</div><div style="font-family:'Space Mono',monospace;font-weight:700;font-size:.9rem">${formatEuro(totalUeb)}</div></div>` : ''}
+          ${totalBar > 0 ? `<div><div style="font-size:.68rem;color:var(--text-muted)">💵 Bar</div><div style="font-family:'Space Mono',monospace;font-weight:700;font-size:.9rem">${formatEuro(totalBar)}</div></div>` : ''}
+        </div>
+      </div>` : '';
+
+    // ── Monthly history table (last 6 months, all betriebe) ──
+    const months = [...new Set(data.map(d => d.monat))].slice(0, 6);
+    const histRows = months.flatMap(m => {
+      const mData = data.filter(d => d.monat === m);
+      const [y, mo] = m.split('-');
+      const mLabel = new Date(+y, +mo-1, 1).toLocaleDateString('de-DE', {month:'short', year:'2-digit'});
+      return mData.map((d, i) => {
+        const c = getColor(d.betrieb);
+        const isFirst = i === 0;
+        return `<tr style="border-bottom:1px solid var(--border-light)">
+          ${isFirst ? `<td rowspan="${mData.length}" style="padding:5px 8px;font-size:.78rem;font-weight:600;color:var(--text-muted);vertical-align:top;border-right:1px solid var(--border-light)">${mLabel}</td>` : ''}
+          <td style="padding:5px 8px">
+            <span style="background:${c.badge};color:#fff;font-size:.62rem;padding:1px 6px;border-radius:4px;font-weight:700">${d.betrieb}</span>
+          </td>
+          <td style="padding:5px 8px;font-family:monospace;font-size:.8rem;text-align:right">${formatEuro(d.brutto||0)}</td>
+          <td style="padding:5px 8px;font-family:monospace;font-size:.8rem;text-align:right;color:var(--accent)">${formatEuro(d.netto||0)}</td>
+          <td style="padding:5px 8px;text-align:center">${statusBadge(d.ue_status)}</td>
+        </tr>`;
+      });
+    }).join('');
+
+    el.innerHTML = `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;margin-bottom:${latestData.length > 1 ? '0' : '16px'}">${cardsHtml}</div>
+      ${totalCard}
+      <div style="margin-top:16px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">📅 Verlauf (letzte 6 Monate)</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+            <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted)">
+              <th style="text-align:left;padding:4px 8px">Monat</th>
+              <th style="text-align:left;padding:4px 8px">Betrieb</th>
+              <th style="text-align:right;padding:4px 8px">Brutto</th>
+              <th style="text-align:right;padding:4px 8px">Netto</th>
+              <th style="text-align:center;padding:4px 8px">Ü-Status</th>
+            </tr></thead>
+            <tbody>${histRows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  } catch(err) {
+    console.warn('[Lohnabr] Error:', err.message);
+    el.innerHTML = `<span style="color:var(--danger);font-size:.8rem">⚠️ Fehler: ${err.message}</span>`;
   }
 }
 
