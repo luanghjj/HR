@@ -82,6 +82,8 @@ function buildSidebar(){
   document.getElementById('sidebarNav').innerHTML=html;
   // Show pending registration count
   setTimeout(updatePendingBadge, 100);
+  // Build mobile bottom navigation alongside the sidebar
+  buildBottomNav();
 }
 
 function toggleNavSection(key, el) {
@@ -136,7 +138,38 @@ function navigate(page,el){
   document.getElementById('pageTitle').textContent=PAGE_TITLES[page]||page;
   // Auto-close sidebar on mobile
   if(window.innerWidth<=900) closeSidebar();
+  setBottomNavActive(page);
   renderPage(page);
+}
+
+// ═══ MOBILE BOTTOM NAVIGATION ═══
+// Persistente untere Leiste auf Mobilgeräten – schnellster Zugriff auf die
+// wichtigsten Seiten je nach Rolle/Berechtigung. "Menü" öffnet die Sidebar.
+function buildBottomNav(){
+  const nav=document.getElementById('bottomNav');
+  if(!nav||!currentUser) return;
+  const mi=(n)=>`<span class="ms">${n}</span>`;
+  const items=[{page:'dashboard',icon:'grid_view',label:'Start'}];
+
+  const showSchedule = can('seeAllSchedules') || ['mitarbeiter','azubi'].includes(currentUser.role);
+  if(showSchedule) items.push({page:'schedule',icon:'calendar_month',label:'Plan'});
+
+  items.push({page:'vacation',icon:'beach_access',label:'Urlaub'});
+
+  if(can('seeAllEmployees')) items.push({page:'employees',icon:'people',label:'Team'});
+  else items.push({page:'documents',icon:'folder',label:'Akten'});
+
+  let html=items.map(it=>
+    `<button class="bnav-item" data-page="${it.page}" onclick="navigate('${it.page}')">${mi(it.icon)}<span class="bnav-label">${it.label}</span></button>`
+  ).join('');
+  html+=`<button class="bnav-item" onclick="toggleSidebar()">${mi('menu')}<span class="bnav-label">Menü</span></button>`;
+  nav.innerHTML=html;
+  setBottomNavActive(getCurrentPage());
+}
+
+function setBottomNavActive(page){
+  document.querySelectorAll('.bnav-item').forEach(b=>
+    b.classList.toggle('active', b.dataset.page===page));
 }
 function renderPage(p){
   const c=document.getElementById('contentArea');
@@ -3248,6 +3281,12 @@ function renderSchedule(){
   const canEdit=can('editSchedules');const canExp=can('canExport');
   const isEmp=currentUser.role==='mitarbeiter';
   const me=EMPS.find(e=>e.id===currentUser.empId);
+
+  // Mobile: standardmäßig Tagesansicht beim ersten Öffnen (Wochenraster ist
+  // auf dem Handy schwer lesbar). Nutzer kann jederzeit auf Woche umschalten.
+  if(window.innerWidth<=900 && scheduleView==='week' && !window._schedMobileDefaulted){
+    scheduleView='day'; window._schedMobileDefaulted=true;
+  }
 
   let banner=isEmp?permBanner(`Du siehst den Arbeitsplan deines Bereichs (${me?.dept||''} – ${getLocationName(me?.location||'')})`).trim():'';
   let shifts=getVisibleShifts();

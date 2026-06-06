@@ -873,3 +873,68 @@
   /* Inline-Selects (Bereich/Bank) etwas größer für Touch */
   .mit-emp-row td[data-col="standort"] select { font-size: 0.82rem !important; padding: 5px 8px !important; }
 }
+
+/* ─────────────────────────────────────────────────────────
+   22. BOTTOM NAVIGATION – Mobile only
+   ───────────────────────────────────────────────────────── */
+.bottom-nav { display: none; }
+
+@media (max-width: 900px) {
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 150;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.18);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+    justify-content: space-around;
+    align-items: stretch;
+  }
+  .bnav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    padding: 4px 2px;
+    min-height: 48px;
+    transition: color 0.15s;
+  }
+  .bnav-item .ms { font-size: 1.4rem; }
+  .bnav-item.active { color: var(--accent); }
+  .bnav-item.active .ms { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+  .bnav-label { font-weight: 600; line-height: 1; }
+
+  /* Platz unten lassen, damit Inhalt nicht hinter der Leiste verschwindet */
+  .content { padding-bottom: 78px !important; }
+}
+
+/* ─────────────────────────────────────────────────────────
+   23. ARBEITSPLAN – Mobile (Tagesansicht-Default + sticky Name)
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  /* Wochenraster: erste Spalte (Mitarbeiter) beim Querscrollen fixieren */
+  .sc2-grid-wrap table th:first-child,
+  .sc2-grid-wrap table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--bg-card);
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.12);
+    min-width: 140px !important;
+  }
+  .sc2-grid-wrap table thead th:first-child { z-index: 3; }
+
+  /* Tagesansicht-Tabelle (Mitarbeiter/Bereich/Schicht/Status): kompakter */
+  #schedC .table-wrap table { width: 100%; }
+  #schedC .table-wrap th,
+  #schedC .table-wrap td { padding: 8px 8px; font-size: 0.8rem; }
+}
