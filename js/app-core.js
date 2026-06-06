@@ -1194,6 +1194,8 @@ function renderEmpRows(emps){
   const isAdmin = can('seeFinancials') || currentUser?.role === 'manager';
   const _ys1=isoDate(new Date(new Date().getFullYear(),0,1));
   const DEPT_COLORS={'Küche':'#10b981','Service':'#3b4fd2','Bar':'#f97316','Sushi':'#8b5cf6','Ausbildung':'#a29bfe','Verwaltung':'#e11d48'};
+  const canEditDept = can('editEmployees');
+  const BEREICH_OPTS = [...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung', ...DEPTS.map(d=>d.name)].filter(Boolean))];
   document.getElementById('empTB').innerHTML=emps.map(e=>{
     const vr=e.vacTotal-e.vacUsed;
     const pl=VACS.filter(v=>v.empId===e.id&&(v.status==='approved'||v.status==='pending')&&v.from>=_ys1).reduce((s,v)=>s+v.days,0);
@@ -1229,7 +1231,12 @@ function renderEmpRows(emps){
       </td>
       <td data-col="standort">
         <div class="mit-loc-main">${getLocationName(e.location)}</div>
-        <div class="mit-loc-sub">${e.dept}</div>
+        ${canEditDept
+          ? `<select onchange="updateEmpText(${e.id},'dept',this.value)" onclick="event.stopPropagation()" title="Bereich zuweisen"
+               style="font-size:.7rem;padding:2px 4px;margin-top:3px;border-radius:5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);max-width:130px;cursor:pointer">
+              ${[...new Set([...BEREICH_OPTS, e.dept].filter(Boolean))].map(d=>`<option ${d===e.dept?'selected':''}>${d}</option>`).join('')}
+            </select>`
+          : `<div class="mit-loc-sub">${e.dept}</div>`}
       </td>
       <td data-col="urlaub">
         <div class="mit-vac-wrap">
