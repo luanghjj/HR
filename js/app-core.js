@@ -1512,7 +1512,7 @@ function viewEmp(id){
         <div style="font-family:'Space Mono',monospace;font-size:1.3rem;padding:10px 0;color:var(--success)" id="edVacRemain">${vr-pl} Tage</div></div>
     </div>
     <hr style="border-color:var(--border);margin:16px 0">
-    <h4 style="margin-bottom:12px">📥 Steuerberater Export <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">DATEV</span></h4>
+    <h4 style="margin-bottom:12px">📥 Steuerberater Export <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">CSV</span></h4>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn btn-primary" style="font-size:.82rem;padding:8px 16px;display:flex;align-items:center;gap:6px" onclick="exportStammdatenCSV()">
         <span class="ms" style="font-size:1rem">person</span> Stammdaten (CSV)
@@ -1527,11 +1527,11 @@ function viewEmp(id){
           }).join('')}
         </select>
         <button class="btn btn-primary" style="font-size:.82rem;padding:8px 16px;display:flex;align-items:center;gap:6px" onclick="exportLohndatenCSV(document.getElementById('stbExportMonth').value)">
-          <span class="ms" style="font-size:1rem">payments</span> Lohndaten (CSV)
+          <span class="ms" style="font-size:1rem">payments</span> Lohnjournal (CSV)
         </button>
       </div>
     </div>
-    <p style="font-size:.72rem;color:var(--text-muted);margin-top:8px">Format: DATEV-kompatibel · Semikolon-getrennt · Windows-1252</p>`;
+    <p style="font-size:.72rem;color:var(--text-muted);margin-top:8px">Stammdaten: aus HRM · Lohnjournal: echte Steuerdaten aus GehaltsManager (Lohnsteuer, SV, Soli, KiSt) · Semikolon-getrennt · UTF-8 (Excel-kompatibel)</p>`;
   }
 
 
@@ -2760,14 +2760,6 @@ function downloadCSV(filename, csvContent) {
   URL.revokeObjectURL(url);
 }
 
-// Helper: DATEV EXTF Header-Zeile
-function datevHeader(category, label, colCount) {
-  const now = new Date();
-  const ts = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
-  // EXTF;700;Kategorie;Format-Label;Formatversion;Erzeugt-am;;;;;Spaltenanzahl
-  return `"EXTF";700;${category};"${label}";1;${ts};;;;;${colCount}`;
-}
-
 // ═══ EXPORT: Stammdaten ═══
 function exportStammdatenCSV() {
   const emps = getVisibleEmps().filter(e => e.status === 'active' || e.status === 'aktiv');
@@ -2805,75 +2797,66 @@ function exportStammdatenCSV() {
   const now = new Date();
   const monthLabel = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
 
-  let csv = datevHeader(21, 'Stammdaten OKYU HRM', headers.length) + '\r\n';
-  csv += headers.join(';') + '\r\n';
+  // Saubere CSV: nur Spaltenkopf + Daten (kein DATEV-Pseudo-Header)
+  let csv = headers.join(';') + '\r\n';
   csv += rows.join('\r\n') + '\r\n';
 
-  downloadCSV(`EXTF_Stammdaten_${monthLabel}.csv`, csv);
+  downloadCSV(`Stammdaten_${monthLabel}.csv`, csv);
   toast(`📥 Stammdaten exportiert: ${emps.length} Mitarbeiter`);
 }
 
-// ═══ EXPORT: Lohndaten (monatlich) ═══
+// ═══ EXPORT: Lohnjournal (echte Steuerdaten aus GehaltsManager, monatlich) ═══
 async function exportLohndatenCSV(monthStr) {
   if (!monthStr) { toast('Bitte Monat auswählen.', 'warn'); return; }
 
-  const emps = getVisibleEmps().filter(e => (e.status === 'active' || e.status === 'aktiv') && e.bruttoGehalt > 0);
-  if (!emps.length) { toast('Keine Mitarbeiter mit Gehalt gefunden.', 'warn'); return; }
+  const monatLabel = toGehaltMonat(monthStr);  // '2026-03' → 'Mär 2026'
+  toast('Lade Lohndaten aus GehaltsManager…', 'info');
 
-  // Zahlungsstatus für den gewählten Monat laden
-  const monthDate = monthStr + '-01';
-  const { data: payData } = await sb.from('payment_status').select('*').eq('month', monthDate);
-  const payMap = {};
-  if (payData) payData.forEach(p => { payMap[p.emp_id] = p; });
+  let data;
+  try {
+    data = await fetchGehaltByMonth(monatLabel);
+  } catch (err) {
+    toast('Fehler beim Laden der Lohndaten: ' + err.message, 'err');
+    return;
+  }
 
-  // Urlaubstage im Monat berechnen
-  const [yr, mo] = monthStr.split('-').map(Number);
-  const mStart = `${yr}-${String(mo).padStart(2,'0')}-01`;
-  const mEnd = `${yr}-${String(mo).padStart(2,'0')}-${new Date(yr, mo, 0).getDate()}`;
+  if (!data || !data.length) {
+    toast(`Keine Lohndaten für ${monatLabel} in GehaltsManager gefunden.`, 'warn');
+    return;
+  }
+
+  // Sortiert nach Betrieb, dann Name (Steuerberater bekommt alle Betriebe)
+  data.sort((a, b) =>
+    (a.betrieb || '').localeCompare(b.betrieb || '') ||
+    (a.name || '').localeCompare(b.name || ''));
 
   const headers = [
-    'Personalnummer','Nachname','Vorname','Monat',
-    'Soll_Stunden','Ist_Stunden',
-    'Brutto_Gesamt','Netto_Gesamt','Überweisung','BAR',
-    'Krankentage','Urlaubstage','Schultage',
-    'Status_Überweisung','Status_BAR',
-    'ÜW_Datum','BAR_Datum','BAR_Betrag_tatsächlich','BAR_Notiz',
-    'Bank','Standort','Bereich'
+    'Personalnummer','Name','Betrieb','Monat',
+    'Steuer-Brutto','Lohnsteuer','Soli','Kirchensteuer',
+    'SV_Arbeitnehmer','SV_Arbeitgeber',
+    'Brutto_gesamt','Netto','Auszahlung',
+    'Überweisung','BAR',
+    'Status_Überweisung','Status_BAR'
   ];
 
-  const rows = emps.map(e => {
-    const ps = payMap[e.id] || {};
-    const planH = calcPlanHours(e.id);
-    const uebAmt = e.nettoGehalt || (e.bruttoGehalt - (e.barGehalt || 0));
-    const barBetrag = ps.bar_betrag != null ? ps.bar_betrag : (e.barGehalt || 0);
+  const rows = data.map(d => [
+    d.pers_nr ?? '',
+    csvField(d.stb_name || d.name || ''),
+    csvField(d.betrieb || ''),
+    csvField(d.monat || monatLabel),
+    fmtDE(d.stb_steuer_brutto), fmtDE(d.stb_lohnsteuer), fmtDE(d.stb_soli), fmtDE(d.stb_kist),
+    fmtDE(d.stb_sv_an), fmtDE(d.stb_sv_ag),
+    fmtDE(d.brutto), fmtDE(d.netto), fmtDE(d.stb_auszahlung),
+    fmtDE(d.ueberweisung), fmtDE(d.bar_tg),
+    csvField(d.ue_status || ''), csvField(d.bar_status || '')
+  ].join(';'));
 
-    // Urlaubstage im Monat
-    const vacDays = VACS.filter(v => v.empId === e.id && (v.status === 'approved' || v.status === 'pending')
-      && v.from <= mEnd && v.to >= mStart).reduce((s, v) => s + v.days, 0);
-
-    const vn = e.firstName || e.name.split(' ').slice(0, -1).join(' ') || e.name;
-    const nn = e.lastName || e.name.split(' ').pop() || '';
-
-    return [
-      (e.personalNr || persnr(e.id)), csvField(nn), csvField(vn),
-      `${String(mo).padStart(2,'0')}.${yr}`,
-      fmtDE(e.sollStunden), fmtDE(planH),
-      fmtDE(e.bruttoGehalt), fmtDE(e.nettoGehalt), fmtDE(uebAmt), fmtDE(e.barGehalt || 0),
-      e.sickDays || 0, vacDays, e.schuleTage || 0,
-      ps.ueb_status || 'ausstehend', ps.bar_status || 'ausstehend',
-      ps.ue_datum || '', ps.bar_datum || '',
-      fmtDE(barBetrag), csvField(ps.bar_comment || ''),
-      csvField(e.bank), csvField(getLocationName(e.location)), csvField(e.dept)
-    ].join(';');
-  });
-
-  let csv = datevHeader(65, 'Lohndaten OKYU HRM', headers.length) + '\r\n';
-  csv += headers.join(';') + '\r\n';
+  // Saubere CSV: nur Spaltenkopf + Daten (kein DATEV-Pseudo-Header)
+  let csv = headers.join(';') + '\r\n';
   csv += rows.join('\r\n') + '\r\n';
 
-  const label = new Date(yr, mo - 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
-  downloadCSV(`EXTF_Lohndaten_${monthStr}.csv`, csv);
-  toast(`📥 Lohndaten exportiert: ${emps.length} Mitarbeiter · ${label}`);
+  downloadCSV(`Lohnjournal_${monthStr}.csv`, csv);
+  toast(`📥 Lohnjournal exportiert: ${data.length} Einträge · ${monatLabel}`);
 }
 
 async function renderSalaryHistory(empId) {
