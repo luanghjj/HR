@@ -4633,6 +4633,7 @@ function renderAccess(){
       : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
     const deptCell = emp ? `<div style="cursor:pointer;min-width:100px" onclick="openDeptPicker('${u.id}')" title="Klicke zum Ändern">${deptTags}</div>` : deptTags;
     const emailInfo = u.regEmail ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:2px" title="${u.regEmail}">📧 ${u.regEmail}</div>` : '';
+    const linkInfo = `<div style="font-size:.72rem;margin-top:2px;color:${emp?'var(--text-muted)':'var(--danger)'}">👤 ${emp?emp.name:'⚠️ nicht verknüpft'}</div>`;
     const googleBadge = u.regEmail?.includes('gmail') || u.bannerUrl ? '<span style="font-size:.68rem;background:var(--bg-input);padding:1px 6px;border-radius:4px;color:var(--text-muted);margin-left:4px">Google</span>' : '';
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:10px">
@@ -4643,6 +4644,7 @@ function renderAccess(){
             ${googleBadge}
           </div>
           ${emailInfo}
+          ${linkInfo}
         </div>
       </div></td>
       <td><input class="form-input" style="width:140px;font-size:.82rem" value="${emp?.position||u.regPosition||''}" placeholder="Position..." onblur="changeUserPosition('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></td>
@@ -4651,6 +4653,7 @@ function renderAccess(){
       <td>${locCell}</td>
       <td>${statusBadge(u.status)}</td>
       <td><div style="display:flex;gap:4px">
+        <button class="btn btn-sm" onclick="openEmpLinkModal('${u.id}')" title="Mitarbeiter verknüpfen"><span class="ms" style="font-size:16px">link</span></button>
         <button class="btn btn-sm" onclick="openPermissionsModal('${u.id}')" title="Berechtigungen"><span class="ms" style="font-size:16px">shield_person</span></button>
         <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" title="Löschen"><span class="ms" style="font-size:16px">delete</span></button>
       </div></td>
@@ -4678,6 +4681,60 @@ function renderAccess(){
 
   // Update pending badge in sidebar
   updatePendingBadge();
+}
+
+// ═══ MITARBEITER VERKNÜPFEN (Konto ↔ Mitarbeiter neu zuordnen) ═══
+function openEmpLinkModal(userId){
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+  const list = EMPS.slice().sort((a,b) => a.name.localeCompare(b.name));
+  const cur = EMPS.find(e => e.id === u.empId);
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'empLinkModal';
+  modal.innerHTML = `<div class="modal" style="max-width:520px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title"><span class="ms" style="font-size:18px;vertical-align:middle">link</span> Mitarbeiter verknüpfen</span>
+      <button class="modal-close" onclick="document.getElementById('empLinkModal').remove()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px">
+      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:4px">Konto <strong>${u.name}</strong> verknüpfen mit:</p>
+      <p style="font-size:.78rem;margin-bottom:10px">Aktuell: <strong style="color:${cur?'var(--accent)':'var(--danger)'}">${cur?cur.name:'⚠️ nicht verknüpft'}</strong></p>
+      <input class="form-input" id="empLinkSearch" placeholder="Mitarbeiter suchen…" style="margin-bottom:10px;font-size:16px" oninput="_filterEmpLink(this.value)">
+      <div id="empLinkList" style="max-height:48vh;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+        ${list.map(e => `<button class="el-row" data-name="${(e.name||'').toLowerCase()}" onclick="saveEmpLink('${u.id}',${e.id})"
+          style="display:flex;justify-content:space-between;align-items:center;text-align:left;padding:8px 12px;border-radius:8px;border:1px solid ${u.empId===e.id?'var(--accent)':'var(--border)'};background:${u.empId===e.id?'rgba(99,102,241,.08)':'var(--bg-input)'};cursor:pointer">
+          <span style="font-weight:600;font-size:.85rem">${e.name}${u.empId===e.id?' <span style="color:var(--accent);font-size:.7rem">(aktuell)</span>':''}</span>
+          <span style="font-size:.72rem;color:var(--text-muted)">${getLocationName(e.location)} · ${e.dept||'—'}</span>
+        </button>`).join('')}
+      </div>
+      <button class="btn btn-sm btn-danger" style="margin-top:10px" onclick="saveEmpLink('${u.id}','')">Verknüpfung entfernen</button>
+    </div>
+  </div>`;
+  modal.onclick = () => modal.remove();
+  document.body.appendChild(modal);
+}
+
+function _filterEmpLink(q){
+  q = (q || '').toLowerCase().trim();
+  document.querySelectorAll('#empLinkList .el-row').forEach(b => {
+    b.style.display = b.dataset.name.includes(q) ? '' : 'none';
+  });
+}
+
+async function saveEmpLink(userId, empId){
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+  const newEmpId = empId === '' ? null : parseInt(empId, 10);
+  try {
+    const { error } = await sb.from('user_profiles').update({ emp_id: newEmpId }).eq('user_id', userId);
+    if (error) { toast('Fehler: ' + error.message, 'err'); return; }
+    u.empId = newEmpId;
+    const emp = EMPS.find(e => e.id === newEmpId);
+    toast(`✓ ${u.name} → ${emp ? emp.name : 'keine Verknüpfung'}`, 'success');
+    const m = document.getElementById('empLinkModal'); if (m) m.remove();
+    renderAccess();
+  } catch(e) { toast('Fehler: ' + e.message, 'err'); }
 }
 
 // ═══ CREATE NEW USER MODAL ═══
