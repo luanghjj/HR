@@ -1454,6 +1454,12 @@ function viewEmp(id){
   if(isAdmin){
     adminSection=`
     <hr style="border-color:var(--border);margin:16px 0">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <h4 style="margin:0">💰 Lohnabrechnung</h4>
+      <span style="font-size:.68rem;background:rgba(99,102,241,.1);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:600">GehaltsManager</span>
+    </div>
+    <div id="lohnAbrArea_${e.id}"><span style="color:var(--text-muted);font-size:.8rem">Wird geladen…</span></div>
+    <hr style="border-color:var(--border);margin:16px 0">
     <h4 style="margin-bottom:12px">💰 Gehalt &amp; Stunden <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">Nur Inhaber</span></h4>
     <div class="form-grid">
       <div class="form-group"><label class="form-label">Soll-Stunden / Monat</label>
@@ -1480,12 +1486,6 @@ function viewEmp(id){
     <h4 style="margin-bottom:8px">📋 Gehaltshistorie</h4>
     <div id="salHistArea_${e.id}" style="font-size:.82rem;color:var(--text-muted)">Wird geladen…</div>
     <hr style="border-color:var(--border);margin:16px 0">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-      <h4 style="margin:0">💰 Lohnabrechnung</h4>
-      <span style="font-size:.68rem;background:rgba(99,102,241,.1);color:var(--accent);padding:2px 8px;border-radius:6px;font-weight:600">GehaltsManager</span>
-    </div>
-    <div id="lohnAbrArea_${e.id}"><span style="color:var(--text-muted);font-size:.8rem">Wird geladen…</span></div>
-    <hr style="border-color:var(--border);margin:16px 0">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
       <h4 style="margin:0">💳 Zahlungsstatus</h4>
       <select class="form-select" id="payStatusMonth_${e.id}" style="width:auto;font-size:.82rem;padding:4px 8px"
@@ -1499,18 +1499,6 @@ function viewEmp(id){
       </select>
     </div>
     <div id="payStatusArea_${e.id}" style="font-size:.85rem">Wird geladen…</div>
-    <hr style="border-color:var(--border);margin:16px 0">
-    <h4 style="margin-bottom:12px">📅 Urlaubstage &amp; 🎓 Schule/Fortbildung <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">Bearbeitbar</span></h4>
-    <div class="form-grid">
-      <div class="form-group"><label class="form-label">Urlaubstage Gesamt / Jahr</label>
-        <input class="form-input" type="number" id="edVacTotal" value="${e.vacTotal}" onchange="updateEmpField(${e.id},'vacTotal',this.value)"></div>
-      <div class="form-group"><label class="form-label">Urlaubstage genommen</label>
-        <input class="form-input" type="number" id="edVacUsed" value="${e.vacUsed}" onchange="updateEmpField(${e.id},'vacUsed',this.value)"></div>
-      <div class="form-group"><label class="form-label">Schule / Fortbildung (Tage/Monat)</label>
-        <input class="form-input" type="number" id="edSchule" value="${e.schuleTage}" onchange="updateEmpField(${e.id},'schuleTage',this.value)"></div>
-      <div class="form-group"><label class="form-label">Verbleibender Resturlaub</label>
-        <div style="font-family:'Space Mono',monospace;font-size:1.3rem;padding:10px 0;color:var(--success)" id="edVacRemain">${vr-pl} Tage</div></div>
-    </div>
     <hr style="border-color:var(--border);margin:16px 0">
     <h4 style="margin-bottom:12px">📥 Steuerberater Export <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">CSV</span></h4>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -1531,7 +1519,19 @@ function viewEmp(id){
         </button>
       </div>
     </div>
-    <p style="font-size:.72rem;color:var(--text-muted);margin-top:8px">Stammdaten: aus HRM · Lohnjournal: echte Steuerdaten aus GehaltsManager (Lohnsteuer, SV, Soli, KiSt) · Semikolon-getrennt · UTF-8 (Excel-kompatibel)</p>`;
+    <p style="font-size:.72rem;color:var(--text-muted);margin-top:8px">Stammdaten: aus HRM · Lohnjournal: echte Steuerdaten aus GehaltsManager (Lohnsteuer, SV, Soli, KiSt) · Semikolon-getrennt · UTF-8 (Excel-kompatibel)</p>
+    <hr style="border-color:var(--border);margin:16px 0">
+    <h4 style="margin-bottom:12px">📅 Urlaubstage &amp; 🎓 Schule/Fortbildung <span class="badge badge-info" style="font-size:.6rem;vertical-align:middle">Bearbeitbar</span></h4>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Urlaubstage Gesamt / Jahr</label>
+        <input class="form-input" type="number" id="edVacTotal" value="${e.vacTotal}" onchange="updateEmpField(${e.id},'vacTotal',this.value)"></div>
+      <div class="form-group"><label class="form-label">Urlaubstage genommen</label>
+        <input class="form-input" type="number" id="edVacUsed" value="${e.vacUsed}" onchange="updateEmpField(${e.id},'vacUsed',this.value)"></div>
+      <div class="form-group"><label class="form-label">Schule / Fortbildung (Tage/Monat)</label>
+        <input class="form-input" type="number" id="edSchule" value="${e.schuleTage}" onchange="updateEmpField(${e.id},'schuleTage',this.value)"></div>
+      <div class="form-group"><label class="form-label">Verbleibender Resturlaub</label>
+        <div style="font-family:'Space Mono',monospace;font-size:1.3rem;padding:10px 0;color:var(--success)" id="edVacRemain">${vr-pl} Tage</div></div>
+    </div>`;
   }
 
 
@@ -1567,6 +1567,8 @@ function viewEmp(id){
       <div class="stat-card" style="border-left:3px solid var(--late-color)"><div class="stat-label">Verspätungen</div><div class="stat-value" style="font-size:1.4rem">${e.lateCount}</div></div>
       ${isAdmin?`<div class="stat-card" style="border-left:3px solid var(--accent)"><div class="stat-label">Plan-Std.</div><div class="stat-value" style="font-size:1.4rem">${planH}h</div><div class="stat-change">Soll: ${e.sollStunden}h</div></div>`:''}
     </div>
+
+    ${adminSection}
 
     <!-- ═══ BESCHÄFTIGUNG ═══ -->
     <hr style="border-color:var(--border);margin:16px 0">
@@ -1637,8 +1639,6 @@ function viewEmp(id){
       <div class="form-group"><label class="form-label">Arbeitserlaubnis bis</label>
         <input class="form-input" type="date" value="${e.workPermitUntil}" ${ro} ${canEdit?`onchange="updateEmpText(${e.id},'workPermitUntil',this.value)"`:''}></div>
     </div>
-
-    ${adminSection}
 
     <hr style="border-color:var(--border);margin:16px 0"><h4 style="margin-bottom:8px">Urlaub (${ev.length})</h4>
     ${ev.map(v=>`<div class="emp-row"><div class="emp-details"><div class="emp-name-sm">${formatDateDE(v.from)}–${formatDateDE(v.to)} (${v.days}T)</div><div class="emp-dept">${v.note||''}</div></div>${v.status==='approved'?'<span class="badge badge-success">OK</span>':v.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abg.</span>'}</div>`).join('')||'<p style="color:var(--text-muted);font-size:.82rem">—</p>'}
