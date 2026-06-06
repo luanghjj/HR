@@ -1112,7 +1112,7 @@ function renderEmployees(){
       <button class="mit-filter-btn"><span class="ms">filter_alt</span> Alle Filter</button>
       <div class="mit-dept-pills" id="mitDeptPills">
         <button class="mit-dept-pill active" onclick="filterEmpsByDept('all',this)">Alle Bereiche</button>
-        ${[...new Set(emps.map(e=>e.dept))].sort().map(d=>`<button class="mit-dept-pill" onclick="filterEmpsByDept('${d}',this)">${d}</button>`).join('')}
+        ${[...new Set([...STANDARD_BEREICHE, ...emps.map(e=>e.dept)])].filter(d=>d && d!=='—').sort().map(d=>`<button class="mit-dept-pill" onclick="filterEmpsByDept('${d}',this)">${d}</button>`).join('')}
       </div>
     </div>
     <div class="mit-ctrl-right">
@@ -3117,10 +3117,26 @@ function openLateModal(empId){
 function saveLate(empId){const e=EMPS.find(x=>x.id===empId);const m=parseInt(document.getElementById('mLM').value)||0;if(m<=0)return;e.lateCount++;syncEmployeeField(e.id,'lateCount',e.lateCount);const d=document.getElementById('mLD').value;const sh=SHIFTS.find(s=>s.empId===empId&&s.date===d);if(sh){sh.isLate=true;sh.lateMin=m;}addNotif('late','Verspätung',`${e.name}: ${m} Min.`);closeModal();toast(`Verspätung vermerkt`,'warn');renderPage(getCurrentPage());}
 
 // ═══ DEPARTMENTS ═══
+// Standard-Bereiche, falls für einen Standort (noch) keine departments-Zeilen
+// in der DB existieren (aktuell nur Origami gepflegt → Enso/Okyu/OMoi leer).
+const STANDARD_BEREICHE = ['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung'];
+const _BEREICH_COLORS = {'Küche':'#fdcb6e','Service':'#74b9ff','Bar':'#00b894','Sushi':'#fd79a8','Ausbildung':'#e17055','Verwaltung':'#a29bfe'};
+
+/** Bereiche eines Standorts; synthetisiert Standard-Set, wenn DB keine hat. */
+function deptsForLocation(loc){
+  if(!loc || loc==='all') return DEPTS;
+  const rows = DEPTS.filter(d => empHasLoc({location:d.location}, loc));
+  if(rows.length) return rows;
+  return STANDARD_BEREICHE.map((name,i)=>({
+    id:'syn_'+loc+'_'+i, name, location:loc, head:'—', count:0,
+    color:_BEREICH_COLORS[name]||'#94a3b8'
+  }));
+}
+
 function renderDepts(){
   const pg=document.getElementById('page-departments');
   if(!can('seeAllEmployees')){pg.innerHTML=permBanner('Bereichsübersicht ist nur für Manager und Inhaber verfügbar.');return;}
-  const _uLoc=currentUser.location;const _isAll=_uLoc==='all';const depts=_isAll?(currentLocation==='all'?DEPTS:DEPTS.filter(d=>d.location===currentLocation)):DEPTS.filter(d=>empHasLoc({location:d.location},_uLoc));
+  const _uLoc=currentUser.location;const _isAll=_uLoc==='all';const depts=_isAll?(currentLocation==='all'?DEPTS:deptsForLocation(currentLocation)):deptsForLocation(_uLoc);
   const isAdmin=can('seeFinancials');
   const today=isoDate(new Date());
 
@@ -3336,15 +3352,14 @@ function renderSchedule(){
       <span class="sc2-filter-label">Bereich</span>
       <button class="sc2-dept-pill${scheduleDept==='all'?' active':''}" onclick="scheduleDept='all';renderSchedule()">Alle</button>
       ${(()=>{
-        // Filter DEPTS by current visible location
-        let visD = DEPTS;
-        if(currentUser.location !== 'all') {
-          visD = DEPTS.filter(d => empHasLoc({location: d.location}, currentUser.location));
-        }
-        if(currentLocation && currentLocation !== 'all') {
-          visD = visD.filter(d => d.location === currentLocation);
-        }
-        return [...new Set(visD.map(d=>d.name))].sort().map(d=>`<button class="sc2-dept-pill${scheduleDept===d?' active':''}" onclick="scheduleDept='${d}';renderSchedule()">${d}</button>`).join('');
+        // Bereiche des aktuell gewählten Standorts (Fallback: Standard-Set)
+        const effLoc = (currentLocation && currentLocation!=='all')
+          ? currentLocation
+          : (currentUser.location!=='all' ? currentUser.location : 'all');
+        const names = effLoc==='all'
+          ? STANDARD_BEREICHE
+          : [...new Set(deptsForLocation(effLoc).map(d=>d.name))];
+        return names.sort().map(d=>`<button class="sc2-dept-pill${scheduleDept===d?' active':''}" onclick="scheduleDept='${d}';renderSchedule()">${d}</button>`).join('');
       })()}
     </div>
     <div class="sc2-filter-right">
