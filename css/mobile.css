@@ -775,3 +775,101 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* ─────────────────────────────────────────────────────────
+   20. iOS ZOOM FIX – Eingabefelder min. 16px (verhindert
+   automatisches Hineinzoomen beim Fokus auf iPhone/Safari)
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .form-input,
+  .form-select,
+  .form-textarea,
+  .login-box input,
+  .login-box select {
+    font-size: 16px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+   21. MITARBEITER-TABELLE → KARTEN (≤ 640px)
+   Statt horizontalem Scrollen wird jede Zeile zu einer Karte
+   mit Label–Wert-Paaren. Labels kommen aus data-col.
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .mit-table-card { overflow-x: visible; }
+  .mit-table { width: 100% !important; min-width: 0 !important; display: block; }
+  .mit-table thead { display: none; }
+  .mit-table tbody { display: block; width: 100%; }
+
+  .mit-emp-row {
+    display: block;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+  }
+
+  /* Generische Zelle = eine Label/Wert-Zeile */
+  .mit-emp-row td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0 !important;
+    border: none !important;
+    font-size: 0.85rem !important;
+    text-align: right;
+    white-space: normal !important;
+  }
+  .mit-emp-row td + td { border-top: 1px solid var(--border-light) !important; }
+
+  /* Label aus data-col (linksbündig, klein) */
+  .mit-emp-row td[data-col="pnr"]::before       { content: "Personal-Nr."; }
+  .mit-emp-row td[data-col="standort"]::before  { content: "Standort"; }
+  .mit-emp-row td[data-col="urlaub"]::before     { content: "Urlaub"; }
+  .mit-emp-row td[data-col="krank"]::before      { content: "Krank"; }
+  .mit-emp-row td[data-col="verspat"]::before    { content: "Verspätung"; }
+  .mit-emp-row td[data-col="gehalt"]::before     { content: "Brutto"; }
+  .mit-emp-row td[data-col="ges_brutto"]::before { content: "Ges.-Brutto"; }
+  .mit-emp-row td[data-col="netto_val"]::before  { content: "Netto"; }
+  .mit-emp-row td[data-col="ueb"]::before        { content: "Überweisung"; }
+  .mit-emp-row td[data-col="ueb_st"]::before     { content: "Ü-Status"; }
+  .mit-emp-row td[data-col="ueb_dat"]::before    { content: "Ü-Datum"; }
+  .mit-emp-row td[data-col="bar"]::before        { content: "BAR"; }
+  .mit-emp-row td[data-col="bar_st"]::before     { content: "BAR-Status"; }
+  .mit-emp-row td[data-col="bar_dat"]::before    { content: "BAR-Datum"; }
+  .mit-emp-row td[data-col="summe"]::before      { content: "Summe"; }
+  .mit-emp-row td[data-col="ziel"]::before       { content: "Ziel"; }
+  .mit-emp-row td[data-col="diff"]::before       { content: "Differenz"; }
+  .mit-emp-row td[data-col="notiz"]::before      { content: "Notiz"; }
+  .mit-emp-row td[data-col="status"]::before     { content: "Status"; }
+  .mit-emp-row td[data-col]::before {
+    font-size: 0.66rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    text-align: left;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Name-Zelle = Karten-Kopf (volle Breite, kein Label) */
+  .mit-emp-row td[data-col="name"] {
+    justify-content: flex-start;
+    text-align: left;
+    border-bottom: 1px solid var(--border) !important;
+    padding-bottom: 10px !important;
+    margin-bottom: 4px;
+  }
+  .mit-emp-row td[data-col="name"]::before,
+  .mit-emp-row td[data-col="actions"]::before { content: none; }
+
+  /* Aktionen unten, rechtsbündig */
+  .mit-emp-row td[data-col="actions"] { justify-content: flex-end; }
+  .mit-emp-row td[data-col="actions"] .mit-actions { width: 100%; justify-content: flex-end; }
+
+  /* Inline-Selects (Bereich/Bank) etwas größer für Touch */
+  .mit-emp-row td[data-col="standort"] select { font-size: 0.82rem !important; padding: 5px 8px !important; }
+}
