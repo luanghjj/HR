@@ -95,3 +95,115 @@ function getVacTypeForDate(dateStr, locationId) {
   if (sched.halfDays.includes(dow)) return 'A';     // half day
   return 'B';                                        // full day
 }
+
+// ═══════════════════════════════════════════════════════════
+// Standard-Wochenplan (Schicht-Vorlagen pro Bereich × Standort × Wochentag)
+// ───────────────────────────────────────────────────────────
+// Struktur: STANDARD_WEEK[locKind][dept][dow] = [ {from,to,label}, ... ]
+//   dow (JS getDay()): 0=So 1=Mo 2=Di 3=Mi 4=Do 5=Fr 6=Sa
+//   Leeres Array []  = an dem Tag kein Dienst (geschlossen).
+// locKind: 'standard' (Okyu/Enso), 'origami', 'omoi' (O·MO·I Café)
+// ═══════════════════════════════════════════════════════════
+const _shift = (from, to, label) => ({ from, to, label });
+
+// Abendschicht-Ende: Mo–Do & So = 22:00, Fr+Sa = 23:00
+const _abend = (dow) => _shift('17:00', (dow === 5 || dow === 6) ? '23:00' : '22:00', 'Abend');
+
+const STANDARD_WEEK = {
+  // ── Okyu + Enso: geteilte Schichten, Mo–Sa offen, So geschlossen ──
+  standard: {
+    'Küche': {
+      1: [_shift('10:30','15:00','Mittag'), _abend(1)],
+      2: [_shift('11:00','15:30','Mittag'), _abend(2)],
+      3: [_shift('10:30','15:00','Mittag'), _abend(3)],
+      4: [_shift('10:30','15:00','Mittag'), _abend(4)],
+      5: [_shift('10:30','15:00','Mittag'), _abend(5)],
+      6: [_shift('11:00','15:30','Mittag'), _abend(6)],
+      0: []
+    },
+    'Sushi': {
+      1: [_shift('10:30','15:00','Mittag'), _abend(1)],
+      2: [_shift('10:30','15:00','Mittag'), _abend(2)],
+      3: [_shift('10:30','15:00','Mittag'), _abend(3)],
+      4: [_shift('10:30','15:00','Mittag'), _abend(4)],
+      5: [_shift('10:30','15:00','Mittag'), _abend(5)],
+      6: [_shift('11:00','16:00','Mittag'), _abend(6)],
+      0: []
+    },
+    'Service': {
+      1: [_shift('10:30','15:00','Mittag'), _abend(1)],
+      2: [_shift('10:30','15:00','Mittag'), _abend(2)],
+      3: [_shift('10:30','15:00','Mittag'), _abend(3)],
+      4: [_shift('10:30','15:00','Mittag'), _abend(4)],
+      5: [_shift('10:30','15:00','Mittag'), _abend(5)],
+      6: [_shift('11:00','16:00','Mittag'), _abend(6)],
+      0: []
+    }
+  },
+  // ── Origami: Mo geschlossen, Di–Fr ganztags, Sa+So halbtags (nur Mittag) ──
+  origami: {
+    'Küche': {
+      1: [],
+      2: [_shift('10:30','15:00','Mittag'), _abend(2)],
+      3: [_shift('10:30','15:00','Mittag'), _abend(3)],
+      4: [_shift('10:30','15:00','Mittag'), _abend(4)],
+      5: [_shift('10:30','15:00','Mittag'), _abend(5)],
+      6: [_shift('10:30','15:00','Halbtag')],
+      0: [_shift('10:30','15:00','Halbtag')]
+    },
+    'Sushi': {
+      1: [],
+      2: [_shift('10:30','15:00','Mittag'), _abend(2)],
+      3: [_shift('10:30','15:00','Mittag'), _abend(3)],
+      4: [_shift('10:30','15:00','Mittag'), _abend(4)],
+      5: [_shift('10:30','15:00','Mittag'), _abend(5)],
+      6: [_shift('10:30','15:00','Halbtag')],
+      0: [_shift('10:30','15:00','Halbtag')]
+    },
+    'Service': {
+      1: [],
+      2: [_shift('10:30','15:00','Mittag'), _abend(2)],
+      3: [_shift('10:30','15:00','Mittag'), _abend(3)],
+      4: [_shift('10:30','15:00','Mittag'), _abend(4)],
+      5: [_shift('10:30','15:00','Mittag'), _abend(5)],
+      6: [_shift('10:30','16:00','Halbtag')],
+      0: [_shift('10:30','16:00','Halbtag')]
+    }
+  },
+  // ── O·MO·I Café: Mo geschlossen, eine Schicht, Start 1h vor Öffnung (11:00) ──
+  omoi: {
+    '*': {
+      1: [],
+      2: [_shift('11:00','21:00','Tagschicht')],
+      3: [_shift('11:00','21:00','Tagschicht')],
+      4: [_shift('11:00','21:00','Tagschicht')],
+      5: [_shift('11:00','22:00','Tagschicht')],
+      6: [_shift('11:00','22:00','Tagschicht')],
+      0: [_shift('11:00','20:00','Tagschicht')]
+    }
+  }
+};
+
+/** Standort-ID → Standort-Typ für den Standard-Wochenplan */
+function getLocationKind(locationId) {
+  if (!locationId) return null;
+  const id = locationId.split(',')[0].trim();   // bei Multi-Standort: erster
+  if (id === 'origami') return 'origami';
+  if (id === 'omoistuttgart') return 'omoi';
+  if (id === 'okyu' || id === 'enso' || id === 'okyu_central') return 'standard';
+  return 'standard';   // Default
+}
+
+/**
+ * Standard-Schichten für (Bereich, Standort, Wochentag) zurückgeben.
+ * @returns {Array<{from,to,label}>} leeres Array = kein Dienst
+ */
+function getStandardShifts(dept, locationId, dow) {
+  const kind = getLocationKind(locationId);
+  if (!kind) return [];
+  const tbl = STANDARD_WEEK[kind];
+  if (!tbl) return [];
+  const deptTbl = tbl[dept] || tbl['*'];   // omoi nutzt '*' für alle Bereiche
+  if (!deptTbl) return [];
+  return deptTbl[dow] || [];
+}

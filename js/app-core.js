@@ -1448,7 +1448,7 @@ function viewEmp(id){
   const vr=e.vacTotal-e.vacUsed,pl=ev.filter(v=>(v.status==='approved'||v.status==='pending')&&v.from>='2026-03-20').reduce((s,v)=>s+v.days,0);
   const planH=calcPlanHours(e.id);
   const hourly=calcHourly(e);
-  const deptOpts=DEPTS.map(d=>d.name).filter((v,i,a)=>a.indexOf(v)===i);
+  const deptOpts=[...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung', ...DEPTS.map(d=>d.name), e.dept].filter(Boolean))];
 
   let adminSection='';
   if(isAdmin){
@@ -3278,6 +3278,7 @@ function renderSchedule(){
     </div>
     <div class="sc2-page-right">
     ${canEdit?`<button class="sc2-action-btn" onclick="copyWeek()"><span class="ms" style="font-size:1rem">content_copy</span> Woche kopieren</button>`:``}
+    ${canEdit?`<button class="sc2-action-btn" onclick="generateStandardWeek()"><span class="ms" style="font-size:1rem">auto_fix_high</span> Standard-Plan</button>`:``}
       ${canEdit?`<div class="sc2-tmpl-wrap"><button class="sc2-action-btn" onclick="openModal('saveTemplate')"><span class="ms" style="font-size:1rem">bookmark</span> Vorlagen</button></div>`:``}
       ${canExp?`<button class="sc2-action-btn is-primary" onclick="exportPDF()"><span class="ms" style="font-size:1rem">picture_as_pdf</span> PDF Export</button>`:``}
       ${canEdit?`<button class="sc2-action-btn" onclick="openModal('addShift')" style="background:var(--accent);color:#fff;border-color:var(--accent)"><span class="ms" style="font-size:1rem">add</span> Schicht</button>`:``}
@@ -3672,6 +3673,89 @@ function copyWeek(){const ws2=getWeekStart(scheduleDate);const nw=new Date(ws2);
     const src=getVisibleShifts().filter(s=>s.date===sds);SHIFTS=SHIFTS.filter(s=>s.date!==dds);
     src.forEach(s=>{const ns={...s,id:Date.now()+Math.random()*1e6|0,date:dds,isSick:false,isVacation:false,isLate:false,lateMin:0};SHIFTS.push(ns);syncAddShift(ns);c++;});}
   toast(`${c} Schichten auf Folgewoche kopiert`);renderSchedule();}
+
+// ═══ STANDARD-WOCHE GENERIEREN ═══
+// Füllt die aktuell angezeigte Woche mit den Standard-Schichten (config.js
+// STANDARD_WEEK) für jeden sichtbaren aktiven Mitarbeiter, dessen Bereich
+// (Küche/Sushi/Service) + Standort eine Vorlage hat. Mitarbeiter ohne
+// passenden Bereich werden übersprungen. Bestehende Tage bleiben unverändert.
+const STD_WEEK_DEPTS = ['Küche', 'Sushi', 'Service'];
+
+function generateStandardWeek() {
+  if (!can('editSchedules')) return;
+
+  const ws = getWeekStart(scheduleDate);
+  const dates = [];
+  for (let i = 0; i < 7; i++) { const d = new Date(ws); d.setDate(d.getDate() + i); dates.push(d); }
+
+  const emps = getVisibleEmps().filter(e => e.status === 'active' || e.status === 'aktiv');
+  const toCreate = [];
+  const empSet = new Set();
+  let skippedNoBereich = 0;
+
+  emps.forEach(emp => {
+    // Bereich auflösen (Mehrfach-Bereich: ersten passenden nehmen)
+    const depts = (emp.dept || '').split(',').map(s => s.trim());
+    const dept = depts.find(d => STD_WEEK_DEPTS.includes(d));
+    // O·MO·I nutzt '*' (alle Bereiche) → auch ohne passenden Bereich gültig
+    const kind = getLocationKind(emp.location);
+    if (!dept && kind !== 'omoi') { skippedNoBereich++; return; }
+
+    // Standort auflösen (Multi-Standort: currentLocation falls passend, sonst erster)
+    let loc = emp.location || '';
+    if (loc.includes(',')) {
+      const list = loc.split(',').map(s => s.trim());
+      loc = (currentLocation !== 'all' && list.includes(currentLocation)) ? currentLocation : list[0];
+    }
+
+    dates.forEach(d => {
+      const ds = isoDate(d);
+      // Tag überspringen, wenn schon eine Schicht existiert
+      if (SHIFTS.some(s => s.empId === emp.id && s.date === ds)) return;
+      const shifts = getStandardShifts(dept || '*', loc, d.getDay());
+      shifts.forEach(sh => {
+        toCreate.push({
+          empId: emp.id, empName: emp.name, dept: dept || emp.dept || '', location: loc,
+          date: ds, from: sh.from, to: sh.to, label: sh.label,
+          colorClass: getDeptColorClass(dept || ''),
+          isSick: false, isVacation: false, isLate: false, lateMin: 0
+        });
+        empSet.add(emp.id);
+      });
+    });
+  });
+
+  if (toCreate.length === 0) {
+    toast(skippedNoBereich > 0
+      ? `Keine Schichten – ${skippedNoBereich} Mitarbeiter ohne Bereich (Küche/Sushi/Service)`
+      : 'Keine neuen Schichten – Woche bereits gefüllt', 'warn');
+    return;
+  }
+
+  window._pendingStdShifts = toCreate;
+  const wkLabel = formatDateDE(isoDate(ws));
+  document.getElementById('modalTitle').textContent = 'Standard-Woche generieren';
+  document.getElementById('modalBody').innerHTML = `<div style="font-size:.9rem;line-height:1.7">
+    <p><strong>${toCreate.length}</strong> Schichten für <strong>${empSet.size}</strong> Mitarbeiter ab Woche <strong>${wkLabel}</strong> erstellen?</p>
+    ${skippedNoBereich > 0 ? `<p style="color:var(--warning);font-size:.82rem">⚠️ ${skippedNoBereich} Mitarbeiter übersprungen (kein Bereich Küche/Sushi/Service zugewiesen).</p>` : ''}
+    <p style="font-size:.78rem;color:var(--text-muted)">Bestehende Schichten bleiben unverändert.</p>
+  </div>`;
+  document.getElementById('modalFooter').innerHTML =
+    `<button class="btn" onclick="closeModal()">Abbrechen</button>` +
+    `<button class="btn btn-primary" onclick="confirmGenerateStandardWeek()">Erstellen</button>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+async function confirmGenerateStandardWeek() {
+  const toCreate = window._pendingStdShifts || [];
+  closeModal();
+  if (!toCreate.length) return;
+  toCreate.forEach(s => SHIFTS.push(s));
+  await syncBulkShifts(toCreate);
+  window._pendingStdShifts = null;
+  toast(`✓ ${toCreate.length} Schichten erstellt`);
+  renderSchedule();
+}
 function deleteShift(id){const s=SHIFTS.find(x=>x.id===id);if(!s)return;if(!confirm(`${s.empName}: ${s.label} (${formatDateDE(s.date)}) löschen?`))return;SHIFTS=SHIFTS.filter(x=>x.id!==id);syncDeleteShift(id);toast('Schicht gelöscht','warn');renderSchedule();}
 function exportPDF(){if(!can('canExport'))return;const pc=document.getElementById('schedC').innerHTML;const lbl=document.getElementById('schedLabel').textContent;const w=window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>Arbeitsplan</title><style>body{font-family:'Segoe UI',Arial,sans-serif;padding:24px;color:#222}h1{font-size:20px}h2{font-size:14px;color:#666;font-weight:normal;margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;border:1px solid #ddd;font-size:12px;text-align:left}th{background:#f5f5f5;font-weight:700;text-transform:uppercase;font-size:10px}.shift-block{padding:3px 6px;border-radius:3px;font-size:11px;margin:2px 0;background:#f0f0f0;border-left:3px solid #666}.shift-block.kitchen{border-left-color:#e17055;background:#fef3ef}.shift-block.service{border-left-color:#74b9ff;background:#eef5ff}.shift-block.bar{border-left-color:#00b894;background:#eefaf6}.shift-block.is-sick{border-left-color:#d63031;background:#ffeaea}.shift-block.is-vacation{border-left-color:#0984e3;background:#eaf2ff}.shift-block.is-late{border-right:3px solid #e84393}.shift-name{font-weight:600}.shift-time{font-size:10px;color:#888}.shift-actions{display:none}.table-wrap{border:none}.table-header{display:none}.late-marker{color:#e84393;font-size:9px}.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}.cal-day{border:1px solid #ddd;padding:4px;min-height:50px;font-size:11px}.cal-day-header{font-size:10px;font-weight:700;text-align:center;padding:4px;background:#f5f5f5}.cal-day-num{font-weight:700}.cal-event{font-size:9px;padding:1px 4px;background:#eef;border-radius:2px;margin-top:2px}@media print{body{padding:0}}</style></head><body><h1>Arbeitsplan – ${currentUser.role==='inhaber'?'Alle Standorte':getLocationName(currentUser.location)}</h1><h2>${lbl}</h2>${pc}<script>window.print();<\/script></body></html>`);w.document.close();}
