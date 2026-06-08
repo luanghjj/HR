@@ -1048,7 +1048,7 @@ function renderEmployees(){
   if(!can('seeAllEmployees') && !can('seeOwnDetail')){pg.innerHTML=permBanner('Mitarbeiter-Ansicht ist nur für Manager und Inhaber verfügbar.');return;}
   const isOwnOnly = !can('seeAllEmployees') && can('seeOwnDetail');
   const emps = isOwnOnly ? EMPS.filter(e=>e.id===currentUser.empId) : getVisibleEmps();
-  const isAdmin = can('seeFinancials') || currentUser?.role === 'manager';
+  const isAdmin = currentUser?._permMode === 'custom' ? can('seeFinancials') : (can('seeFinancials') || currentUser?.role === 'manager');
   const todayStr=isoDate(new Date());
   const empIds=new Set(emps.map(e=>e.id));
   const onVac=VACS.filter(v=>empIds.has(v.empId)&&v.status==='approved'&&v.from<=todayStr&&v.to>=todayStr).length;
@@ -1224,7 +1224,7 @@ function renderEmployees(){
 }
 
 function renderEmpRows(emps){
-  const isAdmin = can('seeFinancials') || currentUser?.role === 'manager';
+  const isAdmin = currentUser?._permMode === 'custom' ? can('seeFinancials') : (can('seeFinancials') || currentUser?.role === 'manager');
   const _ys1=isoDate(new Date(new Date().getFullYear(),0,1));
   const DEPT_COLORS={'Küche':'#10b981','Service':'#3b4fd2','Bar':'#f97316','Sushi':'#8b5cf6','Ausbildung':'#a29bfe','Verwaltung':'#e11d48'};
   const canEditDept = can('editEmployees');
