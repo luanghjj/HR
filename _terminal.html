@@ -333,9 +333,12 @@ async function autoCheckout(today, records) {
     const deadline = new Date(shiftEnd.getTime() + AUTO_CHECKOUT_BUFFER_MIN * 60000);
 
     if (now >= deadline) {
-      // Auto checkout — set check_out = shift end time
+      // Auto checkout — set check_out = shift end time (15-Min-Raster: in↑, out↓)
       const checkOutTime = shiftEnd.toISOString();
-      const totalHours = ((shiftEnd - new Date(rec.check_in)) / 3600000).toFixed(2);
+      const _ms = 15 * 60 * 1000;
+      const _inR = Math.ceil(new Date(rec.check_in).getTime() / _ms) * _ms;
+      const _outR = Math.floor(shiftEnd.getTime() / _ms) * _ms;
+      const totalHours = Math.max(0, Math.round(((_outR - _inR) / 3600000) * 100) / 100).toFixed(2);
 
       await sb.from('time_records').update({
         check_out: checkOutTime,

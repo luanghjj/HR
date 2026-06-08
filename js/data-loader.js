@@ -483,7 +483,7 @@ async function runAutoCheckout() {
 
     if (now >= deadline) {
       const checkOutTime = shiftEnd.toISOString();
-      const totalHours = ((shiftEnd - new Date(rec.checkIn)) / 3600000).toFixed(2);
+      const totalHours = workedHours15(rec.checkIn, shiftEnd);
 
       const { error } = await sb.from('time_records').update({
         check_out: checkOutTime,

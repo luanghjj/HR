@@ -534,7 +534,8 @@ async function doCheckOut() {
     let pos = null;
     try { pos = await getCurrentGPS(); } catch(_) { /* GPS optional beim Check-out */ }
     const cin = new Date(activeCheckIn.checkIn);
-    const totalHours = Math.round(((Date.now() - cin.getTime()) / 3600000) * 100) / 100;
+    // 15-Min-Raster: Check-in↑, Check-out↓
+    const totalHours = workedHours15(activeCheckIn.checkIn, Date.now());
 
     const data = await syncCheckOut(activeCheckIn.id, {
       lat: pos?.lat ?? null,

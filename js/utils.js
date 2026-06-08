@@ -345,3 +345,21 @@ function findNearestLocation(lat, lng) {
   });
   return nearest ? { location: nearest, distance: Math.round(minDist) } : null;
 }
+
+// ═══ ZEITERFASSUNG – 15-Minuten-Raster ═══
+// Regel: Check-in wird AUFgerundet (↑), Check-out wird ABgerundet (↓).
+// Dadurch zählt nur die volle 15-Min-Arbeitszeit (zugunsten des Betriebs).
+
+/** Date auf 15-Min-Raster runden. dir: 'ceil' (Check-in) | 'floor' (Check-out) */
+function round15(date, dir) {
+  const ms = 15 * 60 * 1000;
+  const t = new Date(date).getTime();
+  return new Date(dir === 'ceil' ? Math.ceil(t / ms) * ms : Math.floor(t / ms) * ms);
+}
+
+/** Gearbeitete Stunden mit 15-Min-Raster (Check-in↑, Check-out↓). */
+function workedHours15(checkIn, checkOut) {
+  const inR  = round15(checkIn, 'ceil');
+  const outR = round15(checkOut, 'floor');
+  return Math.max(0, Math.round(((outR - inR) / 3600000) * 100) / 100);
+}
