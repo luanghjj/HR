@@ -530,13 +530,15 @@ async function doCheckOut() {
   if (!activeCheckIn) return;
 
   try {
-    const pos = await getCurrentGPS();
+    // GPS ist beim Ausstempeln OPTIONAL — bei Verweigerung/Timeout trotzdem ausstempeln
+    let pos = null;
+    try { pos = await getCurrentGPS(); } catch(_) { /* GPS optional beim Check-out */ }
     const cin = new Date(activeCheckIn.checkIn);
     const totalHours = Math.round(((Date.now() - cin.getTime()) / 3600000) * 100) / 100;
 
     const data = await syncCheckOut(activeCheckIn.id, {
-      lat: pos.lat,
-      lng: pos.lng,
+      lat: pos?.lat ?? null,
+      lng: pos?.lng ?? null,
       totalHours
     });
 
@@ -556,7 +558,7 @@ async function doCheckOut() {
       toast('Check-out fehlgeschlagen', 'err');
     }
   } catch (err) {
-    toast('GPS Fehler: ' + err.message, 'err');
+    toast('Check-out Fehler: ' + err.message, 'err');
   }
 }
 
