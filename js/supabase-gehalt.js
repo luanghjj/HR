@@ -82,3 +82,26 @@ function toGehaltMonat(monthStr) {
   if (!y || !m || m < 1 || m > 12) return monthStr;
   return `${GEHALT_MONAT_ABBR[m - 1]} ${y}`;
 }
+
+/**
+ * Sortier-/Vergleichsschlüssel aus einem GehaltsManager-Monatslabel.
+ * Akzeptiert deutsche Labels ("Mär 2026") UND ISO ("2026-03").
+ * Liefert eine Zahl YYYYMM (z.B. 202603) für chronologische Sortierung,
+ * oder 0 wenn nicht parsbar.
+ */
+function gehaltMonatKey(monat) {
+  if (!monat) return 0;
+  const s = String(monat).trim();
+  // ISO: 2026-03
+  const iso = s.match(/^(\d{4})-(\d{1,2})/);
+  if (iso) return Number(iso[1]) * 100 + Number(iso[2]);
+  // Deutsch: "Mär 2026" / "März 2026" / "Mae 2026"
+  const de = s.match(/^([A-Za-zÄÖÜäöüß]+)\.?\s+(\d{4})$/);
+  if (de) {
+    const want = de[1].slice(0, 3).toLowerCase();
+    const idx = GEHALT_MONAT_ABBR.findIndex(a => a.slice(0, 3).toLowerCase() === want
+      || (want === 'mae' && a === 'Mär'));
+    if (idx >= 0) return Number(de[2]) * 100 + (idx + 1);
+  }
+  return 0;
+}
