@@ -1745,7 +1745,16 @@ function viewEmp(id){
       </div>
     </div>` : ''}
   ${currentUser?.role === 'inhaber' ? `
-    <hr style="border-color:var(--danger);opacity:.2;margin:24px 0 16px">
+    <hr style="border-color:var(--border);margin:24px 0 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(99,102,241,.05);border:1px solid rgba(99,102,241,.2);border-radius:12px;padding:12px 16px;margin-bottom:12px">
+      <div>
+        <div style="font-weight:700;color:var(--accent);font-size:.85rem">🔀 Duplikat zusammenführen</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">Einen doppelten Eintrag in <strong>${escapeHtml(e.name)}</strong> übernehmen. Schichten, Zeiten, Urlaub, Dokumente &amp; Konto werden übertragen, der Standort wird vereint.</div>
+      </div>
+      <button class="btn btn-primary" style="font-size:.8rem;padding:7px 16px;white-space:nowrap" onclick="openMergeModal(${e.id})">
+        <span class="ms" style="font-size:.9rem;vertical-align:middle">merge</span> Zusammenführen
+      </button>
+    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:12px;padding:12px 16px">
       <div>
         <div style="font-weight:700;color:var(--danger);font-size:.85rem">⚠️ Mitarbeiter löschen</div>
@@ -1786,7 +1795,93 @@ async function deleteEmployee(empId, empName) {
   }
 }
 
-// ═══ PAYMENT FILTER (Monat wechseln in Mitarbeitertabelle) ═══
+// ═══ MITARBEITER ZUSAMMENFÜHREN (Duplikate, Inhaber only) ═══
+// Überträgt alle Referenzen von dropId → keepId, vereint Standorte,
+// löscht den doppelten Eintrag. Für "1 Person, mehrere Standorte".
+function openMergeModal(keepId) {
+  const keep = EMPS.find(e => e.id === keepId);
+  if (!keep) return;
+  // Kandidaten: gleicher/ähnlicher Name zuerst, dann alle anderen
+  const norm = s => (s || '').toLowerCase().replace(/[^a-zäöü]/g, '');
+  const keepN = norm(keep.name);
+  const list = EMPS.filter(e => e.id !== keepId).sort((a, b) => {
+    const am = norm(a.name) === keepN ? 0 : 1, bm = norm(b.name) === keepN ? 0 : 1;
+    return am - bm || a.name.localeCompare(b.name);
+  });
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'mergeModal';
+  modal.innerHTML = `<div class="modal" style="max-width:540px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title"><span class="ms" style="font-size:18px;vertical-align:middle">merge</span> In „${escapeHtml(keep.name)}" zusammenführen</span>
+      <button class="modal-close" onclick="document.getElementById('mergeModal').remove()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px">
+      <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:10px">Wähle den <strong>doppelten</strong> Eintrag. Er wird in <strong>${escapeHtml(keep.name)}</strong> (#${keep.id}) übernommen und danach gelöscht.</p>
+      <input class="form-input" id="mergeSearch" placeholder="Mitarbeiter suchen…" style="margin-bottom:10px;font-size:16px" oninput="_filterMerge(this.value)">
+      <div id="mergeList" style="max-height:48vh;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+        ${list.map(e => `<button class="mg-row" data-name="${(e.name||'').toLowerCase()}" onclick="confirmMerge(${keepId},${e.id})"
+          style="display:flex;justify-content:space-between;align-items:center;text-align:left;padding:8px 12px;border-radius:8px;border:1px solid ${norm(e.name)===keepN?'var(--warning)':'var(--border)'};background:var(--bg-input);cursor:pointer">
+          <span style="font-weight:600;font-size:.85rem">${e.name} <span style="color:var(--text-muted);font-size:.7rem">#${e.id}</span></span>
+          <span style="font-size:.72rem;color:var(--text-muted)">${getLocationName(e.location)} · ${e.dept||'—'}</span>
+        </button>`).join('')}
+      </div>
+    </div>
+  </div>`;
+  modal.onclick = () => modal.remove();
+  document.body.appendChild(modal);
+}
+
+function _filterMerge(q){
+  q = (q || '').toLowerCase().trim();
+  document.querySelectorAll('#mergeList .mg-row').forEach(b => {
+    b.style.display = b.dataset.name.includes(q) ? '' : 'none';
+  });
+}
+
+async function confirmMerge(keepId, dropId) {
+  const keep = EMPS.find(e => e.id === keepId);
+  const drop = EMPS.find(e => e.id === dropId);
+  if (!keep || !drop) return;
+  if (!confirm(`„${drop.name}" (#${dropId}) in „${keep.name}" (#${keepId}) zusammenführen?\n\nAlle Schichten, Zeiterfassung, Urlaub, Krankmeldungen, Dokumente und Konten von #${dropId} werden auf #${keepId} übertragen. #${dropId} wird gelöscht.\n\nNICHT rückgängig machbar!`)) return;
+
+  const m = document.getElementById('mergeModal'); if (m) m.remove();
+  try {
+    // 1) Referenzen mit emp_name auf keep umhängen
+    for (const t of ['shifts','vacations','sick_leaves','documents']) {
+      const { error } = await sb.from(t).update({ emp_id: keepId, emp_name: keep.name }).eq('emp_id', dropId);
+      if (error) console.warn(`[Merge] ${t}:`, error.message);
+    }
+    // 2) Referenzen nur mit emp_id
+    for (const t of ['time_records','user_profiles','salary_history']) {
+      const { error } = await sb.from(t).update({ emp_id: keepId }).eq('emp_id', dropId);
+      if (error) console.warn(`[Merge] ${t}:`, error.message);
+    }
+    // 3) Standorte vereinen
+    const locs = [...new Set([
+      ...(keep.location||'').split(','), ...(drop.location||'').split(',')
+    ].map(s => s.trim()).filter(Boolean))].join(',');
+    await sb.from('employees').update({ location: locs }).eq('id', keepId);
+    // 4) Duplikat löschen
+    const { error: delErr } = await sb.from('employees').delete().eq('id', dropId);
+    if (delErr) { toast('Fehler beim Löschen: ' + delErr.message, 'err'); return; }
+
+    // 5) Lokale Daten aktualisieren
+    keep.location = locs;
+    const di = EMPS.findIndex(e => e.id === dropId); if (di !== -1) EMPS.splice(di, 1);
+    SHIFTS.forEach(s => { if (s.empId === dropId) { s.empId = keepId; s.empName = keep.name; } });
+    VACS.forEach(v => { if (v.empId === dropId) { v.empId = keepId; v.empName = keep.name; } });
+    SICKS.forEach(s => { if (s.empId === dropId) { s.empId = keepId; s.empName = keep.name; } });
+    USERS.forEach(u => { if (u.empId === dropId) u.empId = keepId; });
+
+    closeModal();
+    toast(`✓ „${drop.name}" in „${keep.name}" zusammengeführt (Standorte: ${getLocationName(locs)})`, 'success');
+    renderEmployees();
+  } catch (e) {
+    console.error('[Merge]', e);
+    toast('Fehler beim Zusammenführen: ' + e.message, 'err');
+  }
+}
 async function reloadPayStatusForMonth(monthStr) {
   const monthDate = monthStr + '-01';
   const { data } = await sb.from('payment_status').select('*').eq('month', monthDate);
