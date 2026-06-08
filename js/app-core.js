@@ -4776,30 +4776,61 @@ async function saveEmpLink(userId, empId){
 function openCreateUserModal() {
   const locOptions = `<option value="all">🌍 Alle Standorte</option>` +
     LOCS.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-  const deptOptions = [...new Set(DEPTS.map(d => d.name))].sort().map(d => `<option value="${d}">${d}</option>`).join('');
+  const deptOptions = [...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung', ...DEPTS.map(d => d.name)].filter(Boolean))].map(d => `<option value="${d}">${d}</option>`).join('');
+  const empOptions = EMPS.slice().sort((a,b)=>a.name.localeCompare(b.name))
+    .map(e => `<option value="${e.id}">${e.name} · ${getLocationName(e.location)}</option>`).join('');
 
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
   modal.id = 'createUserModal';
-  modal.innerHTML = `<div class="modal" style="max-width:520px">
+  modal.innerHTML = `<div class="modal" style="max-width:540px">
     <div class="modal-header">
-      <h3><span class="ms" style="font-size:20px;vertical-align:middle">person_add</span> Neuen Benutzer anlegen</h3>
+      <h3><span class="ms" style="font-size:20px;vertical-align:middle">person_add</span> Zugang freischalten</h3>
       <button class="modal-close" onclick="document.getElementById('createUserModal').remove()">&times;</button>
     </div>
     <div class="modal-body" style="padding:20px">
+      <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:14px">
+        E-Mail freischalten. Der Mitarbeiter loggt sich dann per <strong>Google</strong> oder
+        <strong>Selbst-Registrierung (eigenes Passwort)</strong> mit dieser E-Mail ein → automatischer Zugang.
+      </p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div style="grid-column:span 2">
+          <label class="form-label">E-Mail (Login) *</label>
+          <input class="form-input" id="newUserEmail" type="email" placeholder="email@example.com" style="width:100%">
+        </div>
+
+        <div style="grid-column:span 2">
+          <label class="form-label">Mitarbeiter</label>
+          <div style="display:flex;gap:14px;margin:4px 0 8px">
+            <label style="display:flex;align-items:center;gap:5px;font-size:.85rem;cursor:pointer">
+              <input type="radio" name="cuEmpMode" value="existing" checked onchange="cuToggleEmpMode()"> Bestehenden verknüpfen</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:.85rem;cursor:pointer">
+              <input type="radio" name="cuEmpMode" value="new" onchange="cuToggleEmpMode()"> Neu anlegen</label>
+          </div>
+        </div>
+
+        <div style="grid-column:span 2" id="cuExistingWrap">
+          <label class="form-label">Mitarbeiter auswählen *</label>
+          <select class="form-select" id="newUserEmpSel" style="width:100%">${empOptions}</select>
+        </div>
+
+        <div style="grid-column:span 2" id="cuNewName" style="display:none">
           <label class="form-label">Name *</label>
           <input class="form-input" id="newUserName" placeholder="Vor- und Nachname" style="width:100%">
         </div>
-        <div>
-          <label class="form-label">E-Mail *</label>
-          <input class="form-input" id="newUserEmail" type="email" placeholder="email@example.com" style="width:100%">
+        <div id="cuNewLoc" style="display:none">
+          <label class="form-label">Standort *</label>
+          <select class="form-select" id="newUserLoc" style="width:100%">${locOptions}</select>
         </div>
-        <div>
-          <label class="form-label">Passwort *</label>
-          <input class="form-input" id="newUserPwd" type="password" placeholder="Min. 6 Zeichen" style="width:100%">
+        <div id="cuNewDept" style="display:none">
+          <label class="form-label">Bereich</label>
+          <select class="form-select" id="newUserDept" style="width:100%">${deptOptions}</select>
         </div>
+        <div id="cuNewPos" style="display:none">
+          <label class="form-label">Position</label>
+          <input class="form-input" id="newUserPos" placeholder="z.B. Kellner, Koch..." style="width:100%">
+        </div>
+
         <div>
           <label class="form-label">Rolle</label>
           <select class="form-select" id="newUserRole" style="width:100%">
@@ -4809,136 +4840,96 @@ function openCreateUserModal() {
             <option value="inhaber">👑 Inhaber</option>
           </select>
         </div>
-        <div>
-          <label class="form-label">Standort *</label>
-          <select class="form-select" id="newUserLoc" style="width:100%">${locOptions}</select>
-        </div>
-        <div>
-          <label class="form-label">Bereich</label>
-          <select class="form-select" id="newUserDept" style="width:100%">${deptOptions}</select>
-        </div>
-        <div>
-          <label class="form-label">Position</label>
-          <input class="form-input" id="newUserPos" placeholder="z.B. Kellner, Koch..." style="width:100%">
-        </div>
       </div>
       <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
         <button class="btn btn-sm" onclick="document.getElementById('createUserModal').remove()">Abbrechen</button>
         <button class="btn btn-sm btn-success" onclick="createNewUser()" id="btnCreateUser" style="font-weight:600">
-          <span class="ms" style="font-size:16px">check</span> Anlegen
+          <span class="ms" style="font-size:16px">check</span> Freischalten
         </button>
       </div>
     </div>
   </div>`;
   document.body.appendChild(modal);
   requestAnimationFrame(() => modal.classList.add('show'));
-  document.getElementById('newUserName').focus();
+}
+
+function cuToggleEmpMode() {
+  const mode = document.querySelector('input[name="cuEmpMode"]:checked')?.value || 'existing';
+  const isNew = mode === 'new';
+  document.getElementById('cuExistingWrap').style.display = isNew ? 'none' : '';
+  ['cuNewName','cuNewLoc','cuNewDept','cuNewPos'].forEach(id => {
+    document.getElementById(id).style.display = isNew ? '' : 'none';
+  });
 }
 
 async function createNewUser() {
-  const name = document.getElementById('newUserName').value.trim();
-  const email = document.getElementById('newUserEmail').value.trim();
-  const pwd = document.getElementById('newUserPwd').value;
+  const email = document.getElementById('newUserEmail').value.trim().toLowerCase();
   const role = document.getElementById('newUserRole').value;
-  const loc = document.getElementById('newUserLoc').value;
-  const dept = document.getElementById('newUserDept').value;
-  const pos = document.getElementById('newUserPos').value.trim() || 'Mitarbeiter';
+  const empMode = document.querySelector('input[name="cuEmpMode"]:checked')?.value || 'existing';
 
-  if (!name) { toast('Bitte Name eingeben', 'err'); return; }
-  if (!email) { toast('Bitte E-Mail eingeben', 'err'); return; }
-  if (pwd.length < 6) { toast('Passwort muss min. 6 Zeichen haben', 'err'); return; }
+  if (!email || !email.includes('@')) { toast('Bitte gültige E-Mail eingeben', 'err'); return; }
 
   const btn = document.getElementById('btnCreateUser');
   btn.disabled = true;
-  btn.innerHTML = '<span class="ms spin" style="font-size:16px">progress_activity</span> Wird angelegt...';
+  btn.innerHTML = '<span class="ms spin" style="font-size:16px">progress_activity</span> Wird freigeschaltet...';
+  const resetBtn = () => { btn.disabled = false; btn.innerHTML = '<span class="ms" style="font-size:16px">check</span> Freischalten'; };
 
   try {
-    // 1. Create employee record first (no auth needed)
-    const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-    const newEmp = {
-      name: name,
-      location: loc,
-      dept: dept,
-      position: pos,
-      status: 'active',
-      start_date: isoDate(new Date()),
-      avatar: initials,
-      vac_total: 26, vac_used: 0, sick_days: 0,
-      late_count: 0, soll_stunden: 160, brutto_gehalt: 0,
-      schule_tage: 0, birthday: null, prob_end: null
-    };
-    const { data: empData, error: empErr } = await sb.from('employees').insert(newEmp).select().single();
-    if (empErr) { toast('Mitarbeiter-Fehler: ' + empErr.message, 'err'); btn.disabled = false; btn.innerHTML = '<span class="ms" style="font-size:16px">check</span> Anlegen'; return; }
+    // E-Mail darf nicht doppelt vergeben sein
+    const { data: dup } = await sb.from('user_profiles').select('user_id').ilike('reg_email', email).maybeSingle();
+    if (dup) { toast('Diese E-Mail ist bereits freigeschaltet.', 'err'); resetBtn(); return; }
 
-    // 2. Try to create Supabase Auth user
-    let uid = null;
-    const { data: authData, error: authErr } = await sb.auth.signUp({
-      email: email,
-      password: pwd,
-      options: { data: { display_name: name } }
-    });
+    let empId, name, loc;
 
-    if (authErr) {
-      if (authErr.message.toLowerCase().includes('rate limit') || authErr.message.toLowerCase().includes('email')) {
-        // Rate limit: create profile without auth_user_id, user can link later
-        console.warn('[Auth] Rate limit hit - creating profile without auth link');
-        uid = 'pending_' + Date.now();
-      } else {
-        // Real error
-        toast('Auth-Fehler: ' + authErr.message, 'err');
-        btn.disabled = false; btn.innerHTML = '<span class="ms" style="font-size:16px">check</span> Anlegen';
-        return;
-      }
+    if (empMode === 'existing') {
+      empId = parseInt(document.getElementById('newUserEmpSel').value, 10);
+      const emp = EMPS.find(e => e.id === empId);
+      if (!emp) { toast('Bitte Mitarbeiter auswählen', 'err'); resetBtn(); return; }
+      name = emp.name; loc = (emp.location || '').split(',')[0].trim() || 'origami';
     } else {
-      uid = authData.user?.id || ('pending_' + Date.now());
+      name = document.getElementById('newUserName').value.trim();
+      loc = document.getElementById('newUserLoc').value;
+      const dept = document.getElementById('newUserDept').value;
+      const pos = document.getElementById('newUserPos').value.trim() || 'Mitarbeiter';
+      if (!name) { toast('Bitte Name eingeben', 'err'); resetBtn(); return; }
+      const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+      const { data: empData, error: empErr } = await sb.from('employees').insert({
+        name, location: loc, dept, position: pos, status: 'active',
+        start_date: isoDate(new Date()), avatar: initials,
+        vac_total: 26, vac_used: 0, sick_days: 0, late_count: 0,
+        soll_stunden: 160, brutto_gehalt: 0, schule_tage: 0
+      }).select().single();
+      if (empErr) { toast('Mitarbeiter-Fehler: ' + empErr.message, 'err'); resetBtn(); return; }
+      empId = empData.id;
+      EMPS.push({ id: empId, name, location: loc, dept, position: pos, status: 'active',
+        start: isoDate(new Date()), avatar: initials, vacTotal: 26, vacUsed: 0,
+        sickDays: 0, lateCount: 0, sollStunden: 160, bruttoGehalt: 0, schuleTage: 0, birthday: '', probEnd: '' });
     }
 
-    // 3. Create user_profile
+    // Einladung: Profil OHNE auth_user_id (wird beim ersten Login per E-Mail beansprucht)
+    const emp = EMPS.find(e => e.id === empId);
+    const initials = (name || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const uid = 'invite_' + email.replace(/[^a-z0-9]/g, '').slice(0, 16) + '_' + Date.now().toString(36);
     const profile = {
-      user_id: uid,
-      name: name,
-      role: role,
-      location: loc,
-      status: 'active',
-      emp_id: empData.id,
-      avatar: initials,
-      reg_email: email,
-      reg_position: pos
+      user_id: uid, auth_user_id: null, name, role, location: emp?.location || loc,
+      status: 'active', emp_id: empId, avatar: initials, reg_email: email
     };
     const { error: profErr } = await sb.from('user_profiles').insert(profile);
-    if (profErr) { toast('Profil-Fehler: ' + profErr.message, 'err'); btn.disabled = false; btn.textContent = 'Anlegen'; return; }
+    if (profErr) { toast('Profil-Fehler: ' + profErr.message, 'err'); resetBtn(); return; }
 
-    // 4. Update local data
-    EMPS.push({
-      id: empData.id, name, location: loc, dept, position: pos,
-      status: 'active', start: isoDate(new Date()), avatar: initials,
-      vacTotal: 26, vacUsed: 0, sickDays: 0, lateCount: 0,
-      sollStunden: 160, bruttoGehalt: 0, schuleTage: 0,
-      birthday: '', probEnd: ''
-    });
-    USERS.push({
-      id: uid, name, role, location: loc, status: 'active',
-      empId: empData.id, avatar: initials, regEmail: email,
-      regPosition: pos
-    });
+    USERS.push({ id: uid, name, role, location: emp?.location || loc, status: 'active',
+      empId, avatar: initials, regEmail: email });
 
     document.getElementById('createUserModal').remove();
-
-    const isPending = uid.startsWith('pending_');
-    if (isPending) {
-      toast(`✓ ${name} als Mitarbeiter angelegt! ⚠️ E-Mail-Limit: Bitte morgen nochmal anlegen ODER ${name} soll sich selbst registrieren.`, 'warn');
-    } else {
-      toast(`✓ ${name} wurde angelegt! Login: ${email}`, 'success');
-    }
-    addNotif('info', 'Neuer Benutzer', `${name} (${email}) wurde als ${role} angelegt`);
+    toast(`✓ Zugang freigeschaltet für ${email}. Login per Google oder Registrierung mit dieser E-Mail.`, 'success');
+    addNotif('info', 'Zugang freigeschaltet', `${name} (${email}) – ${role}`);
     renderAccess();
     updateBadges();
 
   } catch (e) {
     console.error('[CreateUser]', e);
-    toast('Fehler beim Anlegen: ' + e.message, 'err');
-    btn.disabled = false;
-    btn.textContent = 'Anlegen';
+    toast('Fehler: ' + e.message, 'err');
+    resetBtn();
   }
 }
 

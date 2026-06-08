@@ -215,7 +215,30 @@ async function doRegister() {
       return;
     }
 
-    // 2. Create user profile with status='pending'
+    // 2. Vorautorisierte Einladung per E-Mail beanspruchen?
+    const { data: invite } = await sb.from('user_profiles')
+      .select('*').ilike('reg_email', email.toLowerCase()).is('auth_user_id', null).maybeSingle();
+
+    if (invite) {
+      await sb.from('user_profiles')
+        .update({ auth_user_id: authData.user.id, status: 'active' })
+        .eq('user_id', invite.user_id);
+      console.log('[Auth] ✓ Einladung beansprucht (Registrierung):', email);
+      if (authData.session) {
+        location.reload();   // direkt eingeloggt → App via Session-Check laden
+        return;
+      }
+      // E-Mail-Bestätigung nötig
+      await sb.auth.signOut().catch(() => {});
+      loginError.textContent = 'Konto erstellt. Bitte E-Mail bestätigen und dann einloggen.';
+      loginError.style.color = 'var(--success)';
+      loginError.style.display = 'block';
+      if (typeof switchLoginMode === 'function') switchLoginMode('supabase');
+      regBtn.disabled = false; regBtn.textContent = 'Konto erstellen';
+      return;
+    }
+
+    // 3. Keine Einladung → pending Profil (Admin verknüpft später)
     const avatar = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
     const userId = 'emp_' + name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
 
@@ -238,10 +261,9 @@ async function doRegister() {
       console.warn('[Auth] Profile creation error:', profError.message);
     }
 
-    // 3. Sign out (don't auto-login) and show pending screen
+    // Sign out (don't auto-login) and show pending screen
     await sb.auth.signOut();
 
-    // Show pending confirmation
     document.getElementById('loginSupabase').style.display = 'none';
     document.getElementById('loginRegister').style.display = 'none';
     document.getElementById('loginPending').style.display = 'block';
@@ -327,67 +349,47 @@ async function checkExistingSession() {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (session) {
-      const { data: profile } = await sb
+      let { data: profile } = await sb
         .from('user_profiles')
         .select('*')
         .eq('auth_user_id', session.user.id)
         .maybeSingle();
 
-      // No profile found — auto-create for Google OAuth users
+      // Kein verknüpftes Profil → versuche, ein vom Admin VORAUTORISIERTES
+      // Profil per E-Mail zu beanspruchen (Einladung). KEIN automatisches
+      // Anlegen eines Mitarbeiters mehr.
       if (!profile) {
         const user = session.user;
-        const isGoogle = user.app_metadata?.provider === 'google' || user.identities?.some(i => i.provider === 'google');
-
-        if (isGoogle) {
-          // Extract name from Google metadata
-          const googleName = user.user_metadata?.full_name || user.user_metadata?.name || user.email.split('@')[0];
-          const avatar = googleName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-          const userId = 'google_' + googleName.toLowerCase().replace(/[^a-z]/g, '').slice(0, 10) + '_' + Date.now().toString(36);
-
-          // First create employee entry (id is auto-increment)
-          const newEmp = {
-            name: googleName,
-            position: 'Neu',
-            dept: 'Service',
-            location: 'origami',
-            status: 'inactive',
-            start_date: new Date().toISOString().slice(0, 10),
-            avatar: avatar,
-            vac_total: 26,
-            vac_used: 0,
-            sick_days: 0,
-            late_count: 0
-          };
-
-          const { data: empData, error: empErr } = await sb.from('employees').insert(newEmp).select('id').single();
-          if (empErr) console.error('[Auth] Employee create error:', empErr);
-
-          const empId = empData?.id || null;
-
-          // Create user_profiles entry
-          const newProfile = {
-            user_id: userId,
-            auth_user_id: user.id,
-            name: googleName,
-            role: 'mitarbeiter',
-            location: 'origami',
-            avatar: avatar,
-            emp_id: empId
-          };
-
-          const { error: profErr } = await sb.from('user_profiles').insert(newProfile);
-          if (profErr) console.error('[Auth] Profile create error:', profErr);
-
-          console.log('[Auth] ✓ Google user auto-registered:', googleName, '(pending, emp_id:', empId, ')');
+        const email = (user.email || '').trim().toLowerCase();
+        let claimed = null;
+        if (email) {
+          const { data: preauth } = await sb.from('user_profiles')
+            .select('*').ilike('reg_email', email).is('auth_user_id', null).maybeSingle();
+          if (preauth) {
+            const { error: claimErr } = await sb.from('user_profiles')
+              .update({ auth_user_id: user.id, status: 'active' })
+              .eq('user_id', preauth.user_id);
+            if (!claimErr) {
+              claimed = { ...preauth, auth_user_id: user.id, status: 'active' };
+              console.log('[Auth] ✓ Zugang per E-Mail beansprucht:', email);
+            }
+          }
         }
-
-        // Show pending screen
-        hideLoading();
-        document.getElementById('loginSupabase').style.display = 'none';
-        document.getElementById('loginRegister').style.display = 'none';
-        document.getElementById('loginPending').style.display = 'block';
-        document.querySelector('.login-tabs').style.display = 'none';
-        return true; // Prevent showing login form
+        if (claimed) {
+          profile = claimed; // weiter mit normalem Login unten
+        } else {
+          // Nicht freigeschaltet → abmelden + Hinweis (kein Auto-Anlegen)
+          hideLoading();
+          await sb.auth.signOut();
+          document.getElementById('loginScreen').classList.remove('hidden');
+          document.getElementById('app').classList.add('hidden');
+          const le = document.getElementById('loginError');
+          if (le) {
+            le.textContent = 'Diese E-Mail ist nicht freigeschaltet. Bitte den Admin kontaktieren.';
+            le.style.display = 'block';
+          }
+          return true; // Login-Formular bleibt sichtbar
+        }
       }
 
       // Profile exists — check if employee is still inactive (pending approval)
