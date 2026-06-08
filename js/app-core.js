@@ -4667,7 +4667,7 @@ function renderAccess(){
         : '<span style="color:var(--text-muted);font-size:.75rem">—</span>')
       : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
     const deptCell = emp ? `<div style="cursor:pointer;min-width:100px" onclick="openDeptPicker('${u.id}')" title="Klicke zum Ändern">${deptTags}</div>` : deptTags;
-    const emailInfo = u.regEmail ? `<div style="font-size:.72rem;color:var(--text-muted);margin-top:2px" title="${u.regEmail}">📧 ${u.regEmail}</div>` : '';
+    const emailInfo = `<input class="form-input" style="width:190px;font-size:.72rem;padding:3px 7px;margin-top:3px" value="${(u.regEmail||'').replace(/"/g,'&quot;')}" placeholder="📧 + Login-E-Mail" title="E-Mail für Login (Google oder Registrierung)" onblur="saveUserEmail('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()">`;
     const linkInfo = `<div style="font-size:.72rem;margin-top:2px;color:${emp?'var(--text-muted)':'var(--danger)'}">👤 ${emp?emp.name:'⚠️ nicht verknüpft'}</div>`;
     const googleBadge = u.regEmail?.includes('gmail') || u.bannerUrl ? '<span style="font-size:.68rem;background:var(--bg-input);padding:1px 6px;border-radius:4px;color:var(--text-muted);margin-left:4px">Google</span>' : '';
     return `<tr>
@@ -4769,6 +4769,27 @@ async function saveEmpLink(userId, empId){
     toast(`✓ ${u.name} → ${emp ? emp.name : 'keine Verknüpfung'}`, 'success');
     const m = document.getElementById('empLinkModal'); if (m) m.remove();
     renderAccess();
+  } catch(e) { toast('Fehler: ' + e.message, 'err'); }
+}
+
+// ═══ LOGIN-E-MAIL pro Konto setzen (Vorautorisierung) ═══
+async function saveUserEmail(userId, email){
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+  email = (email || '').trim().toLowerCase();
+  if (email === (u.regEmail || '').toLowerCase()) return; // keine Änderung
+  if (email && !email.includes('@')) { toast('Ungültige E-Mail', 'err'); return; }
+  try {
+    if (email) {
+      const { data: dup } = await sb.from('user_profiles')
+        .select('user_id').ilike('reg_email', email).neq('user_id', userId).maybeSingle();
+      if (dup) { toast('Diese E-Mail ist bereits vergeben', 'err'); renderAccess(); return; }
+    }
+    const { error } = await sb.from('user_profiles')
+      .update({ reg_email: email || null }).eq('user_id', userId);
+    if (error) { toast('Fehler: ' + error.message, 'err'); return; }
+    u.regEmail = email;
+    toast(email ? `✓ Login-E-Mail: ${email}` : '✓ E-Mail entfernt', 'success');
   } catch(e) { toast('Fehler: ' + e.message, 'err'); }
 }
 
