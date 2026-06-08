@@ -3098,8 +3098,10 @@ async function renderEmpLohnabrechnung(empId, empName) {
 
     // Get distinct betriebe for this employee
     const betriebe = [...new Set(data.map(d => d.betrieb))].sort();
-    // Latest month
-    const latestMonat = data[0].monat;
+    // Latest month — GehaltsManager speichert "Mär 2026" (kein ISO!),
+    // daher chronologisch über gehaltMonatKey sortieren statt alphabetisch.
+    const latestMonat = data.reduce((best, d) =>
+      gehaltMonatKey(d.monat) > gehaltMonatKey(best) ? d.monat : best, data[0].monat);
     const latestData  = data.filter(d => d.monat === latestMonat);
 
     // ── Betrieb color map ─────────────────────────────
@@ -3120,10 +3122,7 @@ async function renderEmpLohnabrechnung(empId, empName) {
     const totalNetto  = latestData.reduce((s,d) => s + (d.netto||0), 0);
     const totalUeb    = latestData.reduce((s,d) => s + (d.ueberweisung||0), 0);
     const totalBar    = latestData.reduce((s,d) => s + (d.bar_tg||0), 0);
-    const monatLabel  = (() => {
-      const [y,m] = latestMonat.split('-');
-      return new Date(+y, +m-1, 1).toLocaleDateString('de-DE', {month:'long', year:'numeric'});
-    })();
+    const monatLabel  = latestMonat;  // bereits menschenlesbar, z.B. "Mär 2026"
 
     // Build salary cards (1 or 2+ betriebe)
     const cardsHtml = latestData.map((d, i) => {
@@ -3175,11 +3174,12 @@ async function renderEmpLohnabrechnung(empId, empName) {
       </div>` : '';
 
     // ── Monthly history table (last 6 months, all betriebe) ──
-    const months = [...new Set(data.map(d => d.monat))].slice(0, 6);
+    const months = [...new Set(data.map(d => d.monat))]
+      .sort((a, b) => gehaltMonatKey(b) - gehaltMonatKey(a))
+      .slice(0, 6);
     const histRows = months.flatMap(m => {
       const mData = data.filter(d => d.monat === m);
-      const [y, mo] = m.split('-');
-      const mLabel = new Date(+y, +mo-1, 1).toLocaleDateString('de-DE', {month:'short', year:'2-digit'});
+      const mLabel = m;  // bereits "Mär 2026"
       return mData.map((d, i) => {
         const c = getColor(d.betrieb);
         const isFirst = i === 0;
