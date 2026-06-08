@@ -3135,7 +3135,6 @@ async function renderEmpLohnabrechnung(empId, empName) {
             <span style="background:${c.badge};color:#fff;font-size:.68rem;padding:2px 8px;border-radius:5px;font-weight:700">${d.betrieb}</span>
             <span style="font-size:.7rem;color:var(--text-muted)">${monatLabel}</span>
           </div>
-          ${d.pers_nr ? `<div style="font-size:.66rem;color:var(--text-muted);margin-bottom:8px">Pers-Nr: <strong style="font-family:'Space Mono',monospace;color:var(--text-secondary)">${d.pers_nr}</strong></div>` : ''}
           <div style="margin-bottom:6px">
             <div style="font-size:.68rem;color:var(--text-muted);margin-bottom:1px">Brutto</div>
             <div style="font-family:'Space Mono',monospace;font-weight:800;font-size:1.05rem;color:var(--text-primary)">${formatEuro(d.brutto||0)}</div>
