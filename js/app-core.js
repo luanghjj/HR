@@ -171,6 +171,38 @@ function setBottomNavActive(page){
   document.querySelectorAll('.bnav-item').forEach(b=>
     b.classList.toggle('active', b.dataset.page===page));
 }
+
+// ═══ BERECHTIGUNGEN LIVE NACHLADEN (ohne erneutes Login) ═══
+// Lädt die Permissions des aktuellen Users neu und baut UI nur dann neu,
+// wenn sich etwas geändert hat. Wird beim Tab-Fokus + nach eigenem Speichern
+// aufgerufen.
+async function reloadPermissions(){
+  if(!currentUser || typeof loadUserPermissions !== 'function') return;
+  const before = JSON.stringify({
+    m: currentUser._permMode,
+    p: currentUser._customPerms,
+    l: currentUser._allowedLocations,
+    d: currentUser._allowedDepts
+  });
+  await loadUserPermissions();
+  const after = JSON.stringify({
+    m: currentUser._permMode,
+    p: currentUser._customPerms,
+    l: currentUser._allowedLocations,
+    d: currentUser._allowedDepts
+  });
+  if(before !== after){
+    buildSidebar();
+    try { buildLocationSelect(); } catch(_){}
+    renderPage(getCurrentPage());
+    toast('Berechtigungen aktualisiert', 'info');
+  }
+}
+
+// Beim Zurückkehren zum Tab Berechtigungen auffrischen
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden && currentUser) reloadPermissions();
+});
 function renderPage(p){
   const c=document.getElementById('contentArea');
 
@@ -5655,6 +5687,8 @@ async function savePermissions(userId) {
 
   closeModal();
   toast('Berechtigungen gespeichert ✓', 'success');
+  // Wenn der Admin seine EIGENEN Rechte geändert hat → sofort neu laden
+  if (userId === currentUser?.id) reloadPermissions();
 }
 
 // ═══ NOTIFICATIONS ═══
