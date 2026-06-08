@@ -725,7 +725,7 @@ function renderDashboard(){
         </div>
       </div>
 
-      ${can('seeFinancials')?`
+      ${(SHOW_SALARY && can('seeFinancials'))?`
       <!-- Financial + Shifts Bento -->
       <div class="dash-bento">
         <div class="dash-bento-main">
@@ -862,7 +862,7 @@ function renderDashboard(){
       </div>
       `:``}
 
-      ${!can('seeFinancials')?`
+      ${!(SHOW_SALARY && can('seeFinancials'))?`
       <div class="dash-bento">
         <div class="dash-bento-main">
           <div class="dash-card">
@@ -1005,7 +1005,7 @@ function renderDashboard(){
     document.getElementById('dashAttendance').innerHTML = attHtml;
 
     // Auto-load Zahlungsübersicht (nur seeFinancials)
-    if (can('seeFinancials')) {
+    if (SHOW_SALARY && can('seeFinancials')) {
       const curM = new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0');
       setTimeout(() => renderDashPayOverview(curM), 200);
     }
@@ -1083,7 +1083,7 @@ function renderEmployees(){
   if(!can('seeAllEmployees') && !can('seeOwnDetail')){pg.innerHTML=permBanner('Mitarbeiter-Ansicht ist nur für Manager und Inhaber verfügbar.');return;}
   const isOwnOnly = !can('seeAllEmployees') && can('seeOwnDetail');
   const emps = isOwnOnly ? EMPS.filter(e=>e.id===currentUser.empId) : getVisibleEmps();
-  const isAdmin = currentUser?._permMode === 'custom' ? can('seeFinancials') : (can('seeFinancials') || currentUser?.role === 'manager');
+  const isAdmin = SHOW_SALARY && (currentUser?._permMode === 'custom' ? can('seeFinancials') : (can('seeFinancials') || currentUser?.role === 'manager'));
   const todayStr=isoDate(new Date());
   const empIds=new Set(emps.map(e=>e.id));
   const onVac=VACS.filter(v=>empIds.has(v.empId)&&v.status==='approved'&&v.from<=todayStr&&v.to>=todayStr).length;
@@ -1259,7 +1259,7 @@ function renderEmployees(){
 }
 
 function renderEmpRows(emps){
-  const isAdmin = currentUser?._permMode === 'custom' ? can('seeFinancials') : (can('seeFinancials') || currentUser?.role === 'manager');
+  const isAdmin = SHOW_SALARY && (currentUser?._permMode === 'custom' ? can('seeFinancials') : (can('seeFinancials') || currentUser?.role === 'manager'));
   const _ys1=isoDate(new Date(new Date().getFullYear(),0,1));
   const DEPT_COLORS={'Küche':'#10b981','Service':'#3b4fd2','Bar':'#f97316','Sushi':'#8b5cf6','Ausbildung':'#a29bfe','Verwaltung':'#e11d48'};
   const canEditDept = can('editEmployees');
@@ -1516,7 +1516,7 @@ function viewEmp(id){
   const isOwnProfile = currentUser.empId === id;
   const canEdit = can('editEmployees');
   const showZeit = can('seeZeiterfassung');
-  const isAdmin = can('seeFinancials');
+  const isAdmin = SHOW_SALARY && can('seeFinancials');
   const ro = canEdit ? '' : 'disabled';
 
   const ev=VACS.filter(v=>v.empId===id),es=SICKS.filter(s=>s.empId===id),ed=DOCS.filter(d=>d.empId===id);
@@ -3172,7 +3172,7 @@ function renderDepts(){
   const pg=document.getElementById('page-departments');
   if(!can('seeAllEmployees')){pg.innerHTML=permBanner('Bereichsübersicht ist nur für Manager und Inhaber verfügbar.');return;}
   const _uLoc=currentUser.location;const _isAll=_uLoc==='all';const depts=_isAll?(currentLocation==='all'?DEPTS:deptsForLocation(currentLocation)):deptsForLocation(_uLoc);
-  const isAdmin=can('seeFinancials');
+  const isAdmin=SHOW_SALARY && can('seeFinancials');
   const today=isoDate(new Date());
 
   let html=`
@@ -5727,7 +5727,7 @@ function openModal(type, bodyHtml, footerHtml){
 
   if(type==='addEmployee'){
     t.textContent='Neuen Mitarbeiter';
-    const adm=can('seeFinancials');
+    const adm=SHOW_SALARY && can('seeFinancials');
     const _defLoc=currentLocation!=='all'?currentLocation:(currentUser.location!=='all'?currentUser.location.split(',')[0]:'');
     b.innerHTML=`<div class="form-grid"><div class="form-group"><label class="form-label">Vorname</label><input class="form-input" id="mF"></div><div class="form-group"><label class="form-label">Nachname</label><input class="form-input" id="mL"></div><div class="form-group"><label class="form-label">Standort</label><select class="form-select" id="mLoc">${LOCS.map(l=>`<option value="${l.id}"${l.id===_defLoc?' selected':''}>${l.name}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Bereich</label><select class="form-select" id="mDpt">${[...new Set(DEPTS.map(d=>d.name))].sort().map(d=>`<option>${d}</option>`).join('')}</select></div><div class="form-group"><label class="form-label">Position</label><input class="form-input" id="mPos"></div><div class="form-group"><label class="form-label">Geburtstag</label><input class="form-input" type="date" id="mBday"></div><div class="form-group"><label class="form-label">Urlaubstage / Jahr</label><input class="form-input" type="number" id="mVT" value="26"></div>
     ${adm?`<div class="form-group"><label class="form-label">Soll-Stunden / Monat</label><input class="form-input" type="number" id="mSollH" value="160"></div>
@@ -5863,7 +5863,7 @@ function filterShiftEmps(){
 }
 function applyTmpl(){const i=document.getElementById('mST').value;if(i!==''){document.getElementById('mSF').value=SHIFT_TEMPLATES[i].from;document.getElementById('mSTo').value=SHIFT_TEMPLATES[i].to;}}
 function saveEmp(){const f=document.getElementById('mF').value.trim(),l=document.getElementById('mL').value.trim();if(!f||!l)return;
-  const adm=can('seeFinancials');
+  const adm=SHOW_SALARY && can('seeFinancials');
   EMPS.push({id:Date.now(),name:f+' '+l,location:document.getElementById('mLoc').value,dept:document.getElementById('mDpt').value,position:document.getElementById('mPos').value||'Mitarbeiter',status:'active',start:isoDate(new Date()),avatar:f[0]+l[0],vacTotal:parseInt(document.getElementById('mVT').value)||26,vacUsed:0,sickDays:0,lateCount:0,
     sollStunden:adm?parseInt(document.getElementById('mSollH')?.value)||160:160,
     bruttoGehalt:adm?parseFloat(document.getElementById('mBrutto')?.value)||0:0,
@@ -6362,7 +6362,7 @@ function renderReports(){
   const pg=document.getElementById('page-reports');
   if(!can('seeAllEmployees')){pg.innerHTML=permBanner('Berichte sind nur für Manager und Inhaber verfügbar.');return;}
   const emps=getVisibleEmps();
-  const isAdmin=can('seeFinancials');
+  const isAdmin=SHOW_SALARY && can('seeFinancials');
 
   // ─── Data calculations (unchanged logic) ───
   const statusCount={active:0,vacation:0,sick:0};emps.forEach(e=>{statusCount[e.status]=(statusCount[e.status]||0)+1;});
@@ -6622,7 +6622,7 @@ function renderReports(){
 }
 
 function exportReport(){
-  const emps=getVisibleEmps();const isAdmin=can('seeFinancials');
+  const emps=getVisibleEmps();const isAdmin=SHOW_SALARY && can('seeFinancials');
   const w=window.open('','_blank');
   const totalBrutto=emps.reduce((s,e)=>s+e.bruttoGehalt,0);
   let rows=emps.map(e=>`<tr><td>${e.name}</td><td>${getLocationName(e.location)}</td><td>${e.dept}</td><td>${e.position}</td><td>${e.vacTotal-e.vacUsed}</td><td>${e.sickDays}</td><td>${e.lateCount}</td>${isAdmin?`<td>${e.sollStunden}h</td><td>${formatEuro(e.bruttoGehalt)}</td><td>${formatEuro(calcHourly(e))}</td>`:''}</tr>`).join('');

@@ -5,6 +5,18 @@
 const SUPABASE_URL = 'https://zkxsyipyjqikqxswpbks.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpreHN5aXB5anFpa3F4c3dwYmtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MzgxOTMsImV4cCI6MjA5MTIxNDE5M30.oodwUnavIkmHS6W08OwpAoxxFoBPcJ6ZOizOQkaE5PY';
 
+// ═══════════════════════════════════════════════════════════
+// Feature-Flag: Gehalt/Lohn-Anzeige
+// ───────────────────────────────────────────────────────────
+// false  → ALLE Geld-/Lohn-Bereiche werden in der App ausgeblendet
+//          (Lohnabrechnung, Gehalt, Gehaltshistorie, Zahlungsstatus,
+//           Steuerberater-Export, Gehaltsspalten in der Mitarbeitertabelle,
+//           Finanz-Kacheln im Dashboard).
+//          Daten & GehaltsManager-Anbindung bleiben UNVERÄNDERT —
+//          nur die Anzeige ist deaktiviert. Zum Wiedereinschalten: true.
+// ═══════════════════════════════════════════════════════════
+const SHOW_SALARY = false;
+
 // German locale constants
 const DAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const MONTHS_DE = [
