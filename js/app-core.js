@@ -1258,7 +1258,62 @@ function renderEmployees(){
   renderEmpRows(emps);
 }
 
+/**
+ * Gruppiert Mitarbeiter mit gleichem (normalisierten) Namen zu EINEM
+ * repräsentativen Eintrag. Standorte aller Duplikate werden zusammengeführt.
+ * Dient nur der Anzeige – die Datenbank bleibt unverändert.
+ * @param {Array} emps – flache EMPS-Liste
+ * @returns {Array} – gruppierte Liste (eine Zeile pro Person)
+ */
+function groupEmpsByName(emps) {
+  if (!GROUP_EMPLOYEES) return emps;
+  const norm = s => (s || '').toLowerCase().replace(/[^a-zäöüß]/g, '');
+  const map = new Map();
+  emps.forEach(e => {
+    const k = norm(e.name);
+    if (!map.has(k)) { map.set(k, []); }
+    map.get(k).push(e);
+  });
+  return [...map.values()].map(group => {
+    if (group.length === 1) return group[0];
+    // Pick primary: prefer the one with dept set, then most complete data
+    const primary = group.reduce((best, e) => {
+      const score = (e.dept && e.dept !== '—' ? 10 : 0)
+        + (e.position && e.position !== '—' ? 5 : 0)
+        + ((e.location || '').includes(',') ? 3 : 0)
+        + (e.status === 'active' ? 2 : 0);
+      const bestScore = (best.dept && best.dept !== '—' ? 10 : 0)
+        + (best.position && best.position !== '—' ? 5 : 0)
+        + ((best.location || '').includes(',') ? 3 : 0)
+        + (best.status === 'active' ? 2 : 0);
+      return score > bestScore ? e : best;
+    }, group[0]);
+    // Union all locations
+    const allLocs = [...new Set(
+      group.flatMap(e => (e.location || '').split(',').map(l => l.trim()).filter(Boolean))
+    )];
+    // Union depts (for display purposes)
+    const allDepts = [...new Set(group.map(e => e.dept).filter(d => d && d !== '—'))];
+    // Create a shallow clone so we don't mutate EMPS
+    const merged = Object.assign({}, primary);
+    merged.location = allLocs.join(',') || primary.location;
+    if (allDepts.length > 1) merged._allDepts = allDepts;
+    // Sum vacation/sick/late across all records
+    merged.vacTotal = group.reduce((s, e) => Math.max(s, e.vacTotal || 0), 0);
+    merged.vacUsed = group.reduce((s, e) => s + (e.vacUsed || 0), 0);
+    merged.sickDays = group.reduce((s, e) => s + (e.sickDays || 0), 0);
+    merged.lateCount = group.reduce((s, e) => s + (e.lateCount || 0), 0);
+    // Store all IDs for reference
+    merged._groupIds = group.map(e => e.id);
+    merged._groupCount = group.length;
+    return merged;
+  });
+}
+
 function renderEmpRows(emps){
+  // Gruppierung: Duplikate (gleicher Name) → 1 Zeile
+  emps = groupEmpsByName(emps);
+
   const isAdmin = SHOW_SALARY && (currentUser?._permMode === 'custom' ? can('seeFinancials') : (can('seeFinancials') || currentUser?.role === 'manager'));
   const _ys1=isoDate(new Date(new Date().getFullYear(),0,1));
   const DEPT_COLORS={'Küche':'#10b981','Service':'#3b4fd2','Bar':'#f97316','Sushi':'#8b5cf6','Ausbildung':'#a29bfe','Verwaltung':'#e11d48'};
@@ -1274,15 +1329,13 @@ function renderEmpRows(emps){
   };
   const locBadges = (location) => (location||'').split(',').map(locBadge).join(' ');
 
-  // Duplikat-Warnung: count records per normalized name
-  const _nameCount = {};
-  emps.forEach(e => { const k = (e.name||'').toLowerCase().replace(/[^a-zäöü]/g,''); _nameCount[k] = (_nameCount[k]||0)+1; });
+  // Duplikat-Info: dùng _groupCount từ groupEmpsByName (nếu có)
 
   document.getElementById('empTB').innerHTML=emps.map(e=>{
     const vr=e.vacTotal-e.vacUsed;
-    const pl=VACS.filter(v=>v.empId===e.id&&(v.status==='approved'||v.status==='pending')&&v.from>=_ys1).reduce((s,v)=>s+v.days,0);
+    const pl=VACS.filter(v=>(e._groupIds||[e.id]).some(gid=>v.empId===gid)&&(v.status==='approved'||v.status==='pending')&&v.from>=_ys1).reduce((s,v)=>s+v.days,0);
     const vacRemain=vr-pl;const vacUsedPct=e.vacTotal>0?Math.round(pl/e.vacTotal*100):0;
-    const planH=calcPlanHours(e.id);const hourly=calcHourly(e);
+    const planH=(e._groupIds||[e.id]).reduce((s,gid)=>s+calcPlanHours(gid),0);const hourly=calcHourly(e);
     const sollDiff=e.sollStunden>0?planH-e.sollStunden:0;
     const sollColor=sollDiff>=0?'var(--success)':sollDiff>=-10?'var(--warning)':'var(--danger)';
     const initials=e.name.split(' ').map(n=>n[0]).join('').substring(0,2);
@@ -1313,7 +1366,7 @@ function renderEmpRows(emps){
       </td>
       <td data-col="standort">
         <div style="display:flex;flex-wrap:wrap;gap:3px">${locBadges(e.location)}</div>
-        ${(() => { const k=(e.name||'').toLowerCase().replace(/[^a-zäöü]/g,''); return _nameCount[k]>1 ? `<div style="font-size:.6rem;color:var(--warning);margin-top:2px">⚠️ ${_nameCount[k]} Einträge</div>` : ''; })()}
+        ${e._groupCount > 1 ? `<div style="font-size:.6rem;color:var(--text-muted);margin-top:2px">📋 ${e._groupCount} Einträge zusammengefasst</div>` : ''}
         ${canEditDept
           ? `<select onchange="updateEmpText(${e.id},'dept',this.value)" onclick="event.stopPropagation()" title="Bereich zuweisen"
                style="font-size:.7rem;padding:2px 4px;margin-top:3px;border-radius:5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);max-width:130px;cursor:pointer">

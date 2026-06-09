@@ -17,6 +17,16 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // ═══════════════════════════════════════════════════════════
 const SHOW_SALARY = false;
 
+// ═══════════════════════════════════════════════════════════
+// Feature-Flag: Mitarbeiter-Gruppierung (optische Zusammenfassung)
+// ───────────────────────────────────────────────────────────
+// true  → Duplikate (gleicher Name) werden in der Mitarbeiterliste als
+//          EINE Zeile dargestellt, mit allen Standorten zusammengefasst.
+//          Datenbank bleibt unverändert (nur Anzeige).
+// false → Jeder DB-Record = eine eigene Zeile (alter Modus).
+// ═══════════════════════════════════════════════════════════
+const GROUP_EMPLOYEES = true;
+
 // German locale constants
 const DAYS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 const MONTHS_DE = [
