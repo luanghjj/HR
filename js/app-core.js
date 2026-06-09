@@ -1264,6 +1264,20 @@ function renderEmpRows(emps){
   const DEPT_COLORS={'Küche':'#10b981','Service':'#3b4fd2','Bar':'#f97316','Sushi':'#8b5cf6','Ausbildung':'#a29bfe','Verwaltung':'#e11d48'};
   const canEditDept = can('editEmployees');
   const BEREICH_OPTS = [...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung', ...DEPTS.map(d=>d.name)].filter(Boolean))];
+
+  // Badge-Farben pro Standort
+  const LOC_BADGE_COLORS = {origami:'#6366f1',enso:'#d97706',okyu:'#dc2626',omoistuttgart:'#059669'};
+  const locBadge = (locId) => {
+    const name = (LOCS.find(l=>l.id===locId.trim())||{}).name || locId.trim();
+    const color = LOC_BADGE_COLORS[locId.trim()] || '#6b7280';
+    return `<span style="display:inline-block;font-size:.62rem;font-weight:700;padding:1px 6px;border-radius:4px;background:${color}15;color:${color};border:1px solid ${color}30;white-space:nowrap">${name}</span>`;
+  };
+  const locBadges = (location) => (location||'').split(',').map(locBadge).join(' ');
+
+  // Duplikat-Warnung: count records per normalized name
+  const _nameCount = {};
+  emps.forEach(e => { const k = (e.name||'').toLowerCase().replace(/[^a-zäöü]/g,''); _nameCount[k] = (_nameCount[k]||0)+1; });
+
   document.getElementById('empTB').innerHTML=emps.map(e=>{
     const vr=e.vacTotal-e.vacUsed;
     const pl=VACS.filter(v=>v.empId===e.id&&(v.status==='approved'||v.status==='pending')&&v.from>=_ys1).reduce((s,v)=>s+v.days,0);
@@ -1298,7 +1312,8 @@ function renderEmpRows(emps){
         </div>
       </td>
       <td data-col="standort">
-        <div class="mit-loc-main">${getLocationName(e.location)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:3px">${locBadges(e.location)}</div>
+        ${(() => { const k=(e.name||'').toLowerCase().replace(/[^a-zäöü]/g,''); return _nameCount[k]>1 ? `<div style="font-size:.6rem;color:var(--warning);margin-top:2px">⚠️ ${_nameCount[k]} Einträge</div>` : ''; })()}
         ${canEditDept
           ? `<select onchange="updateEmpText(${e.id},'dept',this.value)" onclick="event.stopPropagation()" title="Bereich zuweisen"
                style="font-size:.7rem;padding:2px 4px;margin-top:3px;border-radius:5px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);max-width:130px;cursor:pointer">
@@ -1624,12 +1639,18 @@ function viewEmp(id){
           ? (() => {
               const eLocs = (e.location || '').split(',').map(l => l.trim()).filter(Boolean);
               const isAllL = eLocs.includes('all');
+              const _LC = {origami:'#6366f1',enso:'#d97706',okyu:'#dc2626',omoistuttgart:'#059669'};
               const tags = isAllL
                 ? '<span style="font-size:.72rem;background:rgba(217,119,6,.1);color:#d97706;padding:2px 8px;border-radius:8px">Alle</span>'
-                : eLocs.map(lid => `<span style="font-size:.72rem;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:8px;margin:1px 2px">${getLocationName(lid)}</span>`).join('');
+                : eLocs.map(lid => { const c=_LC[lid]||'#6b7280'; return `<span style="font-size:.72rem;background:${c}15;color:${c};border:1px solid ${c}30;padding:2px 8px;border-radius:8px;margin:1px 2px;font-weight:600">${getLocationName(lid)}</span>`; }).join('');
               return `<div style="cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:7px 10px;min-height:36px" onclick="openEmpLocPicker(${e.id})" title="Klicke zum Ändern">${tags}</div>`;
             })()
-          : `<div style="padding:7px 0;color:var(--text-muted)">${getLocationName(e.location)}</div>`
+          : (() => {
+              const eLocs = (e.location || '').split(',').map(l => l.trim()).filter(Boolean);
+              const _LC = {origami:'#6366f1',enso:'#d97706',okyu:'#dc2626',omoistuttgart:'#059669'};
+              const tags = eLocs.map(lid => { const c=_LC[lid]||'#6b7280'; return `<span style="font-size:.72rem;background:${c}15;color:${c};border:1px solid ${c}30;padding:2px 8px;border-radius:8px;margin:1px 2px;font-weight:600">${getLocationName(lid)}</span>`; }).join(' ');
+              return `<div style="padding:7px 0;display:flex;flex-wrap:wrap;gap:3px">${tags}</div>`;
+            })()
         }
       </div>
       <div class="form-group"><div class="form-label">Bereich</div>
