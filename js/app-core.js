@@ -1488,12 +1488,61 @@ function renderEmpRows(emps){
       <td data-col="actions">
         <div class="mit-actions">
           ${can('markLate')?`<button class="mit-icon-btn" onclick="openLateModal(${e.id})" title="Verspätung"><span class="ms">alarm_on</span></button>`:''}
-          <button class="mit-detail-btn" onclick="viewEmp(${e.id})">Details</button>
+          ${e._groupIds && e._groupIds.length > 1
+            ? `<button class="mit-detail-btn" onclick="openGroupPicker([${e._groupIds.join(',')}])">Details</button>`
+            : `<button class="mit-detail-btn" onclick="viewEmp(${e.id})">Details</button>`}
         </div>
       </td>
     </tr>`;
   }).join('');
   setTimeout(applyMitColVisibility,0);
+}
+
+/**
+ * Popup: Standort-Auswahl für gruppierte Mitarbeiter.
+ * Zeigt eine kurze Liste der DB-Records (je mit Standort + Position)
+ * und öffnet bei Klick den jeweiligen viewEmp().
+ */
+function openGroupPicker(ids) {
+  const LOC_COLORS = {origami:'#6366f1',enso:'#d97706',okyu:'#dc2626',omoistuttgart:'#059669'};
+  const records = ids.map(id => EMPS.find(e => e.id === id)).filter(Boolean);
+  if (records.length === 0) return;
+  if (records.length === 1) { viewEmp(records[0].id); return; }
+
+  const name = records[0].name;
+  const rows = records.map(r => {
+    const locs = (r.location||'').split(',').map(l => l.trim()).filter(Boolean);
+    const badges = locs.map(lid => {
+      const c = LOC_COLORS[lid] || '#6b7280';
+      const n = (LOCS.find(l=>l.id===lid)||{}).name || lid;
+      return `<span style="font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:5px;background:${c}15;color:${c};border:1px solid ${c}30">${n}</span>`;
+    }).join(' ');
+    return `<button onclick="document.getElementById('groupPickerModal').remove();viewEmp(${r.id})"
+      style="display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);cursor:pointer;gap:10px;transition:background .15s"
+      onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background='var(--bg-input)'">
+      <div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">${badges}</div>
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">${r.dept||'—'} · ${r.position||'—'} · #${r.id}</div>
+      </div>
+      <span class="ms" style="font-size:1.1rem;color:var(--text-muted)">chevron_right</span>
+    </button>`;
+  }).join('');
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'groupPickerModal';
+  modal.onclick = () => modal.remove();
+  modal.innerHTML = `<div class="modal" style="max-width:420px" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">📋 ${escapeHtml(name)} — Standort wählen</span>
+      <button class="modal-close" onclick="document.getElementById('groupPickerModal').remove()">✕</button>
+    </div>
+    <div class="modal-body" style="padding:14px;display:flex;flex-direction:column;gap:8px">
+      <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 8px">Dieser Mitarbeiter hat ${records.length} Einträge. Wähle den Standort:</p>
+      ${rows}
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
 }
 
 function filterEmps(q){const emps=getVisibleEmps().filter(e=>e.name.toLowerCase().includes(q.toLowerCase())||e.dept.toLowerCase().includes(q.toLowerCase()));renderEmpRows(emps);}
