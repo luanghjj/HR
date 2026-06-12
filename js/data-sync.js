@@ -671,4 +671,86 @@ async function syncSaveAushilfeMaxShifts(maxShifts) {
   }
 }
 
+// ═══ MITARBEITER-UMZUG: zukünftige Schichten mitziehen ═══
+/**
+ * Wenn ein Mitarbeiter den Standort/Bereich wechselt, sollen seine
+ * ZUKÜNFTIGEN Schichten (ab heute) mitwandern. Vergangene Schichten
+ * bleiben unverändert (korrekte Stunden-/Lohnhistorie).
+ * @param {number} empId
+ * @param {'location'|'dept'} field
+ * @param {string} value - neuer Wert (z.B. 'enso' oder 'origami,enso')
+ * @returns {Promise<number>} Anzahl aktualisierter Schichten
+ */
+async function syncFutureShiftsForEmp(empId, field, value) {
+  const colMap = { location: 'location', dept: 'dept' };
+  const col = colMap[field];
+  if (!col) return 0;
+  const today = isoDate(new Date());
+  const affected = SHIFTS.filter(s => s.empId === empId && s.date >= today);
+  if (affected.length === 0) return 0;
+  // Bei Bereichswechsel: Farb-Klasse mitführen (sonst zeigt der Plan die alte Farbe)
+  const newColor = field === 'dept' ? getDeptColorClass(value) : null;
+  // 1. Lokalen State sofort aktualisieren
+  affected.forEach(s => {
+    s[field] = value;
+    if (newColor && s.label !== 'Schule' && s.colorClass !== 'schule') s.colorClass = newColor;
+  });
+  // 2. In Supabase persistieren (bulk: emp_id + Datum >= heute)
+  try {
+    const payload = { [col]: value };
+    if (newColor) payload.color_class = newColor;
+    const { error } = await sb.from('shifts')
+      .update(payload)
+      .eq('emp_id', empId)
+      .gte('shift_date', today);
+    if (error) console.warn('[Sync] Future shifts update error:', error.message);
+    else console.log('[Sync] ✓', affected.length, 'future shifts', field, '→', value, 'for emp', empId);
+  } catch (e) { console.warn('[Sync]', e.message); }
+  return affected.length;
+}
+
+/**
+ * Beim Standortwechsel auch ZUKÜNFTIGE Urlaubs- & Krankmeldungen mitziehen
+ * (Einträge, deren Enddatum heute oder später liegt). Vergangene Einträge
+ * bleiben am alten Standort (korrekte Historie). Bereich (dept) ist hier
+ * irrelevant – Urlaub/Krank hängen nur am Standort.
+ * @param {number} empId
+ * @param {string} newLoc - neuer Standort (z.B. 'enso' oder 'origami,enso')
+ * @returns {Promise<number>} Anzahl aktualisierter Einträge (Urlaub + Krank)
+ */
+async function syncFutureVacsSicksForEmp(empId, newLoc) {
+  const today = isoDate(new Date());
+  let count = 0;
+
+  // ── Urlaub ──
+  const futureVacs = VACS.filter(v => v.empId === empId && v.to >= today);
+  if (futureVacs.length > 0) {
+    futureVacs.forEach(v => { v.location = newLoc; });
+    try {
+      const { error } = await sb.from('vacations')
+        .update({ location: newLoc })
+        .eq('emp_id', empId)
+        .gte('to_date', today);
+      if (error) console.warn('[Sync] Future vacations update error:', error.message);
+      else { count += futureVacs.length; console.log('[Sync] ✓', futureVacs.length, 'future vacations →', newLoc, 'for emp', empId); }
+    } catch (e) { console.warn('[Sync]', e.message); }
+  }
+
+  // ── Krankmeldungen ──
+  const futureSicks = SICKS.filter(s => s.empId === empId && s.to >= today);
+  if (futureSicks.length > 0) {
+    futureSicks.forEach(s => { s.location = newLoc; });
+    try {
+      const { error } = await sb.from('sick_leaves')
+        .update({ location: newLoc })
+        .eq('emp_id', empId)
+        .gte('to_date', today);
+      if (error) console.warn('[Sync] Future sick_leaves update error:', error.message);
+      else { count += futureSicks.length; console.log('[Sync] ✓', futureSicks.length, 'future sick_leaves →', newLoc, 'for emp', empId); }
+    } catch (e) { console.warn('[Sync]', e.message); }
+  }
+
+  return count;
+}
+
 

@@ -3259,10 +3259,17 @@ function updateEmpField(empId, field, value){
   toast(field==='schuleTage'?'Schule/Fortbildung aktualisiert':'Aktualisiert');
   syncEmployeeField(empId, field, e[field]);
 }
-function updateEmpText(empId, field, value){
+async function updateEmpText(empId, field, value){
   const e=EMPS.find(x=>x.id===empId);if(!e)return;
   e[field]=value;
   syncEmployeeField(empId, field, value);
+  // Standort/Bereich-Wechsel: zukünftige Schichten (ab heute) mitziehen
+  if(field==='dept'||field==='location'){
+    const moved=await syncFutureShiftsForEmp(empId, field, value);
+    toast('Aktualisiert: '+field+(moved?` · ${moved} künftige Schichten verschoben`:''));
+    if(getCurrentPage()==='schedule')renderSchedule();
+    return;
+  }
   toast('Aktualisiert: '+field);
 }
 function openLateModal(empId){
@@ -5369,6 +5376,12 @@ async function saveEmpLocPicker(empId) {
   // 2. Persist to employees table
   await syncEmployeeField(empId, 'location', newLoc);
 
+  // 2b. Zukünftige Schichten (ab heute) auf neuen Standort mitziehen
+  const movedCount = await syncFutureShiftsForEmp(empId, 'location', newLoc);
+
+  // 2c. Zukünftige Urlaubs-/Krankmeldungen ebenfalls mitziehen
+  const movedVacSick = await syncFutureVacsSicksForEmp(empId, newLoc);
+
   // 3. Also sync linked user_profile location (keep in sync)
   const linkedUser = USERS.find(u => u.empId === empId);
   if (linkedUser && linkedUser.location !== 'all') {
@@ -5380,7 +5393,10 @@ async function saveEmpLocPicker(empId) {
   }
 
   const locLabel = checked.map(l => getLocationName(l)).join(', ');
-  toast(`${emp.name} → ${locLabel}`, 'success');
+  const moveParts = [];
+  if (movedCount) moveParts.push(`${movedCount} Schichten`);
+  if (movedVacSick) moveParts.push(`${movedVacSick} Urlaub/Krank`);
+  toast(`${emp.name} → ${locLabel}${moveParts.length ? ' · ' + moveParts.join(' + ') + ' verschoben' : ''}`, 'success');
   document.getElementById('empLocPickerPopup').remove();
   renderEmployees(); // refresh list without reopening modal
 }
