@@ -1522,7 +1522,7 @@ function openGroupPicker(ids) {
       onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background='var(--bg-input)'">
       <div>
         <div style="display:flex;flex-wrap:wrap;gap:4px">${badges}</div>
-        <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">${r.dept||'—'} · ${r.position||'—'} · #${r.id}</div>
+        <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">${r.dept||'—'} · ${r.position||'—'} · #${r.personalNr || String(r.id).padStart(5,'0')}</div>
       </div>
       <span class="ms" style="font-size:1.1rem;color:var(--text-muted)">chevron_right</span>
     </button>`;
