@@ -3925,7 +3925,12 @@ function generateStandardWeek() {
   const dates = [];
   for (let i = 0; i < 7; i++) { const d = new Date(ws); d.setDate(d.getDate() + i); dates.push(d); }
 
-  const emps = getVisibleEmps().filter(e => e.status === 'active' || e.status === 'aktiv');
+  // Aushilfen werden separat über die Aushilfe-Planung (Slots) verwaltet und
+  // dürfen NICHT in den Standard-Wochenplan einfließen.
+  const isAushilfeEmp = e => e.employmentType === 'Aushilfe'
+    || (e.position || '').toLowerCase().includes('aushilfe');
+  const emps = getVisibleEmps().filter(e =>
+    (e.status === 'active' || e.status === 'aktiv') && !isAushilfeEmp(e));
   const toCreate = [];
   const empSet = new Set();
   let skippedNoBereich = 0;
