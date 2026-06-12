@@ -5440,7 +5440,11 @@ async function saveEmpLocPicker(empId) {
   if (movedVacSick) moveParts.push(`${movedVacSick} Urlaub/Krank`);
   toast(`${emp.name} → ${locLabel}${moveParts.length ? ' · ' + moveParts.join(' + ') + ' verschoben' : ''}`, 'success');
   document.getElementById('empLocPickerPopup').remove();
-  renderEmployees(); // refresh list without reopening modal
+  renderEmployees(); // refresh list in background
+  // Detail-Modal offen? Standort-Chips neu rendern, sonst zeigt es alte Werte.
+  if (!document.getElementById('modalOverlay')?.classList.contains('hidden')) {
+    viewEmp(empId);
+  }
 }
 
 async function approveRegistration(userId) {
