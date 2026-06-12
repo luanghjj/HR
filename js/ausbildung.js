@@ -289,18 +289,24 @@ function getWeekNumber(dateStr){
 // ═══ BERUFSSCHULE – CRUD (Schultage verwalten) ═══
 const SCHULE_WOCHENTAGE = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'];
 
+// Wochentag-Name (Montag..Freitag) ↔ JS getDay() (1..5)
+const SCHULE_WD_NUM = { Montag:1, Dienstag:2, Mittwoch:3, Donnerstag:4, Freitag:5 };
+
 /** Modal: Schultag anlegen oder bearbeiten. schuleId=null → neu. */
 function openSchuleModal(empId, schuleId=null){
   const existing = schuleId ? SCHULE_SCHEDULE.find(s=>s.id===schuleId) : null;
-  const tag = existing?.wochentag || 'Montag';
   const schule = existing?.schule || 'Berufsschule';
   const klasse = existing?.klasse || '';
   const von = (existing?.von || '08:00').substring(0,5);
   const bis = (existing?.bis || '15:00').substring(0,5);
+  // Gewählter Wochentag als JS getDay() (1=Mo..5=Fr); Default Montag
+  window._schuleSelWd = existing ? (SCHULE_WD_NUM[existing.wochentag] || 1) : 1;
+  const now = new Date();
+  window._schuleCalMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   document.getElementById('modalTitle').textContent = existing ? 'Schultag bearbeiten' : 'Schultag hinzufügen';
   document.getElementById('modalBody').innerHTML = `<div class="form-grid">
-    <div class="form-group"><label class="form-label">Wochentag</label>
-      <select class="form-select" id="schTag">${SCHULE_WOCHENTAGE.map(d=>`<option ${d===tag?'selected':''}>${d}</option>`).join('')}</select></div>
+    <div class="form-group full"><label class="form-label">Schultag wählen <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">(wiederholt sich jede Woche)</span></label>
+      <div id="schuleCalArea"></div></div>
     <div class="form-group"><label class="form-label">Klasse</label>
       <input class="form-input" id="schKlasse" value="${klasse}" placeholder="z.B. NK3a"></div>
     <div class="form-group full"><label class="form-label">Schule</label>
@@ -314,14 +320,59 @@ function openSchuleModal(empId, schuleId=null){
     `<button class="btn" onclick="closeModal()">Abbrechen</button>`+
     `<button class="btn btn-primary" onclick="saveSchule(${empId},${schuleId??'null'})">Speichern</button>`;
   document.getElementById('modalOverlay').classList.remove('hidden');
+  renderSchuleCal();
+}
+
+/** Monatskalender im Schultag-Modal rendern (Wochentag-Auswahl, wiederholend). */
+function renderSchuleCal(){
+  const area = document.getElementById('schuleCalArea');
+  if(!area) return;
+  const m = window._schuleCalMonth;
+  const selWd = window._schuleSelWd;
+  const y = m.getFullYear(), mo = m.getMonth();
+  const fd = new Date(y, mo, 1).getDay();
+  const so = fd === 0 ? 6 : fd - 1;          // Mo-first Offset
+  const dim = new Date(y, mo+1, 0).getDate();
+  let cells = '';
+  for(let i=0;i<so;i++) cells += '<div></div>';
+  for(let d=1; d<=dim; d++){
+    const dow = new Date(y, mo, d).getDay();   // 0=So..6=Sa
+    const isWeekend = dow===0 || dow===6;
+    if(isWeekend){
+      cells += `<div style="text-align:center;padding:7px 0;font-size:.82rem;color:var(--text-muted);opacity:.3">${d}</div>`;
+    } else {
+      const sel = dow === selWd;
+      cells += `<div onclick="schulePickDay(${dow})" style="text-align:center;padding:7px 0;font-size:.82rem;border-radius:8px;cursor:pointer;font-weight:${sel?'700':'500'};background:${sel?'var(--accent)':'transparent'};color:${sel?'#fff':'var(--text-primary)'}">${d}</div>`;
+    }
+  }
+  const hdr = ['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div style="text-align:center;font-size:.62rem;font-weight:700;color:var(--text-muted);text-transform:uppercase">${d}</div>`).join('');
+  area.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <button type="button" class="btn btn-sm" onclick="schuleCalNav(-1)">‹</button>
+      <strong style="font-size:.88rem">${MONTHS_DE[mo]} ${y}</strong>
+      <button type="button" class="btn btn-sm" onclick="schuleCalNav(1)">›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">${hdr}</div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">${cells}</div>
+    <div style="margin-top:10px;font-size:.8rem;color:var(--text-secondary)">Gewählt: <strong style="color:var(--accent)">${SCHULE_WOCHENTAGE[selWd-1]||'—'}</strong> · jede Woche</div>`;
+}
+function schuleCalNav(dir){
+  const m = window._schuleCalMonth;
+  window._schuleCalMonth = new Date(m.getFullYear(), m.getMonth()+dir, 1);
+  renderSchuleCal();
+}
+function schulePickDay(dow){
+  window._schuleSelWd = dow;   // 1..5
+  renderSchuleCal();
 }
 
 /** Schultag speichern (neu oder Update) + Supabase-Sync. */
 function saveSchule(empId, schuleId){
   const emp = EMPS.find(e=>e.id===empId);
   if(!emp) return;
+  const wd = window._schuleSelWd || 1;            // 1..5 (Mo..Fr)
   const row = {
-    wochentag: document.getElementById('schTag').value,
+    wochentag: SCHULE_WOCHENTAGE[wd-1] || 'Montag',
     schule: document.getElementById('schSchule').value.trim() || 'Berufsschule',
     klasse: document.getElementById('schKlasse').value.trim(),
     von: document.getElementById('schVon').value || '08:00',
