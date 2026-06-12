@@ -3761,15 +3761,20 @@ async function saveQuickShift() {
   if (!emp || !from || !to) { toast('Bitte Zeiten ausfüllen', 'err'); return; }
 
   const label = tmplIdx !== '' ? SHIFT_TEMPLATES[tmplIdx].label : 'Schicht';
+  // Standort: bei Mehrfach-Standort den aktuell gewählten nehmen, sonst den ersten.
+  const empLocs = (emp.location || '').split(',').map(l => l.trim()).filter(Boolean);
+  const shiftLoc = (currentLocation !== 'all' && empLocs.includes(currentLocation))
+    ? currentLocation
+    : (empLocs[0] || emp.location);
   const newShift = {
-    empId: emp.id, empName: emp.name, dept: emp.dept, location: emp.location,
+    empId: emp.id, empName: emp.name, dept: emp.dept, location: shiftLoc,
     date, from, to, label, colorClass: getDeptColorClass(emp.dept),
     isSick: false, isVacation: false, isLate: false, vacHalf: false
   };
 
   try {
     const { data, error } = await sb.from('shifts').insert({
-      emp_id: emp.id, emp_name: emp.name, dept: emp.dept, location: emp.location,
+      emp_id: emp.id, emp_name: emp.name, dept: emp.dept, location: shiftLoc,
       shift_date: date, shift_from: from, shift_to: to, label, color_class: newShift.colorClass,
       is_sick: false, is_vacation: false, is_late: false, vac_half: false
     }).select().single();
@@ -6107,7 +6112,7 @@ function applyPlanTmpl(idx){
   if(von)von.value=tmpl.from;
   if(bis)bis.value=tmpl.to;
 }
-function saveShift(){
+async function saveShift(){
   const empIds=[...document.querySelectorAll('.shift-emp-cb:checked')].map(cb=>parseInt(cb.value));
   const selEmps=empIds.map(id=>EMPS.find(e=>e.id===id)).filter(Boolean);
   if(selEmps.length===0){toast('Mindestens einen Mitarbeiter wählen','err');return;}
@@ -6146,15 +6151,21 @@ function saveShift(){
   // 2. Schichten je Mitarbeiter erzeugen (Ruhetag pro Standort filtern)
   let created=0;
   const blockedSet=new Set();
-  selEmps.forEach(emp=>{
-    dayDefs.forEach(s=>{
-      const vt=getVacTypeForDate(s.date, emp.location);
-      if(!vt){blockedSet.add(formatDateDE(s.date));return;}
+  for(const emp of selEmps){
+    // Standort der Schicht: bei Mehrfach-Standort den aktuell gewählten nehmen,
+    // sonst den (einzigen) Standort des Mitarbeiters – nie alle gleichzeitig.
+    const empLocs=(emp.location||'').split(',').map(l=>l.trim()).filter(Boolean);
+    const shiftLoc=(currentLocation!=='all'&&empLocs.includes(currentLocation))
+      ? currentLocation
+      : (empLocs[0]||emp.location);
+    for(const s of dayDefs){
+      const vt=getVacTypeForDate(s.date, shiftLoc);
+      if(!vt){blockedSet.add(formatDateDE(s.date));continue;}
       const cc=s.label==='Schule'?'schule':getDeptColorClass(emp.dept);
-      const ns={id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:emp.location,date:s.date,from:s.from,to:s.to,label:s.label,colorClass:cc,isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false};
-      SHIFTS.push(ns);syncAddShift(ns);created++;
-    });
-  });
+      const ns={id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:shiftLoc,date:s.date,from:s.from,to:s.to,label:s.label,colorClass:cc,isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false};
+      SHIFTS.push(ns);await syncAddShift(ns);created++;
+    }
+  }
 
   if(blockedSet.size)toast(`Ruhetag übersprungen: ${[...blockedSet].join(', ')}`,'warn');
   if(created===0){toast('Alle gewählten Tage sind Ruhetage','err');return;}
