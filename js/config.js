@@ -89,8 +89,10 @@ const LOCATION_SCHEDULE = {
 // GPS coordinates for each location (used for check-in proximity check)
 // Source: GPS Zeiterfassung SKILL.md – update with real coords via Google Maps
 const GPS_COORDS = {
-  origami:        { lat: 48.77024,   lng: 9.17621,   radius_m: 50 },
-  omoistuttgart:  { lat: 48.7704374,  lng: 9.1766313,  radius_m: 50 }
+  origami:        { lat: 48.77024,    lng: 9.17621,    radius_m: 50 },
+  omoistuttgart:  { lat: 48.7704374,  lng: 9.1766313,  radius_m: 50 },
+  enso:           { lat: 48.7754637,  lng: 9.1818213,  radius_m: 50 },
+  okyu:           { lat: 48.7752943,  lng: 9.1724394,  radius_m: 50 }
 };
 
 /**
