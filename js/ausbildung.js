@@ -166,19 +166,25 @@ function renderAzubiPlan(emp){
 }
 
 function renderAzubiSchule(emp){
+  const canEdit = can('editTraining');
   const schedule = SCHULE_SCHEDULE.filter(s=>s.empId===emp.id && s.aktiv);
   let h = '<div class="stat-grid" style="grid-template-columns:1fr">';
+  h += '<div class="stat-card">';
+  h += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h3 style="margin:0">📅 Berufsschultage</h3>
+    ${canEdit?`<button class="btn btn-sm btn-primary" onclick="openSchuleModal(${emp.id})">+ Schultag</button>`:''}
+  </div>`;
   if(schedule.length===0){
-    h += '<div class="stat-card"><p style="color:var(--text-muted)">Kein Berufsschulplan hinterlegt.</p></div>';
+    h += '<p style="color:var(--text-muted)">Kein Berufsschulplan hinterlegt.</p>';
   } else {
-    h += '<div class="stat-card"><h3 style="margin-bottom:12px">📅 Berufsschultage</h3>';
-    h += '<div class="table-wrap"><table><thead><tr><th>Tag</th><th>Schule</th><th>Klasse</th><th>Zeit</th></tr></thead><tbody>';
+    h += '<div class="table-wrap"><table><thead><tr><th>Tag</th><th>Schule</th><th>Klasse</th><th>Zeit</th>'+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
     schedule.forEach(s=>{
       h += `<tr>
         <td><strong>${s.wochentag}</strong></td>
         <td>${s.schule}</td>
         <td><span class="badge badge-info">${s.klasse}</span></td>
         <td>${s.von?.substring(0,5)||'08:00'} – ${s.bis?.substring(0,5)||'15:00'}</td>
+        ${canEdit?`<td style="white-space:nowrap"><button class="btn btn-sm" onclick="openSchuleModal(${emp.id},${s.id})" title="Bearbeiten">✏️</button> <button class="btn btn-sm" onclick="deleteSchule(${s.id})" title="Löschen">🗑️</button></td>`:''}
       </tr>`;
     });
     h += '</tbody></table></div>';
@@ -190,9 +196,8 @@ function renderAzubiSchule(emp){
     h += `<div style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:8px">
       <span style="color:var(--text-muted)">📊 ${schedule.length} Schultage/Woche · ca. ${totalSchuleH} Std. Schule · ${emp.schuleTage} Schultage gesamt</span>
     </div>`;
-    h += '</div>';
   }
-  h += '</div>';
+  h += '</div></div>';
   return h;
 }
 
@@ -279,4 +284,71 @@ function getWeekNumber(dateStr){
   d.setUTCDate(d.getUTCDate()+4-dayNum);
   const yearStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));
   return Math.ceil((((d-yearStart)/86400000)+1)/7);
+}
+
+// ═══ BERUFSSCHULE – CRUD (Schultage verwalten) ═══
+const SCHULE_WOCHENTAGE = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'];
+
+/** Modal: Schultag anlegen oder bearbeiten. schuleId=null → neu. */
+function openSchuleModal(empId, schuleId=null){
+  const existing = schuleId ? SCHULE_SCHEDULE.find(s=>s.id===schuleId) : null;
+  const tag = existing?.wochentag || 'Montag';
+  const schule = existing?.schule || 'Berufsschule';
+  const klasse = existing?.klasse || '';
+  const von = (existing?.von || '08:00').substring(0,5);
+  const bis = (existing?.bis || '15:00').substring(0,5);
+  document.getElementById('modalTitle').textContent = existing ? 'Schultag bearbeiten' : 'Schultag hinzufügen';
+  document.getElementById('modalBody').innerHTML = `<div class="form-grid">
+    <div class="form-group"><label class="form-label">Wochentag</label>
+      <select class="form-select" id="schTag">${SCHULE_WOCHENTAGE.map(d=>`<option ${d===tag?'selected':''}>${d}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">Klasse</label>
+      <input class="form-input" id="schKlasse" value="${klasse}" placeholder="z.B. NK3a"></div>
+    <div class="form-group full"><label class="form-label">Schule</label>
+      <input class="form-input" id="schSchule" value="${schule}" placeholder="z.B. Berufsschule"></div>
+    <div class="form-group"><label class="form-label">Von</label>
+      <input class="form-input" type="time" id="schVon" value="${von}"></div>
+    <div class="form-group"><label class="form-label">Bis</label>
+      <input class="form-input" type="time" id="schBis" value="${bis}"></div>
+  </div>`;
+  document.getElementById('modalFooter').innerHTML =
+    `<button class="btn" onclick="closeModal()">Abbrechen</button>`+
+    `<button class="btn btn-primary" onclick="saveSchule(${empId},${schuleId??'null'})">Speichern</button>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+/** Schultag speichern (neu oder Update) + Supabase-Sync. */
+function saveSchule(empId, schuleId){
+  const emp = EMPS.find(e=>e.id===empId);
+  if(!emp) return;
+  const row = {
+    wochentag: document.getElementById('schTag').value,
+    schule: document.getElementById('schSchule').value.trim() || 'Berufsschule',
+    klasse: document.getElementById('schKlasse').value.trim(),
+    von: document.getElementById('schVon').value || '08:00',
+    bis: document.getElementById('schBis').value || '15:00',
+    aktiv: true
+  };
+  if(schuleId){
+    const ex = SCHULE_SCHEDULE.find(s=>s.id===schuleId);
+    if(ex){ Object.assign(ex, row); syncUpdateSchule(ex); }
+  } else {
+    const ns = { id:null, empId, ...row };
+    SCHULE_SCHEDULE.push(ns);
+    syncAddSchule(ns);
+  }
+  closeModal();
+  toast('Schultag gespeichert');
+  renderAusbildung();
+}
+
+/** Schultag löschen + Supabase-Sync. */
+function deleteSchule(schuleId){
+  const s = SCHULE_SCHEDULE.find(x=>x.id===schuleId);
+  if(!s) return;
+  if(!confirm(`Schultag ${s.wochentag} löschen?`)) return;
+  const idx = SCHULE_SCHEDULE.indexOf(s);
+  if(idx>=0) SCHULE_SCHEDULE.splice(idx,1);
+  syncDeleteSchule(schuleId);
+  toast('Schultag gelöscht','warn');
+  renderAusbildung();
 }

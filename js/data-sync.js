@@ -348,6 +348,52 @@ async function syncNachweis(n) {
   } catch (e) { console.warn('[Sync]', e.message); }
 }
 
+// ═══ BERUFSSCHULE (schule_schedule CRUD) ═══
+/** Neuen Schultag in Supabase anlegen; setzt row.id aus dem Ergebnis. */
+async function syncAddSchule(row) {
+  try {
+    const { data, error } = await sb.from('schule_schedule').insert({
+      emp_id:    row.empId,
+      wochentag: row.wochentag,
+      schule:    row.schule || 'Berufsschule',
+      klasse:    row.klasse || '',
+      von:       row.von || '08:00',
+      bis:       row.bis || '15:00',
+      aktiv:     row.aktiv !== false
+    }).select().single();
+    if (error) { console.warn('[Sync] Add Schule error:', error.message); return; }
+    row.id = data.id;
+    console.log('[Sync] ✓ Schultag added:', row.wochentag, 'for emp', row.empId);
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+
+/** Bestehenden Schultag aktualisieren (per id). */
+async function syncUpdateSchule(row) {
+  try {
+    if (!row.id || typeof row.id !== 'number') return;
+    const { error } = await sb.from('schule_schedule').update({
+      wochentag: row.wochentag,
+      schule:    row.schule || 'Berufsschule',
+      klasse:    row.klasse || '',
+      von:       row.von || '08:00',
+      bis:       row.bis || '15:00',
+      aktiv:     row.aktiv !== false
+    }).eq('id', row.id);
+    if (error) console.warn('[Sync] Update Schule error:', error.message);
+    else console.log('[Sync] ✓ Schultag updated:', row.id);
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+
+/** Schultag löschen (per id). */
+async function syncDeleteSchule(id) {
+  try {
+    if (!id || typeof id !== 'number') return;
+    const { error } = await sb.from('schule_schedule').delete().eq('id', id);
+    if (error) console.warn('[Sync] Delete Schule error:', error.message);
+    else console.log('[Sync] ✓ Schultag deleted:', id);
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+
 /**
  * Add a single shift to Supabase
  */

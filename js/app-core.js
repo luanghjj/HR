@@ -3919,13 +3919,21 @@ function generateStandardWeek() {
   const empSet = new Set();
   let skippedNoBereich = 0;
 
+  // Azubi-Erkennung + Wochentag→JS getDay() Mapping (für Berufsschultage)
+  const isAzubiEmp = e => e.employmentType === 'Azubi'
+    || (e.position || '').toLowerCase().includes('azubi')
+    || e.dept === 'Ausbildung';
+  const WD_DE = { Montag:1, Dienstag:2, Mittwoch:3, Donnerstag:4, Freitag:5 };
+
   emps.forEach(emp => {
     // Bereich auflösen (Mehrfach-Bereich: ersten passenden nehmen)
     const depts = (emp.dept || '').split(',').map(s => s.trim());
     const dept = depts.find(d => STD_WEEK_DEPTS.includes(d));
     // O·MO·I nutzt '*' (alle Bereiche) → auch ohne passenden Bereich gültig
     const kind = getLocationKind(emp.location);
-    if (!dept && kind !== 'omoi') { skippedNoBereich++; return; }
+    const azubi = isAzubiEmp(emp);
+    // Azubi ohne passenden Bereich NICHT überspringen (Schultage müssen rein)
+    if (!dept && kind !== 'omoi' && !azubi) { skippedNoBereich++; return; }
 
     // Standort auflösen (Multi-Standort: currentLocation falls passend, sonst erster)
     let loc = emp.location || '';
@@ -3938,6 +3946,22 @@ function generateStandardWeek() {
       const ds = isoDate(d);
       // Tag überspringen, wenn schon eine Schicht existiert
       if (SHIFTS.some(s => s.empId === emp.id && s.date === ds)) return;
+
+      // Azubi: an Berufsschultagen einen Schule-Block setzen (kein Dienst)
+      if (azubi) {
+        const sch = SCHULE_SCHEDULE.find(s => s.empId === emp.id && s.aktiv && WD_DE[s.wochentag] === d.getDay());
+        if (sch) {
+          toCreate.push({
+            empId: emp.id, empName: emp.name, dept: emp.dept || '', location: loc,
+            date: ds, from: (sch.von || '08:00').substring(0,5), to: (sch.bis || '15:00').substring(0,5),
+            label: 'Schule', colorClass: 'schule',
+            isSick: false, isVacation: false, isLate: false, lateMin: 0
+          });
+          empSet.add(emp.id);
+          return; // an Schultagen kein regulärer Dienst
+        }
+      }
+
       const shifts = getStandardShifts(dept || '*', loc, d.getDay());
       shifts.forEach(sh => {
         toCreate.push({
