@@ -3634,6 +3634,17 @@ function renderSchedule(){
           }
         }
 
+        // Show Berufsschultage for azubis (if no shift/Schule already in cell)
+        if (empObj && !dayS.some(s=>s.label==='Schule'||s.colorClass==='schule')) {
+          const sch = SCHULE_SCHEDULE.find(s=>s.empId===empObj.id && s.aktiv && s.datum===ds)
+            || SCHULE_SCHEDULE.find(s=>s.empId===empObj.id && s.aktiv && !s.datum && ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'][new Date(ds).getDay()-1]===s.wochentag);
+          if (sch) {
+            const von=(sch.von||'08:00').substring(0,5), bis=(sch.bis||'15:00').substring(0,5);
+            h+=`<div class="shift-block compact-block schule"><span class="compact-letter">S</span><div class="shift-time">${von}–${bis}</div></div>`;
+            cellHas = true;
+          }
+        }
+
         if(!cellHas){
           // Check if this is a Ruhetag for employee's location
           const ruheEmp = empObj || EMPS.find(e=>e.name===emp);

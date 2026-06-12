@@ -338,7 +338,7 @@ function openSchuleModal(empId, schuleId=null){
 
 /** Schultag(e) speichern: beim Bearbeiten 1 Tag, beim Neuanlegen alle
  *  Werktage (Mo–Fr) im Datumsbereich. + Supabase-Sync. */
-function saveSchule(empId, schuleId){
+async function saveSchule(empId, schuleId){
   const emp = EMPS.find(e=>e.id===empId);
   if(!emp) return;
   const startStr = document.getElementById('schStart').value;
@@ -356,7 +356,7 @@ function saveSchule(empId, schuleId){
     const ex = SCHULE_SCHEDULE.find(s=>s.id===schuleId);
     if(ex){
       Object.assign(ex, base, { datum: startStr, wochentag: SCHULE_WOCHENTAGE[(new Date(startStr).getDay())-1] || null });
-      syncUpdateSchule(ex);
+      await syncUpdateSchule(ex);
     }
     closeModal();
     toast('Schultag gespeichert');
@@ -377,7 +377,7 @@ function saveSchule(empId, schuleId){
     if(SCHULE_SCHEDULE.some(s=>s.empId===empId && s.datum===ds)){ skippedExisting++; continue; }
     const ns = { id:null, empId, datum: ds, wochentag: SCHULE_WOCHENTAGE[dow-1] || null, ...base };
     SCHULE_SCHEDULE.push(ns);
-    syncAddSchule(ns);
+    await syncAddSchule(ns);   // auf echte DB-id warten (sonst kein Löschen möglich)
     created++;
   }
   closeModal();
@@ -387,6 +387,8 @@ function saveSchule(empId, schuleId){
     toast(`${created} Schultag${created>1?'e':''} gespeichert${skippedExisting?` · ${skippedExisting} übersprungen`:''}`);
   }
   renderAusbildung();
+  // Arbeitsplan ggf. aktualisieren, falls gerade sichtbar
+  if(typeof getCurrentPage==='function' && getCurrentPage()==='schedule') renderSchedule();
 }
 
 /** Schultag löschen + Supabase-Sync. */
