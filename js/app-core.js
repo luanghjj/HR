@@ -3546,8 +3546,9 @@ function renderSchedule(){
     let emps=[...new Set(shifts.filter(s=>{const d=new Date(s.date);return d>=weekS&&d<=weekE;}).map(s=>s.empName))];
     const dayD=[];for(let i=0;i<7;i++){const d=new Date(weekS);d.setDate(d.getDate()+i);dayD.push(isoDate(d));}
     // Add employees with approved vacation or active sick in this week
-    VACS.filter(v=>v.status==='approved'&&v.to>=dayD[0]&&v.from<=dayD[6]).forEach(v=>{if(!emps.includes(v.empName))emps.push(v.empName);});
-    SICKS.filter(s=>s.status==='active'&&s.to>=dayD[0]&&s.from<=dayD[6]).forEach(s=>{if(!emps.includes(s.empName))emps.push(s.empName);});
+    // (standortgefiltert – sonst tauchen Mitarbeiter fremder Standorte auf)
+    getVisibleVacs().filter(v=>v.status==='approved'&&v.to>=dayD[0]&&v.from<=dayD[6]).forEach(v=>{if(!emps.includes(v.empName))emps.push(v.empName);});
+    getVisibleSicks().filter(s=>s.status==='active'&&s.to>=dayD[0]&&s.from<=dayD[6]).forEach(s=>{if(!emps.includes(s.empName))emps.push(s.empName);});
     emps.sort();
     // Sort by selected criteria
     const sortBy=scheduleSort;
