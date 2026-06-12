@@ -46,7 +46,7 @@ function getLocationName(locationId) {
 
 /** Map department name to CSS class */
 function getDeptColorClass(deptName) {
-  return { Küche: 'kitchen', Service: 'service', Bar: 'bar', Ausbildung: 'azubi' }[deptName] || '';
+  return { Küche: 'kitchen', Service: 'service', Bar: 'bar', Sushi: 'sushi', Ausbildung: 'azubi', Verwaltung: 'verwaltung' }[deptName] || '';
 }
 
 /** Generate status badge HTML */

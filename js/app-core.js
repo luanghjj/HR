@@ -5883,7 +5883,20 @@ function openModal(type, bodyHtml, footerHtml){
     b.innerHTML=`<div class="form-grid">
       <div class="form-group"><label class="form-label">Standort</label><select class="form-select" id="mSLoc" onchange="filterShiftEmps()"><option value="all">Alle Standorte</option>${allLocs.map(l=>`<option value="${l}">${getLocationName(l)}</option>`).join('')}</select></div>
       <div class="form-group"><label class="form-label">Bereich</label><select class="form-select" id="mSDept" onchange="filterShiftEmps()"><option value="all">Alle Bereiche</option>${allDepts.map(d=>`<option value="${d}">${d}</option>`).join('')}</select></div>
-      <div class="form-group full"><label class="form-label">Mitarbeiter</label><select class="form-select" id="mSE">${emps.map(e=>`<option value="${e.id}" data-loc="${e.location}" data-dept="${e.dept}">${e.name} (${e.dept})</option>`).join('')}</select></div>
+      <div class="form-group full"><label class="form-label">Mitarbeiter <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">(mehrere wählbar)</span></label>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+          <button type="button" class="btn btn-sm" onclick="toggleAllShiftEmps(true)" style="font-size:.72rem;padding:3px 12px">Alle</button>
+          <button type="button" class="btn btn-sm" onclick="toggleAllShiftEmps(false)" style="font-size:.72rem;padding:3px 12px">Keine</button>
+          <span id="mSECount" style="font-size:.74rem;color:var(--text-muted);margin-left:auto">0 ausgewählt</span>
+        </div>
+        <div id="mSEList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:2px;background:var(--bg-input)">
+          ${emps.map(e=>`<label class="shift-emp-row" data-loc="${e.location}" data-dept="${e.dept}" style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:.84rem" onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background=''">
+            <input type="checkbox" class="shift-emp-cb" value="${e.id}" onchange="updateShiftEmpCount()" style="width:15px;height:15px;accent-color:var(--accent)">
+            <span style="font-weight:600">${e.name}</span>
+            <span style="color:var(--text-muted);font-size:.76rem;margin-left:auto">${e.dept}</span>
+          </label>`).join('')}
+        </div>
+      </div>
       <div class="form-group full"><label class="form-label">Modus</label>
         <div style="display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
           <button class="btn shift-mode-btn active" data-mode="day" onclick="toggleShiftMode('day')" style="flex:1;border:none;border-radius:0;font-size:.78rem">📅 Ein Tag</button>
@@ -5988,17 +6001,32 @@ function closeModal(){document.getElementById('modalOverlay').classList.add('hid
 function filterShiftEmps(){
   const loc=document.getElementById('mSLoc')?.value||'all';
   const dept=document.getElementById('mSDept')?.value||'all';
-  const sel=document.getElementById('mSE');
-  if(!sel)return;
-  [...sel.options].forEach(o=>{
-    const oLoc=o.getAttribute('data-loc');
-    const oDept=o.getAttribute('data-dept');
+  const list=document.getElementById('mSEList');
+  if(!list)return;
+  list.querySelectorAll('.shift-emp-row').forEach(row=>{
+    const oLoc=row.getAttribute('data-loc');
+    const oDept=row.getAttribute('data-dept');
     const show=(loc==='all'||oLoc===loc)&&(dept==='all'||oDept===dept);
-    o.hidden=!show;
+    row.style.display=show?'':'none';
+    // Hidden rows dürfen nicht ausgewählt bleiben
+    if(!show){const cb=row.querySelector('.shift-emp-cb');if(cb)cb.checked=false;}
   });
-  // Select first visible option
-  const first=[...sel.options].find(o=>!o.hidden);
-  if(first)sel.value=first.value;
+  updateShiftEmpCount();
+}
+function toggleAllShiftEmps(checked){
+  const list=document.getElementById('mSEList');
+  if(!list)return;
+  list.querySelectorAll('.shift-emp-row').forEach(row=>{
+    if(row.style.display==='none')return; // nur sichtbare
+    const cb=row.querySelector('.shift-emp-cb');
+    if(cb)cb.checked=checked;
+  });
+  updateShiftEmpCount();
+}
+function updateShiftEmpCount(){
+  const n=document.querySelectorAll('.shift-emp-cb:checked').length;
+  const el=document.getElementById('mSECount');
+  if(el)el.textContent=n+' ausgewählt';
 }
 function applyTmpl(){const i=document.getElementById('mST').value;if(i!==''){document.getElementById('mSF').value=SHIFT_TEMPLATES[i].from;document.getElementById('mSTo').value=SHIFT_TEMPLATES[i].to;}}
 function saveEmp(){const f=document.getElementById('mF').value.trim(),l=document.getElementById('mL').value.trim();if(!f||!l)return;
@@ -6033,12 +6061,14 @@ function applyPlanTmpl(idx){
   if(bis)bis.value=tmpl.to;
 }
 function saveShift(){
-  const eid=parseInt(document.getElementById('mSE').value);
-  const emp=EMPS.find(e=>e.id===eid);
+  const empIds=[...document.querySelectorAll('.shift-emp-cb:checked')].map(cb=>parseInt(cb.value));
+  const selEmps=empIds.map(id=>EMPS.find(e=>e.id===id)).filter(Boolean);
+  if(selEmps.length===0){toast('Mindestens einen Mitarbeiter wählen','err');return;}
   const mode=window._shiftMode||'day';
-  
-  let shifts=[];
-  
+
+  // 1. Tag/Zeit-Definitionen (für alle gewählten Mitarbeiter gleich)
+  let dayDefs=[];
+
   if(mode==='plan'){
     // Wochenplan: each day has its own times
     document.querySelectorAll('.plan-day-cb:checked').forEach(cb=>{
@@ -6049,39 +6079,41 @@ function saveShift(){
       if(!von||!bis)return;
       const tmplSel=document.querySelector(`.plan-tmpl[data-idx="${idx}"]`);
       const lbl=tmplSel&&tmplSel.value!==''?SHIFT_TEMPLATES[tmplSel.value].label:'Manuell';
-      shifts.push({date,from:von,to:bis,label:lbl});
+      dayDefs.push({date,from:von,to:bis,label:lbl});
     });
   } else {
     const ti=document.getElementById('mST').value;
     const lbl=ti!==''?SHIFT_TEMPLATES[ti].label:'Manuell';
     const from=document.getElementById('mSF').value;
     const to=document.getElementById('mSTo').value;
-    
+
     if(mode==='week'){
-      document.querySelectorAll('.weekday-cb:checked').forEach(cb=>shifts.push({date:cb.dataset.date,from,to,label:lbl}));
+      document.querySelectorAll('.weekday-cb:checked').forEach(cb=>dayDefs.push({date:cb.dataset.date,from,to,label:lbl}));
     } else {
-      shifts=[{date:document.getElementById('mSD').value,from,to,label:lbl}];
+      dayDefs=[{date:document.getElementById('mSD').value,from,to,label:lbl}];
     }
   }
-  
-  if(!shifts.length){toast('Keine Tage ausgewählt','err');return;}
-  
-  // Filter out Ruhetag days
-  const blocked = [];
-  shifts = shifts.filter(s => {
-    const vt = getVacTypeForDate(s.date, emp.location);
-    if (!vt) { blocked.push(formatDateDE(s.date)); return false; }
-    return true;
-  });
-  if (blocked.length) toast(`Ruhetag übersprungen: ${blocked.join(', ')}`, 'warn');
-  if (!shifts.length) { toast('Alle gewählten Tage sind Ruhetage', 'err'); return; }
 
-  shifts.forEach(s=>{
-    const cc = s.label === 'Schule' ? 'schule' : getDeptColorClass(emp.dept);
-    const ns={id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:emp.location,date:s.date,from:s.from,to:s.to,label:s.label,colorClass:cc,isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false};
-    SHIFTS.push(ns);syncAddShift(ns);
+  if(!dayDefs.length){toast('Keine Tage ausgewählt','err');return;}
+
+  // 2. Schichten je Mitarbeiter erzeugen (Ruhetag pro Standort filtern)
+  let created=0;
+  const blockedSet=new Set();
+  selEmps.forEach(emp=>{
+    dayDefs.forEach(s=>{
+      const vt=getVacTypeForDate(s.date, emp.location);
+      if(!vt){blockedSet.add(formatDateDE(s.date));return;}
+      const cc=s.label==='Schule'?'schule':getDeptColorClass(emp.dept);
+      const ns={id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:emp.location,date:s.date,from:s.from,to:s.to,label:s.label,colorClass:cc,isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false};
+      SHIFTS.push(ns);syncAddShift(ns);created++;
+    });
   });
-  closeModal();toast(`${shifts.length} Schicht${shifts.length>1?'en':''} gespeichert`);renderSchedule();
+
+  if(blockedSet.size)toast(`Ruhetag übersprungen: ${[...blockedSet].join(', ')}`,'warn');
+  if(created===0){toast('Alle gewählten Tage sind Ruhetage','err');return;}
+  closeModal();
+  toast(`${created} Schicht${created>1?'en':''} für ${selEmps.length} Mitarbeiter gespeichert`);
+  renderSchedule();
 }
 function saveVac(){const eid=parseInt(document.getElementById('mVE').value);const emp=EMPS.find(e=>e.id===eid);const fr=document.getElementById('mVF').value,to=document.getElementById('mVTo').value;if(!fr||!to)return;const days=Math.ceil((new Date(to)-new Date(fr))/864e5)+1;const nv={id:Date.now(),empId:eid,empName:emp.name,location:emp.location,from:fr,to,days,status:'pending',note:document.getElementById('mVN').value};VACS.push(nv);syncAddVacation(nv);addNotif('vacation','Urlaubsantrag',`${emp.name}: ${formatDateDE(fr)}–${formatDateDE(to)} (${days}T)`);closeModal();toast('Antrag gestellt');renderVacation();}
 async function saveSickL(){

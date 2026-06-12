@@ -937,4 +937,16 @@
   #schedC .table-wrap table { width: 100%; }
   #schedC .table-wrap th,
   #schedC .table-wrap td { padding: 8px 8px; font-size: 0.8rem; }
+
+  /* Wochenraster: Schicht-Blöcke kompakter auf kleinem Display */
+  .sc2-grid-wrap .shift-cell { min-height: 50px; padding: 2px; }
+  .sc2-grid-wrap .shift-block,
+  .sc2-grid-wrap .compact-block,
+  .sc2-grid-wrap .ruhetag-cell,
+  .sc2-grid-wrap .empty-cell-add { min-height: 46px; border-radius: 9px; }
+  .sc2-grid-wrap .shift-block { padding: 5px 7px; }
+  .sc2-grid-wrap .shift-block .shift-time { font-size: .78rem; }
+  .sc2-grid-wrap .shift-block .shift-name { font-size: .56rem; }
+  /* Σ-Spalte schmaler */
+  .sc2-grid-wrap td.sc2-total-cell { font-size: .82rem; }
 }

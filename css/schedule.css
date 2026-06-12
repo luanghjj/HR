@@ -179,15 +179,18 @@
   padding: 18px 10px;
   text-align: center;
   border-bottom: 1px solid var(--border);
+  border-left: 1px solid rgba(0,0,0,.05);
   font-size: .72rem;
   white-space: nowrap;
+  position: sticky; top: 0; z-index: 15;
+  background: var(--bg-input);
 }
 .sc2-grid-wrap thead th:first-child {
   text-align: left;
   padding-left: 20px;
   min-width: 200px;
-  position: sticky; left: 0;
-  background: var(--bg-input); z-index: 20;
+  position: sticky; left: 0; top: 0;
+  background: var(--bg-input); z-index: 25;
 }
 .sc2-grid-wrap thead th .th-day {
   font-size: .65rem; font-weight: 800; text-transform: uppercase;
@@ -198,6 +201,10 @@
 }
 .sc2-grid-wrap thead th.is-today .th-day,
 .sc2-grid-wrap thead th.is-today .th-date { color: var(--accent); }
+.sc2-grid-wrap thead th.is-today {
+  background: rgba(99,102,241,.07);
+  border-bottom: 2px solid var(--accent);
+}
 
 /* Table body rows */
 .sc2-grid-wrap tbody tr { transition: background .12s; }
@@ -330,10 +337,10 @@
 
 /* ─── Shift Cells & Blocks (v2 overrides) ─── */
 .sc2-grid-wrap .shift-cell {
-  min-height: 90px;
+  min-height: 64px;
   position: relative;
   transition: background 0.15s;
-  padding: 4px;
+  padding: 3px;
 }
 .sc2-grid-wrap .shift-cell.drag-over {
   background: var(--drag-bg) !important;
@@ -342,21 +349,22 @@
   border-radius: 12px;
 }
 .sc2-grid-wrap .shift-block {
-  min-height: 82px;
-  border-radius: 14px;
-  padding: 10px 12px;
+  min-height: 56px;
+  border-radius: 11px;
+  padding: 7px 10px;
   margin: 0;
   font-size: .75rem;
-  display: flex; flex-direction: column; justify-content: space-between;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
   border-left-width: 4px !important;
   position: relative; overflow: hidden;
 }
 .sc2-grid-wrap .shift-block .shift-name {
-  font-size: .65rem; font-weight: 800; text-transform: uppercase;
-  letter-spacing: .05em;
+  font-size: .62rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .04em; line-height: 1.1;
 }
 .sc2-grid-wrap .shift-block .shift-time {
-  font-size: .82rem; font-weight: 800; color: inherit;
+  font-size: .86rem; font-weight: 800; color: var(--text-primary);
+  line-height: 1.1;
 }
 
 /* Dept colors v2 */
@@ -384,6 +392,18 @@
 }
 .sc2-grid-wrap .shift-block.azubi .shift-name { color: #8b5cf6; }
 
+.sc2-grid-wrap .shift-block.sushi {
+  background: rgba(139,92,246,.06);
+  border-left-color: #8b5cf6;
+}
+.sc2-grid-wrap .shift-block.sushi .shift-name { color: #8b5cf6; }
+
+.sc2-grid-wrap .shift-block.verwaltung {
+  background: rgba(225,29,72,.06);
+  border-left-color: #e11d48;
+}
+.sc2-grid-wrap .shift-block.verwaltung .shift-name { color: #e11d48; }
+
 .sc2-grid-wrap .shift-block.schule {
   background: rgba(0,180,216,.07);
   border-left-color: #00b4d8;
@@ -392,8 +412,8 @@
 
 /* Compact blocks (sick/vacation) v2 */
 .sc2-grid-wrap .compact-block {
-  min-height: 82px;
-  border-radius: 14px;
+  min-height: 56px;
+  border-radius: 11px;
   border-left: none !important;
   flex-direction: column; gap: 4px;
   align-items: center; justify-content: center;
@@ -425,7 +445,7 @@
 
 /* Ruhetag v2 */
 .sc2-grid-wrap .ruhetag-cell {
-  min-height: 82px; border-radius: 14px;
+  min-height: 56px; border-radius: 11px;
   background: repeating-linear-gradient(
     -45deg, transparent, transparent 5px,
     rgba(0,0,0,.025) 5px, rgba(0,0,0,.025) 7px
