@@ -227,6 +227,7 @@ async function loadDataFromSupabase() {
       SCHULE_SCHEDULE.length = 0;
       schule.forEach(s => SCHULE_SCHEDULE.push({
         id: s.id, empId: s.emp_id, wochentag: s.wochentag,
+        datum: s.datum || null,
         schule: s.schule, klasse: s.klasse,
         von: s.von, bis: s.bis, aktiv: s.aktiv
       }));

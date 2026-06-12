@@ -354,7 +354,8 @@ async function syncAddSchule(row) {
   try {
     const { data, error } = await sb.from('schule_schedule').insert({
       emp_id:    row.empId,
-      wochentag: row.wochentag,
+      wochentag: row.wochentag || null,
+      datum:     row.datum || null,
       schule:    row.schule || 'Berufsschule',
       klasse:    row.klasse || '',
       von:       row.von || '08:00',
@@ -363,7 +364,7 @@ async function syncAddSchule(row) {
     }).select().single();
     if (error) { console.warn('[Sync] Add Schule error:', error.message); return; }
     row.id = data.id;
-    console.log('[Sync] ✓ Schultag added:', row.wochentag, 'for emp', row.empId);
+    console.log('[Sync] ✓ Schultag added:', row.datum || row.wochentag, 'for emp', row.empId);
   } catch (e) { console.warn('[Sync]', e.message); }
 }
 
@@ -372,7 +373,8 @@ async function syncUpdateSchule(row) {
   try {
     if (!row.id || typeof row.id !== 'number') return;
     const { error } = await sb.from('schule_schedule').update({
-      wochentag: row.wochentag,
+      wochentag: row.wochentag || null,
+      datum:     row.datum || null,
       schule:    row.schule || 'Berufsschule',
       klasse:    row.klasse || '',
       von:       row.von || '08:00',

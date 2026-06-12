@@ -3949,7 +3949,9 @@ function generateStandardWeek() {
 
       // Azubi: an Berufsschultagen einen Schule-Block setzen (kein Dienst)
       if (azubi) {
-        const sch = SCHULE_SCHEDULE.find(s => s.empId === emp.id && s.aktiv && WD_DE[s.wochentag] === d.getDay());
+        // Konkretes Datum bevorzugen; Fallback: alte wöchentliche Einträge (ohne datum)
+        const sch = SCHULE_SCHEDULE.find(s => s.empId === emp.id && s.aktiv && s.datum === ds)
+          || SCHULE_SCHEDULE.find(s => s.empId === emp.id && s.aktiv && !s.datum && WD_DE[s.wochentag] === d.getDay());
         if (sch) {
           toCreate.push({
             empId: emp.id, empName: emp.name, dept: emp.dept || '', location: loc,

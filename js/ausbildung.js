@@ -177,10 +177,22 @@ function renderAzubiSchule(emp){
   if(schedule.length===0){
     h += '<p style="color:var(--text-muted)">Kein Berufsschulplan hinterlegt.</p>';
   } else {
-    h += '<div class="table-wrap"><table><thead><tr><th>Tag</th><th>Schule</th><th>Klasse</th><th>Zeit</th>'+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
+    // Sortieren: nach Datum (konkrete Tage), Einträge ohne Datum ans Ende
+    schedule.sort((a,b)=>{
+      if(a.datum && b.datum) return a.datum < b.datum ? -1 : 1;
+      if(a.datum) return -1;
+      if(b.datum) return 1;
+      return 0;
+    });
+    h += '<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Tag</th><th>Schule</th><th>Klasse</th><th>Zeit</th>'+(canEdit?'<th></th>':'')+'</tr></thead><tbody>';
     schedule.forEach(s=>{
+      const datumTxt = s.datum ? formatDateDE(s.datum) : '<span style="color:var(--text-muted)">wöchentlich</span>';
+      const tagTxt = s.datum
+        ? (SCHULE_WOCHENTAGE[(new Date(s.datum).getDay())-1] || s.wochentag || '—')
+        : (s.wochentag || '—');
       h += `<tr>
-        <td><strong>${s.wochentag}</strong></td>
+        <td><strong>${datumTxt}</strong></td>
+        <td>${tagTxt}</td>
         <td>${s.schule}</td>
         <td><span class="badge badge-info">${s.klasse}</span></td>
         <td>${s.von?.substring(0,5)||'08:00'} – ${s.bis?.substring(0,5)||'15:00'}</td>
@@ -194,7 +206,7 @@ function renderAzubiSchule(emp){
       return sum+(b-v);
     },0);
     h += `<div style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:8px">
-      <span style="color:var(--text-muted)">📊 ${schedule.length} Schultage/Woche · ca. ${totalSchuleH} Std. Schule · ${emp.schuleTage} Schultage gesamt</span>
+      <span style="color:var(--text-muted)">📊 ${schedule.length} Schultage · ca. ${totalSchuleH} Std. Schule · ${emp.schuleTage} Schultage gesamt</span>
     </div>`;
   }
   h += '</div></div>';
@@ -292,103 +304,88 @@ const SCHULE_WOCHENTAGE = ['Montag','Dienstag','Mittwoch','Donnerstag','Freitag'
 // Wochentag-Name (Montag..Freitag) ↔ JS getDay() (1..5)
 const SCHULE_WD_NUM = { Montag:1, Dienstag:2, Mittwoch:3, Donnerstag:4, Freitag:5 };
 
-/** Modal: Schultag anlegen oder bearbeiten. schuleId=null → neu. */
+/** Modal: Schultag(e) anlegen oder einen bearbeiten. schuleId=null → neu. */
 function openSchuleModal(empId, schuleId=null){
   const existing = schuleId ? SCHULE_SCHEDULE.find(s=>s.id===schuleId) : null;
   const schule = existing?.schule || 'Berufsschule';
   const klasse = existing?.klasse || '';
   const von = (existing?.von || '08:00').substring(0,5);
   const bis = (existing?.bis || '15:00').substring(0,5);
-  // Gewählter Wochentag als JS getDay() (1=Mo..5=Fr); Default Montag
-  window._schuleSelWd = existing ? (SCHULE_WD_NUM[existing.wochentag] || 1) : 1;
-  const now = new Date();
-  window._schuleCalMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  document.getElementById('modalTitle').textContent = existing ? 'Schultag bearbeiten' : 'Schultag hinzufügen';
+  // Datum-Vorbelegung: beim Bearbeiten der konkrete Tag, sonst heute
+  const today = isoDate(new Date());
+  const startVal = existing?.datum || today;
+  const endVal = existing?.datum || today;
+  document.getElementById('modalTitle').textContent = existing ? 'Schultag bearbeiten' : 'Schultage hinzufügen';
   document.getElementById('modalBody').innerHTML = `<div class="form-grid">
-    <div class="form-group full"><label class="form-label">Schultag wählen <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">(wiederholt sich jede Woche)</span></label>
-      <div id="schuleCalArea"></div></div>
+    <div class="form-group"><label class="form-label">Von Datum</label>
+      <input class="form-input" type="date" id="schStart" value="${startVal}"></div>
+    <div class="form-group"><label class="form-label">Bis Datum ${existing?'':'<span style="font-weight:400;color:var(--text-muted);font-size:.78rem">(Wochenenden werden übersprungen)</span>'}</label>
+      <input class="form-input" type="date" id="schEnd" value="${endVal}" ${existing?'disabled':''}></div>
     <div class="form-group"><label class="form-label">Klasse</label>
       <input class="form-input" id="schKlasse" value="${klasse}" placeholder="z.B. NK3a"></div>
     <div class="form-group full"><label class="form-label">Schule</label>
       <input class="form-input" id="schSchule" value="${schule}" placeholder="z.B. Berufsschule"></div>
-    <div class="form-group"><label class="form-label">Von</label>
+    <div class="form-group"><label class="form-label">Von (Uhrzeit)</label>
       <input class="form-input" type="time" id="schVon" value="${von}"></div>
-    <div class="form-group"><label class="form-label">Bis</label>
+    <div class="form-group"><label class="form-label">Bis (Uhrzeit)</label>
       <input class="form-input" type="time" id="schBis" value="${bis}"></div>
   </div>`;
   document.getElementById('modalFooter').innerHTML =
     `<button class="btn" onclick="closeModal()">Abbrechen</button>`+
     `<button class="btn btn-primary" onclick="saveSchule(${empId},${schuleId??'null'})">Speichern</button>`;
   document.getElementById('modalOverlay').classList.remove('hidden');
-  renderSchuleCal();
 }
 
-/** Monatskalender im Schultag-Modal rendern (Wochentag-Auswahl, wiederholend). */
-function renderSchuleCal(){
-  const area = document.getElementById('schuleCalArea');
-  if(!area) return;
-  const m = window._schuleCalMonth;
-  const selWd = window._schuleSelWd;
-  const y = m.getFullYear(), mo = m.getMonth();
-  const fd = new Date(y, mo, 1).getDay();
-  const so = fd === 0 ? 6 : fd - 1;          // Mo-first Offset
-  const dim = new Date(y, mo+1, 0).getDate();
-  let cells = '';
-  for(let i=0;i<so;i++) cells += '<div></div>';
-  for(let d=1; d<=dim; d++){
-    const dow = new Date(y, mo, d).getDay();   // 0=So..6=Sa
-    const isWeekend = dow===0 || dow===6;
-    if(isWeekend){
-      cells += `<div style="text-align:center;padding:7px 0;font-size:.82rem;color:var(--text-muted);opacity:.3">${d}</div>`;
-    } else {
-      const sel = dow === selWd;
-      cells += `<div onclick="schulePickDay(${dow})" style="text-align:center;padding:7px 0;font-size:.82rem;border-radius:8px;cursor:pointer;font-weight:${sel?'700':'500'};background:${sel?'var(--accent)':'transparent'};color:${sel?'#fff':'var(--text-primary)'}">${d}</div>`;
-    }
-  }
-  const hdr = ['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<div style="text-align:center;font-size:.62rem;font-weight:700;color:var(--text-muted);text-transform:uppercase">${d}</div>`).join('');
-  area.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <button type="button" class="btn btn-sm" onclick="schuleCalNav(-1)">‹</button>
-      <strong style="font-size:.88rem">${MONTHS_DE[mo]} ${y}</strong>
-      <button type="button" class="btn btn-sm" onclick="schuleCalNav(1)">›</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">${hdr}</div>
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">${cells}</div>
-    <div style="margin-top:10px;font-size:.8rem;color:var(--text-secondary)">Gewählt: <strong style="color:var(--accent)">${SCHULE_WOCHENTAGE[selWd-1]||'—'}</strong> · jede Woche</div>`;
-}
-function schuleCalNav(dir){
-  const m = window._schuleCalMonth;
-  window._schuleCalMonth = new Date(m.getFullYear(), m.getMonth()+dir, 1);
-  renderSchuleCal();
-}
-function schulePickDay(dow){
-  window._schuleSelWd = dow;   // 1..5
-  renderSchuleCal();
-}
-
-/** Schultag speichern (neu oder Update) + Supabase-Sync. */
+/** Schultag(e) speichern: beim Bearbeiten 1 Tag, beim Neuanlegen alle
+ *  Werktage (Mo–Fr) im Datumsbereich. + Supabase-Sync. */
 function saveSchule(empId, schuleId){
   const emp = EMPS.find(e=>e.id===empId);
   if(!emp) return;
-  const wd = window._schuleSelWd || 1;            // 1..5 (Mo..Fr)
-  const row = {
-    wochentag: SCHULE_WOCHENTAGE[wd-1] || 'Montag',
+  const startStr = document.getElementById('schStart').value;
+  if(!startStr){ toast('Bitte Datum wählen','err'); return; }
+  const base = {
     schule: document.getElementById('schSchule').value.trim() || 'Berufsschule',
     klasse: document.getElementById('schKlasse').value.trim(),
     von: document.getElementById('schVon').value || '08:00',
     bis: document.getElementById('schBis').value || '15:00',
     aktiv: true
   };
+
   if(schuleId){
+    // Bearbeiten: nur diesen einen Tag
     const ex = SCHULE_SCHEDULE.find(s=>s.id===schuleId);
-    if(ex){ Object.assign(ex, row); syncUpdateSchule(ex); }
-  } else {
-    const ns = { id:null, empId, ...row };
+    if(ex){
+      Object.assign(ex, base, { datum: startStr, wochentag: SCHULE_WOCHENTAGE[(new Date(startStr).getDay())-1] || null });
+      syncUpdateSchule(ex);
+    }
+    closeModal();
+    toast('Schultag gespeichert');
+    renderAusbildung();
+    return;
+  }
+
+  // Neu anlegen: alle Werktage (Mo–Fr) im Bereich start..end
+  const endStr = document.getElementById('schEnd').value || startStr;
+  let start = new Date(startStr), end = new Date(endStr);
+  if(end < start){ const t=start; start=end; end=t; }
+  let created = 0, skippedExisting = 0;
+  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+    const dow = d.getDay();                // 0=So..6=Sa
+    if(dow===0 || dow===6) continue;       // Wochenenden überspringen
+    const ds = isoDate(d);
+    // Doppelte Tage je Azubi vermeiden
+    if(SCHULE_SCHEDULE.some(s=>s.empId===empId && s.datum===ds)){ skippedExisting++; continue; }
+    const ns = { id:null, empId, datum: ds, wochentag: SCHULE_WOCHENTAGE[dow-1] || null, ...base };
     SCHULE_SCHEDULE.push(ns);
     syncAddSchule(ns);
+    created++;
   }
   closeModal();
-  toast('Schultag gespeichert');
+  if(created===0){
+    toast(skippedExisting>0 ? 'Alle Tage bereits vorhanden' : 'Keine Werktage im Bereich','warn');
+  } else {
+    toast(`${created} Schultag${created>1?'e':''} gespeichert${skippedExisting?` · ${skippedExisting} übersprungen`:''}`);
+  }
   renderAusbildung();
 }
 
