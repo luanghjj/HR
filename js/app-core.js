@@ -3661,7 +3661,7 @@ function renderSchedule(){
           if(!ruheType){
             h+='<div class="ruhetag-cell"><span class="ruhetag-label">Ruhetag</span></div>';
           } else if(canEdit){
-            h+=`<div class="empty-cell-add" onclick="quickAddShift('${emp}','${ds}')" title="Schicht hinzufügen"><span class="ms">add</span></div>`;
+            h+=`<div class="empty-cell-add" onclick="quickAddShift('${emp}','${ds}',${_empObj2?.id??'null'})" title="Schicht hinzufügen"><span class="ms">add</span></div>`;
           } else {
             h+='<span style="color:var(--text-muted);font-size:.7rem">—</span>';
           }
@@ -3723,8 +3723,39 @@ function onDrop(e){e.preventDefault();e.currentTarget.classList.remove('drag-ove
   syncUpdateShift(sh);toast('Schicht verschoben ✓');renderSchedule();}
 
 // ═══ QUICK ADD SHIFT (click empty cell) ═══
-function quickAddShift(empName, date) {
-  const emp = EMPS.find(e => e.name === empName);
+// Ermittelt den Standort für eine neue Schicht. Eindeutig → direkt zurück.
+// Mehrere Standorte UND "Alle Standorte" aktiv → Auswahl-Popup, Promise<string|null>.
+function pickShiftLocation(emp) {
+  const empLocs = (emp.location || '').split(',').map(l => l.trim()).filter(Boolean);
+  if (currentLocation !== 'all' && empLocs.includes(currentLocation)) return Promise.resolve(currentLocation);
+  if (empLocs.length <= 1) return Promise.resolve(empLocs[0] || emp.location || null);
+  // Mehrdeutig → fragen
+  return new Promise(resolve => {
+    document.getElementById('shiftLocPickerPopup')?.remove();
+    const popup = document.createElement('div');
+    popup.id = 'shiftLocPickerPopup';
+    popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+    const finish = (val) => { popup.remove(); resolve(val); };
+    popup.onclick = (e) => { if (e.target === popup) finish(null); };
+    const btns = empLocs.map(lid =>
+      `<button class="btn btn-primary" style="width:100%;justify-content:flex-start" data-loc="${lid}">${getLocationName(lid)}</button>`
+    ).join('');
+    popup.innerHTML = `<div style="background:var(--bg-card);border-radius:20px;padding:24px;width:320px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <h3 style="font-size:.95rem;font-weight:700;margin:0 0 4px">📍 Standort wählen</h3>
+      <p style="font-size:.8rem;color:var(--text-muted);margin:0 0 16px">${emp.name} arbeitet an mehreren Standorten. Für welchen gilt die Schicht?</p>
+      <div style="display:flex;flex-direction:column;gap:8px">${btns}</div>
+      <div style="margin-top:16px;text-align:right"><button class="btn btn-sm" id="shiftLocCancel">Abbrechen</button></div>
+    </div>`;
+    document.body.appendChild(popup);
+    popup.querySelectorAll('[data-loc]').forEach(b => b.onclick = () => finish(b.dataset.loc));
+    popup.querySelector('#shiftLocCancel').onclick = () => finish(null);
+  });
+}
+
+function quickAddShift(empName, date, empId) {
+  // Bevorzugt per ID auflösen (eindeutig); Name nur als Fallback (kann doppelt sein).
+  const emp = (empId != null && EMPS.find(e => e.id === empId))
+    || EMPS.find(e => e.name === empName);
   if (!emp) return;
 
   const tmplOpts = SHIFT_TEMPLATES.map((t, i) => `<option value="${i}">${t.label} (${t.from}–${t.to})</option>`).join('');
@@ -3768,11 +3799,9 @@ async function saveQuickShift() {
   if (!emp || !from || !to) { toast('Bitte Zeiten ausfüllen', 'err'); return; }
 
   const label = tmplIdx !== '' ? SHIFT_TEMPLATES[tmplIdx].label : 'Schicht';
-  // Standort: bei Mehrfach-Standort den aktuell gewählten nehmen, sonst den ersten.
-  const empLocs = (emp.location || '').split(',').map(l => l.trim()).filter(Boolean);
-  const shiftLoc = (currentLocation !== 'all' && empLocs.includes(currentLocation))
-    ? currentLocation
-    : (empLocs[0] || emp.location);
+  // Standort bestimmen (ggf. nachfragen bei Mehrfach-Standort + "Alle").
+  const shiftLoc = await pickShiftLocation(emp);
+  if (!shiftLoc) return; // abgebrochen
   const newShift = {
     empId: emp.id, empName: emp.name, dept: emp.dept, location: shiftLoc,
     date, from, to, label, colorClass: getDeptColorClass(emp.dept),
@@ -6162,12 +6191,9 @@ async function saveShift(){
   let created=0;
   const blockedSet=new Set();
   for(const emp of selEmps){
-    // Standort der Schicht: bei Mehrfach-Standort den aktuell gewählten nehmen,
-    // sonst den (einzigen) Standort des Mitarbeiters – nie alle gleichzeitig.
-    const empLocs=(emp.location||'').split(',').map(l=>l.trim()).filter(Boolean);
-    const shiftLoc=(currentLocation!=='all'&&empLocs.includes(currentLocation))
-      ? currentLocation
-      : (empLocs[0]||emp.location);
+    // Standort der Schicht bestimmen (ggf. nachfragen bei Mehrfach-Standort + "Alle").
+    const shiftLoc=await pickShiftLocation(emp);
+    if(!shiftLoc)continue; // für diesen MA abgebrochen
     for(const s of dayDefs){
       const vt=getVacTypeForDate(s.date, shiftLoc);
       if(!vt){blockedSet.add(formatDateDE(s.date));continue;}
