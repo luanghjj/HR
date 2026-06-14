@@ -3266,7 +3266,14 @@ async function updateEmpText(empId, field, value){
   // Standort/Bereich-Wechsel: zukünftige Schichten (ab heute) mitziehen
   if(field==='dept'||field==='location'){
     const moved=await syncFutureShiftsForEmp(empId, field, value);
-    toast('Aktualisiert: '+field+(moved?` · ${moved} künftige Schichten verschoben`:''));
+    // Beim Standortwechsel auch künftige Urlaub/Krank mitziehen,
+    // sonst erscheint der MA im alten Standort-Raster weiter.
+    let movedVS=0;
+    if(field==='location') movedVS=await syncFutureVacsSicksForEmp(empId, value);
+    const parts=[];
+    if(moved)parts.push(`${moved} Schichten`);
+    if(movedVS)parts.push(`${movedVS} Urlaub/Krank`);
+    toast('Aktualisiert: '+field+(parts.length?` · ${parts.join(' + ')} verschoben`:''));
     if(getCurrentPage()==='schedule')renderSchedule();
     return;
   }
@@ -5153,7 +5160,10 @@ async function changeUserLocation(userId, newLoc) {
     const emp = EMPS.find(e => e.id === u.empId);
     if (emp) {
       emp.location = newLoc;
-      syncEmployeeField(emp.id, 'location', newLoc);
+      await syncEmployeeField(emp.id, 'location', newLoc);
+      // Künftige Schichten + Urlaub/Krank mitziehen, sonst bleiben sie im alten Standort.
+      await syncFutureShiftsForEmp(emp.id, 'location', newLoc);
+      await syncFutureVacsSicksForEmp(emp.id, newLoc);
     }
   }
   try {
