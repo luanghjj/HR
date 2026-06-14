@@ -355,6 +355,7 @@
   margin: 0;
   font-size: .75rem;
   display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  border: 1.5px solid transparent;
   border-left-width: 4px !important;
   position: relative; overflow: hidden;
 }
@@ -367,46 +368,46 @@
   line-height: 1.1;
 }
 
-/* Dept colors v2 */
+/* Dept colors v2 – farbiger Rahmen rundum für bessere Unterscheidbarkeit */
 .sc2-grid-wrap .shift-block.service {
-  background: rgba(59,79,210,.06);
-  border-left-color: #3b4fd2;
+  background: rgba(59,79,210,.10);
+  border-color: #3b4fd2;
 }
 .sc2-grid-wrap .shift-block.service .shift-name { color: #3b4fd2; }
 
 .sc2-grid-wrap .shift-block.kitchen {
-  background: rgba(16,185,129,.06);
-  border-left-color: #10b981;
+  background: rgba(16,185,129,.10);
+  border-color: #10b981;
 }
 .sc2-grid-wrap .shift-block.kitchen .shift-name { color: #10b981; }
 
 .sc2-grid-wrap .shift-block.bar {
-  background: rgba(249,115,22,.06);
-  border-left-color: #f97316;
+  background: rgba(249,115,22,.10);
+  border-color: #f97316;
 }
 .sc2-grid-wrap .shift-block.bar .shift-name { color: #f97316; }
 
 .sc2-grid-wrap .shift-block.azubi {
-  background: rgba(139,92,246,.07);
-  border-left-color: #8b5cf6;
+  background: rgba(139,92,246,.11);
+  border-color: #8b5cf6;
 }
 .sc2-grid-wrap .shift-block.azubi .shift-name { color: #8b5cf6; }
 
 .sc2-grid-wrap .shift-block.sushi {
-  background: rgba(139,92,246,.06);
-  border-left-color: #8b5cf6;
+  background: rgba(236,72,153,.10);
+  border-color: #ec4899;
 }
-.sc2-grid-wrap .shift-block.sushi .shift-name { color: #8b5cf6; }
+.sc2-grid-wrap .shift-block.sushi .shift-name { color: #ec4899; }
 
 .sc2-grid-wrap .shift-block.verwaltung {
-  background: rgba(225,29,72,.06);
-  border-left-color: #e11d48;
+  background: rgba(225,29,72,.10);
+  border-color: #e11d48;
 }
 .sc2-grid-wrap .shift-block.verwaltung .shift-name { color: #e11d48; }
 
 .sc2-grid-wrap .shift-block.schule {
-  background: rgba(0,180,216,.07);
-  border-left-color: #00b4d8;
+  background: rgba(0,180,216,.11);
+  border-color: #00b4d8;
 }
 .sc2-grid-wrap .shift-block.schule .shift-name { color: #00b4d8; }
 
