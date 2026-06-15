@@ -3288,10 +3288,35 @@ function deptsForLocation(loc){
   }));
 }
 
+// Liefert die anzuzeigenden Bereich-Karten als {dept, loc}. Bei "Alle Standorte"
+// wird je Standort × je Bereich eine eigene Karte erzeugt, damit Mitarbeiter
+// nicht standortübergreifend zusammengezählt werden. Leere Bereiche (0 MA und
+// kein DB-Eintrag) werden im Alle-Modus ausgelassen, um die Liste kurz zu halten.
+function deptCardsFor(scopeLoc){
+  if(scopeLoc && scopeLoc!=='all'){
+    return deptsForLocation(scopeLoc).map(d => ({ dept:d, loc:d.location||scopeLoc }));
+  }
+  // Alle Standorte → pro Standort die passenden Bereiche
+  const cards = [];
+  LOCS.forEach(l => {
+    deptsForLocation(l.id).forEach(d => {
+      const hasEmps = EMPS.some(e => e.dept===d.name && empHasLoc(e, l.id));
+      const isRealDbDept = !String(d.id).startsWith('syn_');
+      // synthetische Bereiche nur zeigen, wenn dort wirklich jemand arbeitet
+      if(hasEmps || isRealDbDept){
+        cards.push({ dept:{...d, location:l.id}, loc:l.id });
+      }
+    });
+  });
+  return cards;
+}
+
 function renderDepts(){
   const pg=document.getElementById('page-departments');
   if(!can('seeAllEmployees')){pg.innerHTML=permBanner('Bereichsübersicht ist nur für Manager und Inhaber verfügbar.');return;}
-  const _uLoc=currentUser.location;const _isAll=_uLoc==='all';const depts=_isAll?(currentLocation==='all'?DEPTS:deptsForLocation(currentLocation)):deptsForLocation(_uLoc);
+  const _uLoc=currentUser.location;const _isAll=_uLoc==='all';
+  const scopeLoc=_isAll?currentLocation:_uLoc;
+  const deptCards=deptCardsFor(scopeLoc);
   const isAdmin=SHOW_SALARY && can('seeFinancials');
   const today=isoDate(new Date());
 
@@ -3305,10 +3330,10 @@ function renderDepts(){
   </div>
   <div class="dept-accordion">`;
 
-  if(!depts.length) html+=`<div class="dept-empty"><span class="ms">domain</span><p>Keine Bereiche gefunden.</p></div>`;
+  if(!deptCards.length) html+=`<div class="dept-empty"><span class="ms">domain</span><p>Keine Bereiche gefunden.</p></div>`;
 
-  depts.forEach(dept=>{
-    const deptEmps=EMPS.filter(e=>e.dept===dept.name&&empHasLoc(e,dept.location));
+  deptCards.forEach(({dept,loc})=>{
+    const deptEmps=EMPS.filter(e=>e.dept===dept.name&&empHasLoc(e,loc));
     const activeCount=deptEmps.filter(e=>e.status==='active').length;
     const sickCount=deptEmps.filter(e=>e.status==='sick').length;
     const vacCount=deptEmps.filter(e=>e.status==='vacation').length;
@@ -3316,9 +3341,9 @@ function renderDepts(){
     const sollHours=deptEmps.reduce((s,e)=>s+e.sollStunden,0);
     const hoursPct=sollHours>0?Math.round(totalHours/sollHours*100):0;
     const totalCost=isAdmin?deptEmps.reduce((s,e)=>s+e.bruttoGehalt,0):0;
-    const todayShifts=SHIFTS.filter(s=>s.dept===dept.name&&s.location===dept.location&&s.date===today&&!s.isSick&&!s.isVacation);
-    const deptId='dept_'+dept.id;
-    const city=LOCS.find(l=>l.id===dept.location)?.city||LOCS.find(l=>l.id===dept.location)?.name||'';
+    const todayShifts=SHIFTS.filter(s=>s.dept===dept.name&&s.location===loc&&s.date===today&&!s.isSick&&!s.isVacation);
+    const deptId='dept_'+dept.id+'_'+loc;
+    const city=LOCS.find(l=>l.id===loc)?.name||LOCS.find(l=>l.id===loc)?.city||'';
     const pctColor=hoursPct>=90?'#10b981':hoursPct>=70?'#f59e0b':'#ef4444';
     const barGrad=`linear-gradient(90deg,${pctColor},${pctColor}88)`;
 
@@ -3406,16 +3431,15 @@ function renderDepts(){
 
   html+=`</div>`;
 
-  if(isAdmin && depts.length){
-    const allEmps=EMPS.filter(e=>depts.some(d=>d.name===e.dept&&empHasLoc(e,d.location)));
-    const totalCostAll=allEmps.reduce((s,e)=>s+e.bruttoGehalt,0);
-    const avgPct=depts.length>0?Math.round(depts.map(d=>{
-      const de=EMPS.filter(e=>e.dept===d.name&&empHasLoc(e,d.location));
+  if(isAdmin && deptCards.length){
+    const totalCostAll=deptCards.reduce((sum,{dept,loc})=>sum+EMPS.filter(e=>e.dept===dept.name&&empHasLoc(e,loc)).reduce((s,e)=>s+e.bruttoGehalt,0),0);
+    const avgPct=deptCards.length>0?Math.round(deptCards.map(({dept,loc})=>{
+      const de=EMPS.filter(e=>e.dept===dept.name&&empHasLoc(e,loc));
       const th=de.reduce((s,e)=>s+calcPlanHours(e.id),0);
       const sh=de.reduce((s,e)=>s+e.sollStunden,0);
       return sh>0?th/sh*100:0;
-    }).reduce((a,b)=>a+b,0)/depts.length):0;
-    const totalToday=SHIFTS.filter(s=>s.date===today&&depts.some(d=>d.name===s.dept&&d.location===s.location)&&!s.isSick&&!s.isVacation).length;
+    }).reduce((a,b)=>a+b,0)/deptCards.length):0;
+    const totalToday=SHIFTS.filter(s=>s.date===today&&deptCards.some(({dept,loc})=>dept.name===s.dept&&loc===s.location)&&!s.isSick&&!s.isVacation).length;
 
     html+=`
     <div class="dept-insight-grid">
