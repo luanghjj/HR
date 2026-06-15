@@ -1893,6 +1893,7 @@ function viewEmp(id){
 
 // ═══ DELETE EMPLOYEE (Inhaber only) ═══
 async function deleteEmployee(empId, empName) {
+  if (!can('editEmployees')) return;
   const confirmed = confirm(`⚠️ Mitarbeiter wirklich löschen?\n\n"${empName}" wird dauerhaft aus der Datenbank entfernt.\nDiese Aktion kann NICHT rückgängig gemacht werden!`);
   if (!confirmed) return;
   try {
@@ -3286,7 +3287,7 @@ function openLateModal(empId){
   document.getElementById('modalFooter').innerHTML=`<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="saveLate(${empId})">Vermerken</button>`;
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
-function saveLate(empId){const e=EMPS.find(x=>x.id===empId);const m=parseInt(document.getElementById('mLM').value)||0;if(m<=0)return;e.lateCount++;syncEmployeeField(e.id,'lateCount',e.lateCount);const d=document.getElementById('mLD').value;const sh=SHIFTS.find(s=>s.empId===empId&&s.date===d);if(sh){sh.isLate=true;sh.lateMin=m;syncUpdateShift(sh);}addNotif('late','Verspätung',`${e.name}: ${m} Min.`);closeModal();toast(`Verspätung vermerkt`,'warn');renderPage(getCurrentPage());}
+function saveLate(empId){if(!can('markLate')&&!can('editSchedules'))return;const e=EMPS.find(x=>x.id===empId);const m=parseInt(document.getElementById('mLM').value)||0;if(m<=0)return;e.lateCount++;syncEmployeeField(e.id,'lateCount',e.lateCount);const d=document.getElementById('mLD').value;const sh=SHIFTS.find(s=>s.empId===empId&&s.date===d);if(sh){sh.isLate=true;sh.lateMin=m;syncUpdateShift(sh);}addNotif('late','Verspätung',`${e.name}: ${m} Min.`);closeModal();toast(`Verspätung vermerkt`,'warn');renderPage(getCurrentPage());}
 
 // ═══ DEPARTMENTS ═══
 // Standard-Bereiche, falls für einen Standort (noch) keine departments-Zeilen
@@ -3923,8 +3924,9 @@ function updateShiftFromModal(id){
   syncUpdateShift(s);
   closeModal();toast('Schicht aktualisiert ✓');renderSchedule();
 }
-function markSick(id){const s=SHIFTS.find(x=>x.id===id);if(!s)return;s.isSick=!s.isSick;s.isVacation=false;const e=EMPS.find(x=>x.id===s.empId);if(s.isSick){if(e){e.sickDays++;syncEmployeeField(e.id,'sickDays',e.sickDays);}addNotif('sick','Krank',`${s.empName}: ${formatDateDE(s.date)}`);}else{if(e){e.sickDays=Math.max(0,e.sickDays-1);syncEmployeeField(e.id,'sickDays',e.sickDays);}}syncUpdateShift(s);renderSchedule();}
+function markSick(id){if(!can('editSchedules'))return;const s=SHIFTS.find(x=>x.id===id);if(!s)return;s.isSick=!s.isSick;s.isVacation=false;const e=EMPS.find(x=>x.id===s.empId);if(s.isSick){if(e){e.sickDays++;syncEmployeeField(e.id,'sickDays',e.sickDays);}addNotif('sick','Krank',`${s.empName}: ${formatDateDE(s.date)}`);}else{if(e){e.sickDays=Math.max(0,e.sickDays-1);syncEmployeeField(e.id,'sickDays',e.sickDays);}}syncUpdateShift(s);renderSchedule();}
 function markVac(id){
+  if(!can('editSchedules'))return;
   const s=SHIFTS.find(x=>x.id===id);if(!s)return;
   if(s.isVacation){
     // Toggle off
@@ -3946,7 +3948,7 @@ function markVac(id){
   }
   syncUpdateShift(s);renderSchedule();
 }
-function markLateShift(id){const s=SHIFTS.find(x=>x.id===id);if(!s)return;const m=prompt('Minuten verspätet:','15');if(!m||isNaN(m))return;s.isLate=true;s.lateMin=parseInt(m);const e=EMPS.find(x=>x.id===s.empId);if(e){e.lateCount++;syncEmployeeField(e.id,'lateCount',e.lateCount);}addNotif('late','Verspätung',`${s.empName}: ${m} Min.`);syncUpdateShift(s);toast('Verspätung vermerkt','warn');renderSchedule();}
+function markLateShift(id){if(!can('markLate')&&!can('editSchedules'))return;const s=SHIFTS.find(x=>x.id===id);if(!s)return;const m=prompt('Minuten verspätet:','15');if(!m||isNaN(m))return;s.isLate=true;s.lateMin=parseInt(m);const e=EMPS.find(x=>x.id===s.empId);if(e){e.lateCount++;syncEmployeeField(e.id,'lateCount',e.lateCount);}addNotif('late','Verspätung',`${s.empName}: ${m} Min.`);syncUpdateShift(s);toast('Verspätung vermerkt','warn');renderSchedule();}
 function copyWeek(){const ws2=getWeekStart(scheduleDate);const nw=new Date(ws2);nw.setDate(nw.getDate()+7);let c=0;
   for(let d=0;d<7;d++){const sd=new Date(ws2);sd.setDate(sd.getDate()+d);const dd=new Date(nw);dd.setDate(dd.getDate()+d);const sds=isoDate(sd),dds=isoDate(dd);
     const src=getVisibleShifts().filter(s=>s.date===sds);SHIFTS=SHIFTS.filter(s=>s.date!==dds);
@@ -4066,7 +4068,7 @@ async function confirmGenerateStandardWeek() {
   toast(`✓ ${toCreate.length} Schichten erstellt`);
   renderSchedule();
 }
-function deleteShift(id){const s=SHIFTS.find(x=>x.id===id);if(!s)return;if(!confirm(`${s.empName}: ${s.label} (${formatDateDE(s.date)}) löschen?`))return;SHIFTS=SHIFTS.filter(x=>x.id!==id);syncDeleteShift(id);toast('Schicht gelöscht','warn');renderSchedule();}
+function deleteShift(id){if(!can('editSchedules'))return;const s=SHIFTS.find(x=>x.id===id);if(!s)return;if(!confirm(`${s.empName}: ${s.label} (${formatDateDE(s.date)}) löschen?`))return;SHIFTS=SHIFTS.filter(x=>x.id!==id);syncDeleteShift(id);toast('Schicht gelöscht','warn');renderSchedule();}
 function exportPDF(){if(!can('canExport'))return;const pc=document.getElementById('schedC').innerHTML;const lbl=document.getElementById('schedLabel').textContent;const w=window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>Arbeitsplan</title><style>body{font-family:'Segoe UI',Arial,sans-serif;padding:24px;color:#222}h1{font-size:20px}h2{font-size:14px;color:#666;font-weight:normal;margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;border:1px solid #ddd;font-size:12px;text-align:left}th{background:#f5f5f5;font-weight:700;text-transform:uppercase;font-size:10px}.shift-block{padding:3px 6px;border-radius:3px;font-size:11px;margin:2px 0;background:#f0f0f0;border-left:3px solid #666}.shift-block.kitchen{border-left-color:#e17055;background:#fef3ef}.shift-block.service{border-left-color:#74b9ff;background:#eef5ff}.shift-block.bar{border-left-color:#00b894;background:#eefaf6}.shift-block.is-sick{border-left-color:#d63031;background:#ffeaea}.shift-block.is-vacation{border-left-color:#0984e3;background:#eaf2ff}.shift-block.is-late{border-right:3px solid #e84393}.shift-name{font-weight:600}.shift-time{font-size:10px;color:#888}.shift-actions{display:none}.table-wrap{border:none}.table-header{display:none}.late-marker{color:#e84393;font-size:9px}.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}.cal-day{border:1px solid #ddd;padding:4px;min-height:50px;font-size:11px}.cal-day-header{font-size:10px;font-weight:700;text-align:center;padding:4px;background:#f5f5f5}.cal-day-num{font-weight:700}.cal-event{font-size:9px;padding:1px 4px;background:#eef;border-radius:2px;margin-top:2px}@media print{body{padding:0}}</style></head><body><h1>Arbeitsplan – ${currentUser.role==='inhaber'?'Alle Standorte':getLocationName(currentUser.location)}</h1><h2>${lbl}</h2>${pc}<script>window.print();<\/script></body></html>`);w.document.close();}
 
@@ -4705,8 +4707,8 @@ function renderVacation(){
   vc.innerHTML=`<div class="vac-bento"><div class="vac-cal-card"><div class="vac-cal-toolbar"><div><h3 class="vac-cal-month">${MONTHS_DE[m]} ${y}</h3><p class="vac-cal-sub">${vacs.filter(v=>v.status==='approved').length} genehmigte Abwesenheiten</p></div><div class="vac-cal-nav"><button class="vac-nav-btn" onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()-1);renderVacation()"><span class="ms">chevron_left</span></button><button class="vac-today-btn" onclick="vacationCalendarMonth=new Date();renderVacation()">Heute</button><button class="vac-nav-btn" onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()+1);renderVacation()"><span class="ms">chevron_right</span></button></div></div><div class="vac-cal-grid">${calCells}</div><div class="vac-legend"><div class="vac-legend-item"><div class="vac-legend-dot" style="background:var(--accent)"></div>Urlaub</div><div class="vac-legend-item"><div class="vac-legend-dot" style="background:var(--danger)"></div>Krankheit</div><div class="vac-legend-item"><div class="vac-legend-dot" style="background:#10b981"></div>Fortbildung</div></div></div><div class="vac-side-panel"><div class="vac-panel-card"><div class="vac-panel-header"><h4 class="vac-panel-title">Offene Antr\u00e4ge</h4><span class="vac-badge-count">${pendingVacs.length}</span></div>${pendingList.length?pendingList.map(v=>`<div class="vac-req-item"><div class="vac-req-avatar">${v.empName.split(' ').map(n=>n[0]).join('').substring(0,2)}</div><div class="vac-req-info"><div class="vac-req-name">${v.empName}</div><div class="vac-req-dates">${formatDateDE(v.from)} - ${formatDateDE(v.to)} (${v.days}T)</div></div>${can('approveVacations')?`<div class="vac-req-actions"><button class="vac-btn-approve" onclick="appVac(${v.id})"><span class="ms">check</span></button><button class="vac-btn-reject" onclick="rejVac(${v.id})"><span class="ms">close</span></button></div>`:''}</div>`).join(''):'<p class="vac-empty">Keine offenen Antr\u00e4ge</p>'}${pendingVacs.length>5?`<button class="vac-see-all" onclick="vacationTab='requests';renderVacation()">Alle Antr\u00e4ge sehen</button>`:''}</div></div></div>`;
 }
 
-function appVac(id){const v=VACS.find(x=>x.id===id);if(v){v.status='approved';syncVacationStatus(v.id,'approved');const e=EMPS.find(x=>x.id===v.empId);if(e){e.vacUsed+=v.days;syncEmployeeField(e.id,'vacUsed',e.vacUsed);}addNotif('vacation','Urlaub genehmigt',v.empName);toast('Genehmigt');renderVacation();updateBadges();}}
-function rejVac(id){const v=VACS.find(x=>x.id===id);if(v){v.status='rejected';syncVacationStatus(v.id,'rejected');addNotif('vacation','Urlaub abgelehnt',v.empName);toast('Abgelehnt','err');renderVacation();updateBadges();}}
+function appVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(v){v.status='approved';syncVacationStatus(v.id,'approved');const e=EMPS.find(x=>x.id===v.empId);if(e){e.vacUsed+=v.days;syncEmployeeField(e.id,'vacUsed',e.vacUsed);}addNotif('vacation','Urlaub genehmigt',v.empName);toast('Genehmigt');renderVacation();updateBadges();}}
+function rejVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(v){v.status='rejected';syncVacationStatus(v.id,'rejected');addNotif('vacation','Urlaub abgelehnt',v.empName);toast('Abgelehnt','err');renderVacation();updateBadges();}}
 
 // ═══ SICK ═══
 function renderSick(){
@@ -4860,10 +4862,8 @@ function renderAccess(){
 
   let rows = activeUsers.map(u => {
     const emp = u.empId ? EMPS.find(e=>e.id===u.empId) : null;
-    const roleSelect = `<select class="form-select" style="min-width:120px" onchange="changeUserRole('${u.id}',this.value)">
-      ${roleOpts.map(r => `<option value="${r}" ${u.role===r?'selected':''}>${r==='inhaber'?'👑 Inhaber':r==='manager'?'🏢 Manager':r==='mitarbeiter'?'👤 Mitarbeiter':'🎓 Azubi'}</option>`).join('')}
-    </select>`;
-    // Location – multi-value tags (like dept)
+    const roleLabel = u.role==='inhaber'?'👑 Inhaber':u.role==='manager'?'🏢 Manager':u.role==='mitarbeiter'?'👤 Mitarbeiter':'🎓 Azubi';
+    // Location – multi-value tags
     const userLocs = (u.location || '').split(',').map(l => l.trim()).filter(Boolean);
     const isAllLoc = userLocs.includes('all');
     const locTags = isAllLoc
@@ -4871,39 +4871,26 @@ function renderAccess(){
       : userLocs.length > 0
         ? userLocs.map(lid => `<span style="display:inline-block;font-size:.7rem;font-weight:600;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:10px;margin:1px 2px">${getLocationName(lid)}</span>`).join('')
         : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
-    const locCell = `<div style="cursor:pointer;min-width:120px" onclick="openLocPicker('${u.id}')" title="Klicke zum Ändern">${locTags}</div>`;
-    const empDepts = emp ? (emp.dept || '').split(',').map(d => d.trim()).filter(Boolean) : [];
-    const isAlle = empDepts.includes('Alle');
-    const deptTags = emp ? (isAlle
-      ? '<span style="display:inline-block;font-size:.7rem;font-weight:700;background:rgba(217,119,6,.1);color:#d97706;padding:3px 10px;border-radius:10px">Alle</span>'
-      : empDepts.length > 0
-        ? empDepts.map(d => `<span style="display:inline-block;font-size:.7rem;font-weight:600;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:10px;margin:1px 2px">${d}</span>`).join('')
-        : '<span style="color:var(--text-muted);font-size:.75rem">—</span>')
-      : '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
-    const deptCell = emp ? `<div style="cursor:pointer;min-width:100px" onclick="openDeptPicker('${u.id}')" title="Klicke zum Ändern">${deptTags}</div>` : deptTags;
-    const emailInfo = `<input class="form-input" style="width:190px;font-size:.72rem;padding:3px 7px;margin-top:3px" value="${(u.regEmail||'').replace(/"/g,'&quot;')}" placeholder="📧 + Login-E-Mail" title="E-Mail für Login (Google oder Registrierung)" onblur="saveUserEmail('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()">`;
+    const hasLogin = !!(u.regEmail);
+    const emailCell = hasLogin
+      ? `<span style="font-size:.78rem">📧 ${u.regEmail}</span>`
+      : `<span style="font-size:.74rem;color:var(--danger)">⚠️ kein Login</span>`;
     const linkInfo = `<div style="font-size:.72rem;margin-top:2px;color:${emp?'var(--text-muted)':'var(--danger)'}">👤 ${emp?emp.name:'⚠️ nicht verknüpft'}</div>`;
-    const googleBadge = u.regEmail?.includes('gmail') || u.bannerUrl ? '<span style="font-size:.68rem;background:var(--bg-input);padding:1px 6px;border-radius:4px;color:var(--text-muted);margin-left:4px">Google</span>' : '';
-    return `<tr>
+    return `<tr style="cursor:pointer" onclick="openAccountDetailModal('${u.id}')">
       <td><div style="display:flex;align-items:center;gap:10px">
         <div class="emp-avatar">${u.avatar}</div>
         <div>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input class="form-input" style="width:140px;font-weight:600;font-size:.85rem" value="${u.name}" onblur="changeUserName('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
-            ${googleBadge}
-          </div>
-          ${emailInfo}
+          <div style="font-weight:600;font-size:.88rem">${u.name}</div>
+          ${emailCell}
           ${linkInfo}
         </div>
       </div></td>
-      <td><input class="form-input" style="width:140px;font-size:.82rem" value="${emp?.position||u.regPosition||''}" placeholder="Position..." onblur="changeUserPosition('${u.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()"></td>
-      <td>${deptCell}</td>
-      <td>${roleSelect}</td>
-      <td>${locCell}</td>
+      <td><span style="font-size:.82rem;color:var(--text-secondary)">${emp?.position||u.regPosition||'—'}</span></td>
+      <td><span style="font-size:.82rem;font-weight:600">${roleLabel}</span></td>
+      <td>${locTags}</td>
       <td>${statusBadge(u.status)}</td>
-      <td><div style="display:flex;gap:4px">
-        <button class="btn btn-sm" onclick="openEmpLinkModal('${u.id}')" title="Mitarbeiter verknüpfen"><span class="ms" style="font-size:16px">link</span></button>
-        <button class="btn btn-sm" onclick="openPermissionsModal('${u.id}')" title="Berechtigungen"><span class="ms" style="font-size:16px">shield_person</span></button>
+      <td onclick="event.stopPropagation()"><div style="display:flex;gap:4px">
+        <button class="btn btn-sm btn-primary" onclick="openAccountDetailModal('${u.id}')" title="Details & Einstellungen" style="font-weight:600"><span class="ms" style="font-size:16px">settings</span> Detail</button>
         <button class="btn btn-sm btn-danger" onclick="deleteUser('${u.id}')" title="Löschen"><span class="ms" style="font-size:16px">delete</span></button>
       </div></td>
     </tr>`;
@@ -4921,11 +4908,11 @@ function renderAccess(){
       <button class="btn btn-sm ${sortBtnName}" onclick="accessSort='name';renderAccess()">🔤 Name</button>
     </div>
   </div>
-  <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Position</th><th>Bereich</th><th>Rolle</th><th>Standort</th><th>Status</th><th></th></tr></thead><tbody>
+  <div style="overflow-x:auto"><table><thead><tr><th>Name / Login</th><th>Position</th><th>Rolle</th><th>Standort</th><th>Status</th><th></th></tr></thead><tbody>
   ${rows}
   </tbody></table></div></div>
   <div style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:8px;font-size:.82rem;color:var(--text-muted)">
-    💡 Name, Position, Rolle und Standort direkt in der Tabelle ändern. Änderungen werden sofort gespeichert.
+    💡 Auf eine Zeile bzw. <strong>Detail</strong> klicken, um Konto, Login-E-Mail, Passwort und Berechtigungen zu verwalten.
   </div>`;
 
   // Update pending badge in sidebar
@@ -5007,6 +4994,34 @@ async function saveUserEmail(userId, email){
   } catch(e) { toast('Fehler: ' + e.message, 'err'); }
 }
 
+// ═══ ADMIN-USERS EDGE FUNCTION HELPER ═══
+// Ruft die Edge Function 'admin-users' auf (Konto anlegen, Passwort
+// setzen/ansehen). Nur Inhaber – die Funktion prüft das serverseitig.
+async function callAdminUsers(action, payload = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session?.access_token;
+  const headers = { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-users`, {
+    method: 'POST', headers, body: JSON.stringify({ action, ...payload }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
+// Zufalls-Passwort (Buchstaben + Ziffern, gut lesbar)
+function genPassword(len = 10) {
+  const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  const arr = new Uint32Array(len);
+  (crypto.getRandomValues ? crypto.getRandomValues(arr) : arr).forEach((n, i) => {
+    out += chars[(n || Math.floor(Math.random() * 1e9)) % chars.length];
+    void i;
+  });
+  return out;
+}
+
 // ═══ CREATE NEW USER MODAL ═══
 function openCreateUserModal() {
   const locOptions = `<option value="all">🌍 Alle Standorte</option>` +
@@ -5075,7 +5090,19 @@ function openCreateUserModal() {
             <option value="inhaber">👑 Inhaber</option>
           </select>
         </div>
+
+        <div>
+          <label class="form-label">Passwort (optional)</label>
+          <div style="display:flex;gap:6px">
+            <input class="form-input" id="newUserPass" type="text" placeholder="leer = nur einladen" style="flex:1;font-family:monospace">
+            <button type="button" class="btn btn-sm" onclick="document.getElementById('newUserPass').value=genPassword()" title="Zufällig"><span class="ms" style="font-size:16px">casino</span></button>
+          </div>
+        </div>
       </div>
+      <p style="font-size:.74rem;color:var(--text-muted);margin-top:10px">
+        Mit Passwort → Login wird sofort erstellt (Anmeldung mit E-Mail + Passwort).
+        Ohne Passwort → nur Einladung (Mitarbeiter meldet sich per Google/Selbstregistrierung an).
+      </p>
       <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
         <button class="btn btn-sm" onclick="document.getElementById('createUserModal').remove()">Abbrechen</button>
         <button class="btn btn-sm btn-success" onclick="createNewUser()" id="btnCreateUser" style="font-weight:600">
@@ -5144,6 +5171,28 @@ async function createNewUser() {
     // Einladung: Profil OHNE auth_user_id (wird beim ersten Login per E-Mail beansprucht)
     const emp = EMPS.find(e => e.id === empId);
     const initials = (name || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+    const password = (document.getElementById('newUserPass')?.value || '').trim();
+
+    // ── Variante A: Passwort gesetzt → Login sofort über Edge Function anlegen ──
+    if (password) {
+      if (password.length < 6) { toast('Passwort mind. 6 Zeichen', 'err'); resetBtn(); return; }
+      const uid = 'login_' + email.replace(/[^a-z0-9]/g, '').slice(0, 16) + '_' + Date.now().toString(36);
+      const r = await callAdminUsers('create', {
+        email, password, userId: uid, role, location: emp?.location || loc,
+        empId, name, avatar: initials,
+      });
+      const finalUid = r.userId || uid;
+      USERS.push({ id: finalUid, name, role, location: emp?.location || loc, status: 'active',
+        empId, avatar: initials, regEmail: email });
+      document.getElementById('createUserModal').remove();
+      toast(`✓ Login erstellt für ${email}. Anmeldung mit E-Mail + Passwort möglich.`, 'success');
+      addNotif('info', 'Login erstellt', `${name} (${email}) – ${role}`);
+      renderAccess();
+      updateBadges();
+      return;
+    }
+
+    // ── Variante B: kein Passwort → Einladung (Profil ohne auth_user_id) ──
     const uid = 'invite_' + email.replace(/[^a-z0-9]/g, '').slice(0, 16) + '_' + Date.now().toString(36);
     const profile = {
       user_id: uid, auth_user_id: null, name, role, location: emp?.location || loc,
@@ -5169,6 +5218,7 @@ async function createNewUser() {
 }
 
 async function changeUserRole(userId, newRole) {
+  if (!can('manageAccess')) return;
   const u = USERS.find(x => x.id === userId);
   if (!u) return;
   u.role = newRole;
@@ -5637,6 +5687,7 @@ function updatePendingBadge(){
 }
 
 async function deleteUser(userId){
+  if (!can('manageAccess')) return;
   const u = USERS.find(x => x.id === userId);
   if(!u) return;
 
@@ -5734,6 +5785,7 @@ const PERM_GROUPS = {
     { key: 'seeOwnDetail', label: 'Eigenes Profil sehen' },
     { key: 'seeZeiterfassung', label: 'Zeiterfassung sehen & laden' },
     { key: 'seeDepartments', label: 'Bereiche sehen' },
+    { key: 'editDepartments', label: 'Bereiche bearbeiten' },
     { key: 'seeAllLocations', label: 'Alle Standorte sehen' }
   ],
   'Planung': [
@@ -5813,6 +5865,179 @@ const PERM_GROUPS = {
     { key: 'gm_edit_hrm_status', label: 'Status bearbeiten' }
   ]
 };
+
+async function openAccountDetailModal(userId) {
+  if (!can('manageAccess')) return;
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+  const emp = u.empId ? EMPS.find(e => e.id === u.empId) : null;
+
+  // Berechtigungen laden
+  let mode = 'standard';
+  let perms = {};
+  const { data } = await sb.from('user_permissions').select('*').eq('user_id', userId).maybeSingle();
+  if (data) { mode = data.mode || 'standard'; perms = data.permissions || {}; }
+  const roleDefaults = PERMS[u.role] || {};
+  const isCustom = mode === 'custom';
+
+  // Rechte-Checkboxen (GM-Gruppen ausgeblendet → nur HRM-relevant)
+  let groupsHtml = '';
+  for (const [group, items] of Object.entries(PERM_GROUPS)) {
+    if (group.startsWith('💰')) continue; // GehaltsManager-Keys hier nicht zeigen
+    groupsHtml += `<div style="margin-bottom:12px"><div style="font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">${group}</div>`;
+    items.forEach(p => {
+      const checked = isCustom ? (perms[p.key] ? 'checked' : '') : (roleDefaults[p.key] ? 'checked' : '');
+      const isDefault = roleDefaults[p.key] ? '✓' : '✕';
+      groupsHtml += `<label style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:.84rem;cursor:pointer">
+        <input type="checkbox" class="permCheck" data-key="${p.key}" ${checked}>
+        <span>${p.label}</span>
+        <span style="font-size:.66rem;color:var(--text-muted);margin-left:auto">${isDefault} Standard</span>
+      </label>`;
+    });
+    groupsHtml += '</div>';
+  }
+
+  // Standorte + Bereiche
+  const allowedLocs = data?.allowed_locations || [u.location];
+  const allowedDepts = data?.allowed_depts || [];
+  const allDepts = [...new Set(DEPTS.map(d => d.name))].sort();
+  const locCheckboxes = LOCS.map(l => {
+    const checked = allowedLocs.includes(l.id) || allowedLocs.includes('all') ? 'checked' : '';
+    return `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.84rem;cursor:pointer"><input type="checkbox" class="permLoc" value="${l.id}" ${checked}> ${l.name}</label>`;
+  }).join('');
+  const deptCheckboxes = allDepts.map(d => {
+    const checked = allowedDepts.length === 0 || allowedDepts.includes(d) ? 'checked' : '';
+    return `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.84rem;cursor:pointer"><input type="checkbox" class="permDept" value="${d}" ${checked}> ${d}</label>`;
+  }).join('');
+
+  const roleOptsHtml = ['mitarbeiter','azubi','manager','inhaber'].map(r =>
+    `<option value="${r}" ${u.role===r?'selected':''}>${r==='inhaber'?'👑 Inhaber':r==='manager'?'🏢 Manager':r==='mitarbeiter'?'👤 Mitarbeiter':'🎓 Azubi'}</option>`).join('');
+
+  const hasLogin = !!u.regEmail;
+  const locTags = ((u.location||'').split(',').map(l=>l.trim()).filter(Boolean))
+    .map(lid => `<span style="font-size:.72rem;font-weight:600;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:8px;margin:1px 2px">${lid==='all'?'Alle':getLocationName(lid)}</span>`).join('') || '—';
+
+  // Passwort-Block je nach Login-Status
+  const pwBlock = hasLogin
+    ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+         <input class="form-input" id="adPwShow" type="text" readonly value="••••••••" style="width:160px;font-family:monospace;background:var(--bg-secondary)">
+         <button class="btn btn-sm" onclick="adRevealPassword('${userId}')" title="Passwort anzeigen"><span class="ms" style="font-size:16px">visibility</span></button>
+         <button class="btn btn-sm" onclick="adCopyPassword()" title="Kopieren"><span class="ms" style="font-size:16px">content_copy</span></button>
+         <button class="btn btn-sm" onclick="adResetPassword('${userId}')" title="Neues Passwort setzen"><span class="ms" style="font-size:16px">key</span> Zurücksetzen</button>
+       </div>
+       <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">Login aktiv mit dieser E-Mail.</div>`
+    : `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+         <input class="form-input" id="adNewPw" type="text" placeholder="Passwort" style="width:160px;font-family:monospace">
+         <button class="btn btn-sm" onclick="document.getElementById('adNewPw').value=genPassword()" title="Zufällig"><span class="ms" style="font-size:16px">casino</span></button>
+         <button class="btn btn-sm btn-success" onclick="adCreateLogin('${userId}')" style="font-weight:600"><span class="ms" style="font-size:16px">person_add</span> Konto + Passwort erstellen</button>
+       </div>
+       <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">Noch kein Login. E-Mail eingeben, Passwort setzen → Mitarbeiter kann sich sofort anmelden.</div>`;
+
+  const body = `
+    <div style="display:flex;flex-direction:column;gap:16px;max-height:70vh;overflow-y:auto;padding-right:4px">
+      <!-- Konto & Login -->
+      <div style="background:var(--bg-input);border-radius:10px;padding:14px">
+        <div style="font-size:.75rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">👤 Konto & Login</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label class="form-label">Name</label><input class="form-input" id="adName" value="${(u.name||'').replace(/"/g,'&quot;')}"></div>
+          <div><label class="form-label">Rolle</label><select class="form-select" id="adRole">${roleOptsHtml}</select></div>
+          <div><label class="form-label">Position</label><input class="form-input" id="adPos" value="${(emp?.position||u.regPosition||'').replace(/"/g,'&quot;')}"></div>
+          <div><label class="form-label">Verknüpfter Mitarbeiter</label>
+            <div style="display:flex;align-items:center;gap:6px"><span style="font-size:.82rem;flex:1;color:${emp?'var(--text-primary)':'var(--danger)'}">${emp?emp.name:'⚠️ nicht verknüpft'}</span>
+            <button class="btn btn-sm" onclick="closeModal();openEmpLinkModal('${userId}')" title="Ändern"><span class="ms" style="font-size:15px">link</span></button></div>
+          </div>
+          <div style="grid-column:span 2"><label class="form-label">Standort</label>
+            <div style="display:flex;align-items:center;gap:6px"><div style="flex:1">${locTags}</div>
+            <button class="btn btn-sm" onclick="closeModal();openLocPicker('${userId}')" title="Standorte ändern"><span class="ms" style="font-size:15px">edit_location</span></button></div>
+          </div>
+          <div style="grid-column:span 2"><label class="form-label">E-Mail (Login)</label>
+            <input class="form-input" id="adEmail" type="email" value="${(u.regEmail||'').replace(/"/g,'&quot;')}" placeholder="email@example.com" ${hasLogin?'readonly style="background:var(--bg-secondary)"':''}></div>
+          <div style="grid-column:span 2"><label class="form-label">Passwort</label>${pwBlock}</div>
+        </div>
+      </div>
+
+      <!-- Standorte & Bereiche (Rechte-Scope) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--bg-input);border-radius:10px;padding:12px"><div style="font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">📍 Standorte (Zugriff)</div>${locCheckboxes}</div>
+        <div style="background:var(--bg-input);border-radius:10px;padding:12px"><div style="font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">🏷️ Bereiche</div>${deptCheckboxes}</div>
+      </div>
+
+      <!-- Berechtigungen -->
+      <div>
+        <div style="font-size:.82rem;color:var(--text-secondary);margin-bottom:8px">Rechte-Modus:</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:6px"><input type="radio" name="permMode" value="standard" ${!isCustom?'checked':''} onchange="togglePermMode(false)"><span style="font-size:.9rem;font-weight:600">Standard nach Rolle</span></label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="radio" name="permMode" value="custom" ${isCustom?'checked':''} onchange="togglePermMode(true)"><span style="font-size:.9rem;font-weight:600">✏️ Individuell anpassen</span></label>
+        <div id="permCheckboxes" style="opacity:${isCustom?'1':'.4'};pointer-events:${isCustom?'auto':'none'};border-top:1px solid var(--border);padding-top:12px;margin-top:10px">${groupsHtml}</div>
+      </div>
+    </div>`;
+
+  openModal('Konto: ' + u.name, body,
+    `<button class="btn" onclick="closeModal()">Schließen</button><button class="btn btn-primary" onclick="saveAccountDetail('${userId}')">Speichern</button>`);
+}
+
+// Passwort anzeigen (über Edge Function)
+async function adRevealPassword(userId) {
+  try {
+    const r = await callAdminUsers('getPassword', { userId });
+    const inp = document.getElementById('adPwShow');
+    if (inp) inp.value = r.password || '(nicht gespeichert)';
+  } catch (e) { toast('Fehler: ' + e.message, 'err'); }
+}
+function adCopyPassword() {
+  const inp = document.getElementById('adPwShow');
+  if (inp && inp.value && inp.value !== '••••••••') {
+    navigator.clipboard?.writeText(inp.value).then(() => toast('Passwort kopiert ✓', 'success'),
+      () => toast('Kopieren fehlgeschlagen', 'err'));
+  } else { toast('Erst auf 👁 klicken, um das Passwort zu laden', 'warn'); }
+}
+async function adResetPassword(userId) {
+  const pw = prompt('Neues Passwort (mind. 6 Zeichen):', genPassword());
+  if (!pw) return;
+  if (pw.length < 6) { toast('Passwort zu kurz', 'err'); return; }
+  try {
+    await callAdminUsers('setPassword', { userId, password: pw });
+    toast('Passwort zurückgesetzt ✓', 'success');
+    const inp = document.getElementById('adPwShow');
+    if (inp) inp.value = pw;
+  } catch (e) { toast('Fehler: ' + e.message, 'err'); }
+}
+async function adCreateLogin(userId) {
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+  const email = (document.getElementById('adEmail')?.value || '').trim().toLowerCase();
+  const pw = document.getElementById('adNewPw')?.value || '';
+  if (!email || !email.includes('@')) { toast('Bitte gültige E-Mail eingeben', 'err'); return; }
+  if (pw.length < 6) { toast('Passwort mind. 6 Zeichen', 'err'); return; }
+  const emp = u.empId ? EMPS.find(e => e.id === u.empId) : null;
+  try {
+    const r = await callAdminUsers('create', {
+      email, password: pw, userId: u.id, role: u.role,
+      location: u.location, empId: u.empId, name: u.name, avatar: u.avatar,
+    });
+    // Lokalen State aktualisieren
+    u.regEmail = email;
+    if (r.userId && r.userId !== u.id) u.id = r.userId;
+    toast(`✓ Login erstellt für ${email}`, 'success');
+    closeModal();
+    renderAccess();
+  } catch (e) { toast('Fehler: ' + e.message, 'err'); }
+}
+
+// Speichert Konto-Felder + Berechtigungen in einem Schritt
+async function saveAccountDetail(userId) {
+  if (!can('manageAccess')) return;
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+  // 1. Konto-Felder
+  const name = document.getElementById('adName')?.value.trim();
+  const role = document.getElementById('adRole')?.value;
+  const pos = document.getElementById('adPos')?.value.trim();
+  if (name && name !== u.name) await changeUserName(userId, name);
+  if (role && role !== u.role) await changeUserRole(userId, role);
+  if (pos != null) await changeUserPosition(userId, pos);
+  // 2. Berechtigungen (gleiche Logik wie savePermissions)
+  await savePermissions(userId);
+}
 
 async function openPermissionsModal(userId) {
   const u = USERS.find(x => x.id === userId);
@@ -5903,6 +6128,7 @@ function togglePermMode(isCustom) {
 }
 
 async function savePermissions(userId) {
+  if (!can('manageAccess')) return;
   const mode = document.querySelector('input[name="permMode"]:checked')?.value || 'standard';
   const perms = {};
 
@@ -6357,7 +6583,7 @@ async function saveDoc(){
   closeModal();toast(file&&fileUrl?'Dokument hochgeladen ✓':'Dokument gespeichert');renderDocuments();
 }
 function saveAccess(){const u=document.getElementById('mAU').value.trim();if(!u)return;USERS.push({id:u,name:u,role:document.getElementById('mAR').value,location:document.getElementById('mAL').value,avatar:u.substring(0,2).toUpperCase(),empId:parseInt(document.getElementById('mAE').value)||null,lastLogin:'—',status:'active'});closeModal();toast('Zugang erstellt');renderAccess();}
-function saveDept(){const n=document.getElementById('mDN').value.trim();if(!n)return;DEPTS.push({id:Date.now(),name:n,location:document.getElementById('mDL').value,head:document.getElementById('mDH').value||'—',count:0,color:'#a29bfe'});closeModal();toast('Bereich angelegt');renderDepts();}
+function saveDept(){if(!can('editDepartments'))return;const n=document.getElementById('mDN').value.trim();if(!n)return;DEPTS.push({id:Date.now(),name:n,location:document.getElementById('mDL').value,head:document.getElementById('mDH').value||'—',count:0,color:'#a29bfe'});closeModal();toast('Bereich angelegt');renderDepts();}
 
 // ═══ SAVED SHIFT TEMPLATES ═══
 function applySavedTemplate(){
@@ -7169,7 +7395,7 @@ function saveCLEdit(clId,idx,val){
   renderChecklists();
 }
 
-function saveDept2(){const n=document.getElementById('mDN').value.trim();if(!n)return;DEPTS.push({id:Date.now(),name:n,location:document.getElementById('mDL').value,head:document.getElementById('mDH').value||'—',count:0,color:'#a29bfe'});closeModal();toast('Bereich angelegt');renderDepts();}
+function saveDept2(){if(!can('editDepartments'))return;const n=document.getElementById('mDN').value.trim();if(!n)return;DEPTS.push({id:Date.now(),name:n,location:document.getElementById('mDL').value,head:document.getElementById('mDH').value||'—',count:0,color:'#a29bfe'});closeModal();toast('Bereich angelegt');renderDepts();}
 function saveChecklist(){
   const type=document.getElementById('mCLType').value;
   const empId=parseInt(document.getElementById('mCLEmp').value);
