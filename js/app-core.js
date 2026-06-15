@@ -663,7 +663,7 @@ function renderDashboard(){
     const bannerKey = 'okyu_banner_'+currentUser.id;
     const bannerImg = currentUser.bannerUrl || localStorage.getItem(bannerKey) || '';
     const bannerStyle = bannerImg ? `background-image:url('${bannerImg}');background-size:cover;background-position:center;` : '';
-    const locLogos = {origami:'🍣',enso:'🍜',okyu_central:'🏢'};
+    const locLogos = {origami:'🍣',enso:'🍜',okyu:'🍱',omoistuttgart:'☕'};
     const locLogo = locLogos[currentLocation] || locLogos[currentUser.location] || '🏢';
 
     pg.innerHTML=`
@@ -671,7 +671,7 @@ function renderDashboard(){
       <div class="dash-welcome" style="${bannerStyle}">
         <div class="dash-welcome-overlay"></div>
         <div style="position:relative;z-index:1">
-          <div class="dash-greeting-badge">Willkommen zurück</div>
+          <div class="dash-greeting-badge">${locLogo} ${currentLocation==='all'?'Alle Standorte':getLocationName(currentLocation)}</div>
           <div class="dash-greeting">${currentUser.name.split(' ')[0]}<br>${currentUser.name.split(' ').slice(1).join(' ')}.</div>
           <div class="dash-subtitle">Es sind heute ${todayShifts.length} Schichten geplant. ${emps.filter(e=>sickEmpIds.has(e.id)).length} Mitarbeiter krank gemeldet.</div>
           ${can('editSchedules')?`<label class="dash-upload-btn" title="Hintergrundbild ändern">
@@ -691,36 +691,36 @@ function renderDashboard(){
       <div class="dash-stats-grid">
         <div class="dash-stat" onclick="navigate('employees')">
           <div class="dash-stat-icon blue"><span class="ms">person_check</span></div>
-          <div class="dash-stat-label">Active Employees</div>
+          <div class="dash-stat-label">Aktive Mitarbeiter</div>
           <div style="display:flex;align-items:baseline;gap:8px">
             <span class="dash-stat-value">${activeEmps}</span>
-            <span class="dash-stat-sub green">+${Math.round(activeEmps/emps.length*100)}%</span>
+            <span class="dash-stat-sub">von ${emps.length}</span>
           </div>
         </div>
         <div class="dash-stat" onclick="navigate('vacation')">
-          ${pendingVacs>0?`<div class="dash-stat-badge" style="background:var(--warning)">${pendingVacs} Pending</div>`:''}
+          ${pendingVacs>0?`<div class="dash-stat-badge" style="background:var(--warning)">${pendingVacs} offen</div>`:''}
           <div class="dash-stat-icon amber"><span class="ms">beach_access</span></div>
-          <div class="dash-stat-label">On Leave</div>
+          <div class="dash-stat-label">Im Urlaub</div>
           <div style="display:flex;align-items:baseline;gap:8px">
             <span class="dash-stat-value">${vacEmps}</span>
-            <span class="dash-stat-sub">${vacEmps===0?'Stable':'aktiv'}</span>
+            <span class="dash-stat-sub">${vacEmps===0?'heute keiner':'heute'}</span>
           </div>
         </div>
         <div class="dash-stat" onclick="navigate('sick')">
-          ${activeSick>0?`<div class="dash-stat-badge" style="background:var(--danger)">${activeSick} Active</div>`:''}
+          ${activeSick>0?`<div class="dash-stat-badge" style="background:var(--danger)">${activeSick} aktiv</div>`:''}
           <div class="dash-stat-icon rose"><span class="ms">medical_services</span></div>
-          <div class="dash-stat-label">Sick</div>
+          <div class="dash-stat-label">Krank</div>
           <div style="display:flex;align-items:baseline;gap:8px">
             <span class="dash-stat-value">${sickEmps}</span>
-            <span class="dash-stat-sub red">Meldungen</span>
+            <span class="dash-stat-sub">heute</span>
           </div>
         </div>
         <div class="dash-stat" onclick="navigate('schedule')">
           <div class="dash-stat-icon slate"><span class="ms">history</span></div>
-          <div class="dash-stat-label">Delays</div>
+          <div class="dash-stat-label">Verspätungen</div>
           <div style="display:flex;align-items:baseline;gap:8px">
             <span class="dash-stat-value">${totalLate}</span>
-            <span class="dash-stat-sub">${totalLate<=3?'Great':'lfd. Jahr'}</span>
+            <span class="dash-stat-sub">lfd. Jahr</span>
           </div>
         </div>
       </div>
@@ -731,35 +731,34 @@ function renderDashboard(){
         <div class="dash-bento-main">
           <div class="dash-card">
             <div class="dash-card-header">
-              Monthly Personnel Costs
+              Personalkosten (laufender Monat)
               <div style="text-align:right">
                 <div style="font-size:1.6rem;font-weight:900;font-family:'Manrope',sans-serif;color:var(--accent)">${formatEuro(emps.reduce((s,e)=>s+e.bruttoGehalt,0))}</div>
-                <div style="font-size:.6rem;color:#16a34a;font-weight:700;text-transform:uppercase;letter-spacing:.1em">Within Budget</div>
+                <div style="font-size:.6rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.1em">Brutto gesamt</div>
               </div>
             </div>
             <div class="dash-card-body">
-              <div style="display:flex;gap:20px;align-items:flex-end">
-                <div style="flex:1">
-                  <div class="dash-fin-bars" id="dashFinBars"></div>
-                  <div class="dash-fin-months" id="dashFinMonths"></div>
+              <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <div class="dash-fin-box" style="background:var(--bg-input);flex:1;min-width:120px">
+                  <div class="dash-fin-box-label">Mitarbeiter</div>
+                  <div class="dash-fin-box-value">${emps.length}</div>
                 </div>
-                <div class="dash-fin-summary">
-                  <div class="dash-fin-box" style="background:var(--bg-input)">
-                    <div class="dash-fin-box-label">Trend</div>
-                    <div class="dash-fin-box-value">+${(emps.reduce((s,e)=>s+e.bruttoGehalt,0)/25000*14.2).toFixed(1)}%</div>
-                  </div>
-                  <div class="dash-fin-box" style="background:var(--accent);color:#fff">
-                    <div class="dash-fin-box-label" style="color:rgba(255,255,255,.65)">Summe</div>
-                    <div class="dash-fin-box-value" style="color:#fff">${formatEuro(emps.reduce((s,e)=>s+e.bruttoGehalt,0))}</div>
-                  </div>
+                <div class="dash-fin-box" style="background:var(--bg-input);flex:1;min-width:120px">
+                  <div class="dash-fin-box-label">Ø Brutto / MA</div>
+                  <div class="dash-fin-box-value">${emps.length?formatEuro(Math.round(emps.reduce((s,e)=>s+e.bruttoGehalt,0)/emps.length)):'—'}</div>
+                </div>
+                <div class="dash-fin-box" style="background:var(--accent);color:#fff;flex:1;min-width:120px">
+                  <div class="dash-fin-box-label" style="color:rgba(255,255,255,.65)">Summe</div>
+                  <div class="dash-fin-box-value" style="color:#fff">${formatEuro(emps.reduce((s,e)=>s+e.bruttoGehalt,0))}</div>
                 </div>
               </div>
+              <div style="font-size:.72rem;color:var(--text-muted);margin-top:10px">Detaillierte Monatswerte siehe Zahlungsübersicht unten.</div>
             </div>
           </div>
         </div>
         <div class="dash-bento-side">
           <div class="dash-card" style="height:100%">
-            <div class="dash-card-header">Live Attendance<span class="dash-card-header-link" onclick="navigate('schedule')">Alle anzeigen</span></div>
+            <div class="dash-card-header">Live-Anwesenheit<span class="dash-card-header-link" onclick="navigate('schedule')">Alle anzeigen</span></div>
             <div class="dash-card-body">
               <div class="dash-att-ring-wrap">
                 <div class="dash-donut-rel" style="width:160px;height:160px">
@@ -772,7 +771,7 @@ function renderDashboard(){
                   </svg>
                   <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
                     <div class="dash-att-pct">${attPct}%</div>
-                    <div class="dash-att-quality">${attPct>=90?'Excellent':attPct>=70?'Good':'Fair'}</div>
+                    <div class="dash-att-quality">${attPct>=90?'Sehr gut':attPct>=70?'Gut':'Mäßig'}</div>
                   </div>
                 </div>
               </div>
@@ -785,7 +784,7 @@ function renderDashboard(){
       <!-- Plan vs Actual + Attendance Grid -->
       <div class="dash-grid-2">
         <div class="dash-card">
-          <div class="dash-card-header">Plan vs. Actual Hours</div>
+          <div class="dash-card-header">Soll- vs. Ist-Stunden</div>
           <div class="dash-card-body">
             <div class="dash-donut-wrap">
               <div class="dash-donut-rel" style="width:160px;height:160px">
@@ -800,17 +799,17 @@ function renderDashboard(){
                     stroke-linecap="round" stroke-width="18"/>
                 </svg>
                 <div class="dash-donut-center">
-                  <div class="dash-donut-center-lbl">Total Hours</div>
+                  <div class="dash-donut-center-lbl">Ist-Stunden</div>
                   <div class="dash-donut-center-val">${emps.reduce((s,e)=>s+calcPlanHours(e.id),0)}</div>
                 </div>
               </div>
               <div class="dash-donut-legend">
                 <div class="dash-donut-legend-item">
-                  <div class="dash-donut-legend-label"><span class="dash-donut-legend-dot" style="background:rgba(59,79,210,.55)"></span>Planned</div>
+                  <div class="dash-donut-legend-label"><span class="dash-donut-legend-dot" style="background:rgba(59,79,210,.55)"></span>Soll</div>
                   <div class="dash-donut-legend-val">${emps.reduce((s,e)=>s+e.sollStunden,0)}h</div>
                 </div>
                 <div class="dash-donut-legend-item">
-                  <div class="dash-donut-legend-label"><span class="dash-donut-legend-dot" style="background:#818cf8"></span>Actual</div>
+                  <div class="dash-donut-legend-label"><span class="dash-donut-legend-dot" style="background:#818cf8"></span>Ist (geplant)</div>
                   <div class="dash-donut-legend-val">${emps.reduce((s,e)=>s+calcPlanHours(e.id),0)}h</div>
                 </div>
               </div>
@@ -818,12 +817,7 @@ function renderDashboard(){
           </div>
         </div>
         <div class="dash-card">
-          <div class="dash-card-header">Team Planning Overview
-            <div style="display:flex;gap:4px">
-              <button style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;border-radius:6px" class="hover-bg"><span class="ms">chevron_left</span></button>
-              <button style="width:28px;height:28px;border:none;background:none;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;border-radius:6px" class="hover-bg"><span class="ms">chevron_right</span></button>
-            </div>
-          </div>
+          <div class="dash-card-header">Team-Übersicht heute</div>
           <div class="dash-card-body" id="dashShifts"></div>
         </div>
       </div>
@@ -905,18 +899,6 @@ function renderDashboard(){
     const notifsHtml=notifs.map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('')||'<p style="color:var(--text-muted)">Keine Meldungen</p>';
     const _dn=document.getElementById('dashNotifs'); if(_dn)_dn.innerHTML=notifsHtml;
     const _dnr=document.getElementById('dashNotifsRight'); if(_dnr)_dnr.innerHTML=notifsHtml;
-
-    // Populate financial bar chart (owner only)
-    const _fb=document.getElementById('dashFinBars');
-    const _fm=document.getElementById('dashFinMonths');
-    if(_fb&&_fm){
-      const totalBrutto=emps.reduce((s,e)=>s+e.bruttoGehalt,0);
-      const monthData=[totalBrutto*.55,totalBrutto*.7,totalBrutto*.6,totalBrutto*.85,totalBrutto*.78,totalBrutto];
-      const maxVal=Math.max(...monthData);
-      const monthNames=['Mai','Jun','Jul','Aug','Sep','Okt'];
-      _fb.innerHTML=monthData.map((v,i)=>`<div class="dash-fin-bar${i===5?' current':''}" style="height:${Math.round(v/maxVal*100)}%"><span class="dash-fin-bar-label">${Math.round(v/1000)}k</span></div>`).join('');
-      _fm.innerHTML=monthNames.map((m,i)=>`<span class="dash-fin-month${i===5?' current':''}">${m}</span>`).join('');
-    }
 
 
     // Populate location attendance rows (admin)
