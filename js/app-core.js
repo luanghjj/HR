@@ -1562,9 +1562,14 @@ function toggleColDropdown() {
 // Close dropdown on outside click
 document.addEventListener('click', e => {
   const dd = document.getElementById('mitColDropdown');
-  if (!dd) return;
-  const wrap = e.target.closest('.mit-col-toggle-wrap');
-  if (!wrap && dd.style.display !== 'none') dd.style.display = 'none';
+  if (dd) {
+    const wrap = e.target.closest('.mit-col-toggle-wrap');
+    if (!wrap && dd.style.display !== 'none') dd.style.display = 'none';
+  }
+  // "Mehr"-Dropdown im Arbeitsplan schließen, wenn außerhalb geklickt
+  document.querySelectorAll('.sc2-more-wrap.open').forEach(w => {
+    if (!w.contains(e.target)) w.classList.remove('open');
+  });
 });
 
 function initColChecks() {
@@ -3495,11 +3500,11 @@ function renderSchedule(){
   let controls=`
   <div class="sc2-conflict-bar">
     <div class="sc2-conflict-left">
-      <div class="sc2-conflict-item"><div class="sc2-conflict-icon" style="background:rgba(239,68,68,.08);color:#ef4444"><span class="ms">warning</span></div><div><div class="sc2-conflict-micro">Konflikte</div><div class="sc2-conflict-val">${_sickWkShifts} Warnungen gefunden</div></div></div>
+      <div class="sc2-conflict-item"><div class="sc2-conflict-icon" style="background:${_sickWkShifts>0?'rgba(239,68,68,.08)':'rgba(16,185,129,.08)'};color:${_sickWkShifts>0?'#ef4444':'#10b981'}"><span class="ms">${_sickWkShifts>0?'sick':'check_circle'}</span></div><div><div class="sc2-conflict-micro">Krank diese Woche</div><div class="sc2-conflict-val">${_sickWkShifts===0?'Keine Krankmeldung':_sickWkShifts+' Schicht'+(_sickWkShifts>1?'en':'')}</div></div></div>
       <div class="sc2-conflict-divider"></div>
       <div class="sc2-conflict-item"><div class="sc2-conflict-icon" style="background:rgba(99,102,241,.08);color:var(--accent)"><span class="ms">speed</span></div><div><div class="sc2-conflict-micro">Planungseffizienz</div><div class="sc2-conflict-val">${_effPct}% Auslastung</div></div></div>
     </div>
-    <button class="sc2-detail-btn">Details anzeigen</button>
+    <button class="sc2-detail-btn" onclick="navigate('sick')">Details anzeigen</button>
   </div>
   <div class="sc2-page-hd">
     <div>
@@ -3518,9 +3523,14 @@ function renderSchedule(){
       </div>
     </div>
     <div class="sc2-page-right">
-    ${canEdit?`<button class="sc2-action-btn" onclick="copyWeek()"><span class="ms" style="font-size:1rem">content_copy</span> Woche kopieren</button>`:``}
-    ${canEdit?`<button class="sc2-action-btn" onclick="generateStandardWeek()"><span class="ms" style="font-size:1rem">auto_fix_high</span> Standard-Plan</button>`:``}
-      ${canEdit?`<div class="sc2-tmpl-wrap"><button class="sc2-action-btn" onclick="openModal('saveTemplate')"><span class="ms" style="font-size:1rem">bookmark</span> Vorlagen</button></div>`:``}
+      ${canEdit?`<div class="sc2-more-wrap">
+        <button class="sc2-action-btn" onclick="event.stopPropagation();this.parentElement.classList.toggle('open')"><span class="ms" style="font-size:1rem">more_horiz</span> Mehr</button>
+        <div class="sc2-more-menu">
+          <button onclick="this.closest('.sc2-more-wrap').classList.remove('open');copyWeek()"><span class="ms">content_copy</span> Woche kopieren</button>
+          <button onclick="this.closest('.sc2-more-wrap').classList.remove('open');generateStandardWeek()"><span class="ms">auto_fix_high</span> Standard-Plan</button>
+          <button onclick="this.closest('.sc2-more-wrap').classList.remove('open');openModal('saveTemplate')"><span class="ms">bookmark</span> Vorlagen</button>
+        </div>
+      </div>`:``}
       ${canExp?`<button class="sc2-action-btn is-primary" onclick="exportPDF()"><span class="ms" style="font-size:1rem">picture_as_pdf</span> PDF Export</button>`:``}
       ${canEdit?`<button class="sc2-action-btn" onclick="openModal('addShift')" style="background:var(--accent);color:#fff;border-color:var(--accent)"><span class="ms" style="font-size:1rem">add</span> Schicht</button>`:``}
     </div>
@@ -3675,7 +3685,7 @@ function renderSchedule(){
         }
         h+='</td>';
       });
-      if(showH)h+=`<td class="sc2-total-cell"><div style="font-size:1.15rem;font-weight:900">${Math.round(weekH*10)/10}</div><span class="sc2-total-label">Std.</span></td>`;
+      if(showH){const _wh=Math.round(weekH*10)/10;const _hl=_wh>48?'is-over':_wh>=40?'is-high':'';h+=`<td class="sc2-total-cell ${_hl}"><div class="sc2-total-num">${_wh}</div><span class="sc2-total-label">Std.</span></td>`;}
       h+='</tr>';
     });
     if(!emps.length)h+=`<tr><td colspan="${8+(showH?1:0)}" style="text-align:center;color:var(--text-muted)">Keine Schichten</td></tr>`;
@@ -3693,8 +3703,8 @@ function renderSchedule(){
 
     h+=`<div class="sc2-bento">
       <div class="sc2-bento-card is-blue"><div><div class="sc2-bento-label">Planungseffizienz</div><div class="sc2-bento-sub">${_effPct}% der Zielbesetzung erreicht</div></div><div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:auto"><div class="sc2-bento-big">${_effPct}%</div></div></div>
-      <div class="sc2-bento-card"><div class="sc2-bento-icon" style="background:rgba(239,68,68,.06);color:#ef4444"><span class="ms">warning</span></div><div class="sc2-bento-big" style="font-size:2.5rem">${_sickWkShifts}</div><div class="sc2-bento-micro">Konflikte gefunden</div></div>
-      <div class="sc2-bento-card"><div class="sc2-bento-icon" style="background:rgba(99,102,241,.06);color:var(--accent)"><span class="ms">person_search</span></div><div class="sc2-bento-big" style="font-size:2.5rem">${Math.max(0,_openShifts)}</div><div class="sc2-bento-micro">Offene Schichten</div></div>
+      <div class="sc2-bento-card is-stat"><div class="sc2-bento-icon" style="background:rgba(239,68,68,.08);color:#ef4444"><span class="ms">sick</span></div><div class="sc2-bento-stat-text"><div class="sc2-bento-big">${_sickWkShifts}</div><div class="sc2-bento-micro">Krank diese Woche</div><div class="sc2-bento-hint">${_sickWkShifts===0?'Alle gesund 🎉':'Schichten als krank markiert'}</div></div></div>
+      <div class="sc2-bento-card is-stat" ${Math.max(0,_openShifts)>0&&canEdit?`onclick="openModal('addShift')" style="cursor:pointer"`:''}><div class="sc2-bento-icon" style="background:rgba(99,102,241,.08);color:var(--accent)"><span class="ms">event_available</span></div><div class="sc2-bento-stat-text"><div class="sc2-bento-big">${Math.max(0,_openShifts)}</div><div class="sc2-bento-micro">Freie Slots</div><div class="sc2-bento-hint">${Math.max(0,_openShifts)===0?'Woche voll geplant':canEdit?'Klicken zum Planen →':'noch zu besetzen'}</div></div></div>
     </div>`;
     c.innerHTML=h;
   } else if(scheduleView==='day'){

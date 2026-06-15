@@ -113,6 +113,25 @@
 .sc2-action-btn.is-primary:hover { opacity: .9; }
 .sc2-tmpl-wrap { position: relative; }
 
+/* ─── "Mehr" Dropdown ─── */
+.sc2-more-wrap { position: relative; }
+.sc2-more-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: 0 12px 32px rgba(0,0,0,.14);
+  padding: 6px; min-width: 210px;
+  display: none; flex-direction: column; gap: 2px;
+}
+.sc2-more-wrap.open .sc2-more-menu { display: flex; }
+.sc2-more-menu button {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left; border: none; background: none;
+  padding: 9px 12px; border-radius: 9px; cursor: pointer;
+  font-size: .85rem; font-weight: 500; color: var(--text-primary);
+}
+.sc2-more-menu button:hover { background: var(--bg-input); }
+.sc2-more-menu button .ms { font-size: 1.1rem; color: var(--text-muted); }
+
 /* ─── Filter Bar ─── */
 .sc2-filter-bar {
   background: var(--bg-card);
@@ -242,8 +261,19 @@
 /* Total column */
 .sc2-grid-wrap td.sc2-total-cell {
   text-align: center;
-  background: rgba(99,102,241,.04);
+  background: rgba(99,102,241,.06);
   font-size: 1rem; font-weight: 800; color: var(--accent);
+  border-left: 1px solid var(--border);
+}
+.sc2-total-num { font-size: 1.25rem; font-weight: 900; line-height: 1.1; }
+.sc2-grid-wrap td.sc2-total-cell.is-high {
+  background: rgba(245,158,11,.1); color: #d97706;
+}
+.sc2-grid-wrap td.sc2-total-cell.is-over {
+  background: rgba(239,68,68,.12); color: #dc2626;
+}
+.sc2-grid-wrap td.sc2-total-cell.is-over .sc2-total-num::after {
+  content: ' ⚠'; font-size: .8rem;
 }
 .sc2-total-label {
   font-size: .6rem; font-weight: 700; text-transform: uppercase;
@@ -303,6 +333,17 @@
   box-shadow: 0 2px 12px rgba(0,0,0,.05);
   transition: border-color .15s;
 }
+/* Kleine Kennzahl-Karten kompakter: Icon + Zahl + Label in einer Reihe */
+.sc2-bento-card.is-stat {
+  flex-direction: row; align-items: center; gap: 16px;
+  min-height: 0; padding: 22px 24px;
+}
+.sc2-bento-card.is-stat .sc2-bento-icon { margin-bottom: 0; flex-shrink: 0; }
+.sc2-bento-card.is-stat .sc2-bento-big { margin-top: 0; font-size: 2.4rem; }
+.sc2-bento-card.is-stat .sc2-bento-stat-text { display: flex; flex-direction: column; gap: 2px; }
+.sc2-bento-card.is-stat .sc2-bento-hint {
+  font-size: .72rem; color: var(--text-muted); font-weight: 500;
+}
 .sc2-bento-card:hover { border-color: var(--accent-light); }
 .sc2-bento-card.is-blue {
   background: var(--accent); border-color: var(--accent);
@@ -360,12 +401,12 @@
   position: relative; overflow: hidden;
 }
 .sc2-grid-wrap .shift-block .shift-name {
-  font-size: .62rem; font-weight: 800; text-transform: uppercase;
-  letter-spacing: .04em; line-height: 1.1;
+  font-size: .56rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .03em; line-height: 1.1; opacity: .55;
 }
 .sc2-grid-wrap .shift-block .shift-time {
-  font-size: .86rem; font-weight: 800; color: var(--text-primary);
-  line-height: 1.1;
+  font-size: .95rem; font-weight: 800; color: var(--text-primary);
+  line-height: 1.15; letter-spacing: -.01em;
 }
 
 /* Dept colors v2 – farbiger Rahmen rundum für bessere Unterscheidbarkeit */
@@ -461,22 +502,24 @@
 /* Click-to-add empty cell */
 .sc2-grid-wrap .empty-cell-add {
   min-height: 82px; border-radius: 14px;
-  border: 2px dashed transparent;
+  border: 2px dashed var(--border);
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: all .2s;
-  color: var(--text-muted); opacity: .3;
+  cursor: pointer; transition: all .15s;
+  color: var(--text-muted); opacity: .5;
 }
 .sc2-grid-wrap .empty-cell-add .ms {
-  font-size: 1.4rem; transition: transform .2s;
+  font-size: 1.4rem; transition: transform .15s;
 }
 .sc2-grid-wrap .empty-cell-add:hover {
   border-color: var(--accent);
-  background: rgba(99,102,241,.04);
+  border-style: solid;
+  background: rgba(99,102,241,.06);
   color: var(--accent);
   opacity: 1;
+  box-shadow: 0 2px 10px rgba(99,102,241,.15);
 }
 .sc2-grid-wrap .empty-cell-add:hover .ms {
-  transform: scale(1.2);
+  transform: scale(1.25);
 }
 .sc2-grid-wrap .empty-cell-add:active {
   background: rgba(99,102,241,.1);
