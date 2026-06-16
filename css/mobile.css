@@ -169,6 +169,12 @@
   .form-grid {
     grid-template-columns: 1fr;
   }
+  /* Inline-Grids (2 Spalten) in Modals auf Mobile zu 1 Spalte zwingen.
+     Inline-Styles brauchen !important, um überschrieben zu werden. */
+  .modal-body div[style*="grid-template-columns:1fr 1fr"],
+  .modal div[style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -569,10 +575,11 @@
   .cl-add-row {
     padding: 10px 16px 14px;
   }
-  /* FABs: closer to edge */
+  /* FABs: über der Bottom-Navigation halten, nicht dahinter */
   .cl-fab-wrap {
-    bottom: 20px;
+    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
     right: 16px;
+    z-index: 250;
   }
 }
 

@@ -296,7 +296,8 @@
 .dept-emp-table-wrap {
   background: var(--bg-card);
   border-radius: 16px;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
 }
 .dept-emp-table {

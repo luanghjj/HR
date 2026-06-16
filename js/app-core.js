@@ -374,7 +374,7 @@ async function handleQrCheckin(locationId) {
     const locName = getLocationName(locationId);
     const shiftInfo = todayShift ? ` · ${todayShift.from}–${todayShift.to}` : '';
     const gpsInfo = gpsVerified === true ? ' ✅ GPS bestätigt' :
-                    gpsVerified === false ? ' ⚠️ GPS nicht bestätigt' : '';
+                    gpsVerified === false ? (distanceM != null ? ` ⚠️ ${distanceM}m vom Standort` : ' ⚠️ GPS nicht bestätigt') : '';
     toast(`✅ Eingecheckt · ${locName}${shiftInfo}${gpsInfo}`, 'success');
     if (isLate) toast(`⏰ ${lateMin} Min. verspätet`, 'warn');
     if (gpsSuspicious) toast('🔴 GPS-Standort verdächtig — Admin wird benachrichtigt', 'warn');
@@ -896,7 +896,7 @@ function renderDashboard(){
 
     // Populate notifications
     const notifs=getVisibleNotifs().slice(0,5);
-    const notifsHtml=notifs.map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('')||'<p style="color:var(--text-muted)">Keine Meldungen</p>';
+    const notifsHtml=notifs.map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}" onclick="markRead(${n.id})"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('')||'<p style="color:var(--text-muted)">Keine Meldungen</p>';
     const _dn=document.getElementById('dashNotifs'); if(_dn)_dn.innerHTML=notifsHtml;
     const _dnr=document.getElementById('dashNotifsRight'); if(_dnr)_dnr.innerHTML=notifsHtml;
 
@@ -3605,7 +3605,7 @@ function renderSchedule(){
         dayS.forEach(s=>{
           // Cross-reference with GPS check-in
           const tr = TIME_RECORDS.find(r => r.shiftId === s.id || (r.empId === s.empId && r.checkIn && r.checkIn.startsWith(ds)));
-          if (tr && tr.isLate && !s.isLate) { s.isLate = true; s.lateMin = tr.lateMin || 0; }
+          if (tr && tr.isLate && !s.isLate) { s.isLate = true; s.lateMin = tr.lateMin || 0; syncUpdateShift(s); }
           // Compact mode for special days
           if (s.isSick) {
             h+=`<div class="shift-block compact-block is-sick" ${canEdit?`onclick="shiftBlockTap(${s.id})"`:''}
@@ -3735,8 +3735,17 @@ function onDragEnd(e){e.target.classList.remove('dragging');dragData=null;}
 function onDragOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over');}
 function onDragLeave(e){e.currentTarget.classList.remove('drag-over');}
 function onDrop(e){e.preventDefault();e.currentTarget.classList.remove('drag-over');if(!dragData)return;
-  const cell=e.currentTarget,nd=cell.dataset.date,ne=cell.dataset.emp,sh=SHIFTS.find(s=>s.id===dragData.sid);if(!sh)return;sh.date=nd;
-  if(ne&&ne!==sh.empName){const emp=EMPS.find(x=>x.name===ne);if(emp){sh.empId=emp.id;sh.empName=emp.name;sh.dept=emp.dept;sh.location=emp.location;sh.colorClass=getDeptColorClass(emp.dept);}}
+  const cell=e.currentTarget,nd=cell.dataset.date,ne=cell.dataset.emp,sh=SHIFTS.find(s=>s.id===dragData.sid);if(!sh)return;
+  if(ne&&ne!==sh.empName){
+    const emp=EMPS.find(x=>x.name===ne);
+    if(!emp){toast('Mitarbeiter nicht gefunden','err');return;}
+    if(emp.status!=='active'&&emp.status!=='aktiv'){toast(`${emp.name} ist nicht aktiv – keine Zuweisung möglich`,'err');return;}
+    // Standort der Schicht beibehalten, wenn der Ziel-MA dort arbeitet; sonst dessen ersten Standort
+    const empLocs=(emp.location||'').split(',').map(l=>l.trim()).filter(Boolean);
+    const newLoc=empLocs.includes(sh.location)?sh.location:(empLocs[0]||emp.location);
+    sh.empId=emp.id;sh.empName=emp.name;sh.dept=emp.dept;sh.location=newLoc;sh.colorClass=getDeptColorClass(emp.dept);
+  }
+  sh.date=nd;
   syncUpdateShift(sh);toast('Schicht verschoben ✓');renderSchedule();}
 
 // ═══ QUICK ADD SHIFT (click empty cell) ═══
@@ -3964,7 +3973,12 @@ function markVac(id){
   }
   syncUpdateShift(s);renderSchedule();
 }
-function markLateShift(id){if(!can('markLate')&&!can('editSchedules'))return;const s=SHIFTS.find(x=>x.id===id);if(!s)return;const m=prompt('Minuten verspätet:','15');if(!m||isNaN(m))return;s.isLate=true;s.lateMin=parseInt(m);const e=EMPS.find(x=>x.id===s.empId);if(e){e.lateCount++;syncEmployeeField(e.id,'lateCount',e.lateCount);}addNotif('late','Verspätung',`${s.empName}: ${m} Min.`);syncUpdateShift(s);toast('Verspätung vermerkt','warn');renderSchedule();}
+function markLateShift(id){if(!can('markLate')&&!can('editSchedules'))return;const s=SHIFTS.find(x=>x.id===id);if(!s)return;
+  document.getElementById('modalTitle').textContent='Verspätung – '+s.empName;
+  document.getElementById('modalBody').innerHTML=`<div class="form-grid"><div class="form-group full"><label class="form-label">Schicht</label><div class="form-input" style="background:var(--bg-secondary);cursor:default">${s.label} · ${formatDateDE(s.date)} · ${s.from}–${s.to}</div></div><div class="form-group full"><label class="form-label">Minuten verspätet</label><input class="form-input" type="number" id="mlsMin" min="1" value="${s.lateMin||15}"></div></div>`;
+  document.getElementById('modalFooter').innerHTML=`<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="saveLateShift(${id})">Vermerken</button>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');}
+function saveLateShift(id){const s=SHIFTS.find(x=>x.id===id);if(!s)return;const m=parseInt(document.getElementById('mlsMin').value);if(!m||m<=0){toast('Bitte gültige Minutenzahl eingeben','err');return;}s.isLate=true;s.lateMin=m;const e=EMPS.find(x=>x.id===s.empId);if(e){e.lateCount++;syncEmployeeField(e.id,'lateCount',e.lateCount);}addNotif('late','Verspätung',`${s.empName}: ${m} Min.`);syncUpdateShift(s);closeModal();toast('Verspätung vermerkt','warn');renderSchedule();}
 function copyWeek(){const ws2=getWeekStart(scheduleDate);const nw=new Date(ws2);nw.setDate(nw.getDate()+7);let c=0;
   for(let d=0;d<7;d++){const sd=new Date(ws2);sd.setDate(sd.getDate()+d);const dd=new Date(nw);dd.setDate(dd.getDate()+d);const sds=isoDate(sd),dds=isoDate(dd);
     const src=getVisibleShifts().filter(s=>s.date===sds);SHIFTS=SHIFTS.filter(s=>s.date!==dds);
@@ -4704,7 +4718,7 @@ function renderVacation(){
   }
   if(vacationTab==='requests'){
     let h=`<div class="vac-table-card"><table class="vac-table"><thead><tr><th>Mitarbeiter</th><th>Von</th><th>Bis</th><th>Tage</th><th>Status</th>${can('approveVacations')?'<th>Aktionen</th>':''}</tr></thead><tbody>`;
-    vacs.forEach(v=>{h+=`<tr><td><strong style="color:var(--text-primary)">${v.empName}</strong></td><td>${formatDateDE(v.from)}</td><td>${formatDateDE(v.to)}</td><td>${v.days}</td><td>${v.status==='approved'?'<span class="badge badge-success">OK</span>':v.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abg.</span>'}</td>${can('approveVacations')?`<td class="vac-action-cell">${v.status==='pending'?`<button class="vac-btn-approve" onclick="appVac(${v.id})"><span class="ms">check</span></button> <button class="vac-btn-reject" onclick="rejVac(${v.id})"><span class="ms">close</span></button>`:'—'}</td>`:''}</tr>`;});
+    vacs.forEach(v=>{h+=`<tr><td><strong style="color:var(--text-primary)">${v.empName}</strong></td><td>${formatDateDE(v.from)}</td><td>${formatDateDE(v.to)}</td><td>${v.days}</td><td>${v.status==='approved'?'<span class="badge badge-success">OK</span>':v.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abg.</span>'}</td>${can('approveVacations')?`<td class="vac-action-cell">${v.status==='pending'?`<button class="vac-btn-approve" onclick="appVac(${v.id})" title="Antrag von ${v.empName} genehmigen" aria-label="Antrag von ${v.empName} genehmigen"><span class="ms">check</span></button> <button class="vac-btn-reject" onclick="rejVac(${v.id})" title="Antrag von ${v.empName} ablehnen" aria-label="Antrag von ${v.empName} ablehnen"><span class="ms">close</span></button>`:'—'}</td>`:''}</tr>`;});
     h+=`</tbody></table></div>`;vc.innerHTML=h;return;
   }
   if(vacationTab==='overview'){
@@ -4720,7 +4734,7 @@ function renderVacation(){
   ['Mo','Di','Mi','Do','Fr','Sa','So'].forEach(d=>{calCells+=`<div class="vac-cal-head">${d}</div>`;});
   for(let i=0;i<so;i++)calCells+=`<div class="vac-cal-day other-month"></div>`;
   for(let d=1;d<=dim;d++){const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const dv=vacs.filter(v=>v.from<=ds&&v.to>=ds&&v.status==='approved');const dk=getVisibleSicks().filter(s=>s.from<=ds&&s.to>=ds&&s.status==='active');calCells+=`<div class="vac-cal-day${ds===todayStr?' today':''}"><div class="vac-cal-num">${d}</div>`;dv.slice(0,2).forEach(v=>{calCells+=`<div class="vac-cal-event vacation">${v.empName.split(' ')[0]}</div>`;});if(dv.length>2)calCells+=`<div class="vac-cal-event more">+${dv.length-2}</div>`;dk.slice(0,1).forEach(s=>{calCells+=`<div class="vac-cal-event sick">${s.empName.split(' ')[0]}</div>`;});calCells+=`</div>`;}
-  vc.innerHTML=`<div class="vac-bento"><div class="vac-cal-card"><div class="vac-cal-toolbar"><div><h3 class="vac-cal-month">${MONTHS_DE[m]} ${y}</h3><p class="vac-cal-sub">${vacs.filter(v=>v.status==='approved').length} genehmigte Abwesenheiten</p></div><div class="vac-cal-nav"><button class="vac-nav-btn" onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()-1);renderVacation()"><span class="ms">chevron_left</span></button><button class="vac-today-btn" onclick="vacationCalendarMonth=new Date();renderVacation()">Heute</button><button class="vac-nav-btn" onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()+1);renderVacation()"><span class="ms">chevron_right</span></button></div></div><div class="vac-cal-grid">${calCells}</div><div class="vac-legend"><div class="vac-legend-item"><div class="vac-legend-dot" style="background:var(--accent)"></div>Urlaub</div><div class="vac-legend-item"><div class="vac-legend-dot" style="background:var(--danger)"></div>Krankheit</div><div class="vac-legend-item"><div class="vac-legend-dot" style="background:#10b981"></div>Fortbildung</div></div></div><div class="vac-side-panel"><div class="vac-panel-card"><div class="vac-panel-header"><h4 class="vac-panel-title">Offene Antr\u00e4ge</h4><span class="vac-badge-count">${pendingVacs.length}</span></div>${pendingList.length?pendingList.map(v=>`<div class="vac-req-item"><div class="vac-req-avatar">${v.empName.split(' ').map(n=>n[0]).join('').substring(0,2)}</div><div class="vac-req-info"><div class="vac-req-name">${v.empName}</div><div class="vac-req-dates">${formatDateDE(v.from)} - ${formatDateDE(v.to)} (${v.days}T)</div></div>${can('approveVacations')?`<div class="vac-req-actions"><button class="vac-btn-approve" onclick="appVac(${v.id})"><span class="ms">check</span></button><button class="vac-btn-reject" onclick="rejVac(${v.id})"><span class="ms">close</span></button></div>`:''}</div>`).join(''):'<p class="vac-empty">Keine offenen Antr\u00e4ge</p>'}${pendingVacs.length>5?`<button class="vac-see-all" onclick="vacationTab='requests';renderVacation()">Alle Antr\u00e4ge sehen</button>`:''}</div></div></div>`;
+  vc.innerHTML=`<div class="vac-bento"><div class="vac-cal-card"><div class="vac-cal-toolbar"><div><h3 class="vac-cal-month">${MONTHS_DE[m]} ${y}</h3><p class="vac-cal-sub">${vacs.filter(v=>v.status==='approved').length} genehmigte Abwesenheiten</p></div><div class="vac-cal-nav"><button class="vac-nav-btn" onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()-1);renderVacation()"><span class="ms">chevron_left</span></button><button class="vac-today-btn" onclick="vacationCalendarMonth=new Date();renderVacation()">Heute</button><button class="vac-nav-btn" onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()+1);renderVacation()"><span class="ms">chevron_right</span></button></div></div><div class="vac-cal-grid">${calCells}</div><div class="vac-legend"><div class="vac-legend-item"><div class="vac-legend-dot" style="background:var(--accent)"></div>Urlaub</div><div class="vac-legend-item"><div class="vac-legend-dot" style="background:var(--danger)"></div>Krankheit</div><div class="vac-legend-item"><div class="vac-legend-dot" style="background:#10b981"></div>Fortbildung</div></div></div><div class="vac-side-panel"><div class="vac-panel-card"><div class="vac-panel-header"><h4 class="vac-panel-title">Offene Antr\u00e4ge</h4><span class="vac-badge-count">${pendingVacs.length}</span></div>${pendingList.length?pendingList.map(v=>`<div class="vac-req-item"><div class="vac-req-avatar">${v.empName.split(' ').map(n=>n[0]).join('').substring(0,2)}</div><div class="vac-req-info"><div class="vac-req-name">${v.empName}</div><div class="vac-req-dates">${formatDateDE(v.from)} - ${formatDateDE(v.to)} (${v.days}T)</div></div>${can('approveVacations')?`<div class="vac-req-actions"><button class="vac-btn-approve" onclick="appVac(${v.id})" title="Antrag von ${v.empName} genehmigen" aria-label="Antrag von ${v.empName} genehmigen"><span class="ms">check</span></button><button class="vac-btn-reject" onclick="rejVac(${v.id})" title="Antrag von ${v.empName} ablehnen" aria-label="Antrag von ${v.empName} ablehnen"><span class="ms">close</span></button></div>`:''}</div>`).join(''):'<p class="vac-empty">Keine offenen Antr\u00e4ge</p>'}${pendingVacs.length>5?`<button class="vac-see-all" onclick="vacationTab='requests';renderVacation()">Alle Antr\u00e4ge sehen</button>`:''}</div></div></div>`;
 }
 
 function appVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(v){v.status='approved';syncVacationStatus(v.id,'approved');const e=EMPS.find(x=>x.id===v.empId);if(e){e.vacUsed+=v.days;syncEmployeeField(e.id,'vacUsed',e.vacUsed);}addNotif('vacation','Urlaub genehmigt',v.empName);toast('Genehmigt');renderVacation();updateBadges();}}
@@ -6006,13 +6020,33 @@ function adCopyPassword() {
       () => toast('Kopieren fehlgeschlagen', 'err'));
   } else { toast('Erst auf 👁 klicken, um das Passwort zu laden', 'warn'); }
 }
-async function adResetPassword(userId) {
-  const pw = prompt('Neues Passwort (mind. 6 Zeichen):', genPassword());
-  if (!pw) return;
-  if (pw.length < 6) { toast('Passwort zu kurz', 'err'); return; }
+function adResetPassword(userId) {
+  document.getElementById('adPwResetPopup')?.remove();
+  const popup = document.createElement('div');
+  popup.id = 'adPwResetPopup';
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10001;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  popup.onclick = (e) => { if (e.target === popup) popup.remove(); };
+  popup.innerHTML = `<div style="background:var(--bg-card);border-radius:18px;padding:22px;width:340px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <h3 style="font-size:.95rem;font-weight:700;margin:0 0 14px">🔑 Passwort zurücksetzen</h3>
+    <label class="form-label">Neues Passwort (mind. 6 Zeichen)</label>
+    <div style="display:flex;gap:6px;margin-bottom:16px">
+      <input class="form-input" id="adPwResetInput" type="text" value="${genPassword()}" style="flex:1;font-family:monospace">
+      <button class="btn btn-sm" onclick="document.getElementById('adPwResetInput').value=genPassword()" title="Zufällig"><span class="ms" style="font-size:16px">casino</span></button>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-sm" onclick="document.getElementById('adPwResetPopup').remove()">Abbrechen</button>
+      <button class="btn btn-sm btn-primary" onclick="adDoResetPassword('${userId}')">Speichern</button>
+    </div>
+  </div>`;
+  document.body.appendChild(popup);
+}
+async function adDoResetPassword(userId) {
+  const pw = document.getElementById('adPwResetInput')?.value || '';
+  if (pw.length < 6) { toast('Passwort mind. 6 Zeichen', 'err'); return; }
   try {
     await callAdminUsers('setPassword', { userId, password: pw });
     toast('Passwort zurückgesetzt ✓', 'success');
+    document.getElementById('adPwResetPopup')?.remove();
     const inp = document.getElementById('adPwShow');
     if (inp) inp.value = pw;
   } catch (e) { toast('Fehler: ' + e.message, 'err'); }
@@ -6451,12 +6485,14 @@ async function saveShift(){
   toast(`${created} Schicht${created>1?'en':''} für ${selEmps.length} Mitarbeiter gespeichert`);
   renderSchedule();
 }
-function saveVac(){const eid=parseInt(document.getElementById('mVE').value);const emp=EMPS.find(e=>e.id===eid);const fr=document.getElementById('mVF').value,to=document.getElementById('mVTo').value;if(!fr||!to)return;const days=Math.ceil((new Date(to)-new Date(fr))/864e5)+1;const nv={id:Date.now(),empId:eid,empName:emp.name,location:emp.location,from:fr,to,days,status:'pending',note:document.getElementById('mVN').value};VACS.push(nv);syncAddVacation(nv);addNotif('vacation','Urlaubsantrag',`${emp.name}: ${formatDateDE(fr)}–${formatDateDE(to)} (${days}T)`);closeModal();toast('Antrag gestellt');renderVacation();}
+function saveVac(){const eid=parseInt(document.getElementById('mVE').value);const emp=EMPS.find(e=>e.id===eid);if(!emp){toast('Bitte Mitarbeiter wählen','err');return;}const fr=document.getElementById('mVF').value,to=document.getElementById('mVTo').value;if(!fr||!to){toast('Bitte Von- und Bis-Datum eingeben','err');return;}if(to<fr){toast('Bis-Datum darf nicht vor Von-Datum liegen','err');return;}const days=Math.ceil((new Date(to)-new Date(fr))/864e5)+1;const nv={id:Date.now(),empId:eid,empName:emp.name,location:emp.location,from:fr,to,days,status:'pending',note:document.getElementById('mVN').value};VACS.push(nv);syncAddVacation(nv);addNotif('vacation','Urlaubsantrag',`${emp.name}: ${formatDateDE(fr)}–${formatDateDE(to)} (${days}T)`);closeModal();toast('Antrag gestellt');renderVacation();}
 async function saveSickL(){
   const eid=parseInt(document.getElementById('mKE').value);
   const emp=EMPS.find(e=>e.id===eid);
   const fr=document.getElementById('mKF').value,to=document.getElementById('mKTo').value;
-  if(!fr||!to)return;
+  if(!emp){toast('Bitte Mitarbeiter wählen','err');return;}
+  if(!fr||!to){toast('Bitte Von- und Bis-Datum eingeben','err');return;}
+  if(to<fr){toast('Bis-Datum darf nicht vor Von-Datum liegen','err');return;}
   const days=Math.ceil((new Date(to)-new Date(fr))/864e5)+1;
   const hasAU=document.getElementById('mKAU').value==='1';
   const fileInput=document.getElementById('mKFile');
@@ -6966,7 +7002,8 @@ function renderReports(){
   const delayRows=topDelays.slice(0,8).map((e,i)=>{
     const deptIdx=deptEntries.findIndex(([d])=>d===e.dept);
     const tagStyle=deptTagStyle(e.dept,deptIdx>=0?deptIdx:i);
-    const avgDur=e.lateCount>0?Math.round(e.lateAvgMin||12):0;
+    const _lateShifts=SHIFTS.filter(s=>s.empId===e.id&&s.isLate&&s.lateMin>0);
+    const avgDur=_lateShifts.length?Math.round(_lateShifts.reduce((a,s)=>a+s.lateMin,0)/_lateShifts.length):null;
     const durClass=e.lateCount>=8?'danger':'';
     return `<tr>
       <td>
@@ -6977,7 +7014,7 @@ function renderReports(){
       </td>
       <td><span class="rep-dept-tag" style="${tagStyle}">${e.dept.toUpperCase()}</span></td>
       <td class="rep-late-count">${e.lateCount}×</td>
-      <td class="rep-late-dur ${durClass}">${avgDur} Min.</td>
+      <td class="rep-late-dur ${durClass}">${avgDur!=null?avgDur+' Min.':'—'}</td>
       <td>${lateStatus(e.lateCount)}</td>
       <td><button class="rep-action-btn" title="Nachricht"><span class="ms">mail</span></button></td>
     </tr>`;
@@ -7991,7 +8028,7 @@ function _renderQrCards(domain){
       <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:16px">📍 ${l.city || 'Standort'}</div>
       <div style="background:#fff;border-radius:12px;padding:16px;display:inline-block;margin-bottom:12px"><div id="qrC_${l.id}"></div></div>
       <div style="font-family:'Space Mono',monospace;font-size:.6rem;color:var(--text-muted);word-break:break-all;margin-bottom:8px;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px">${domain}/index.html?checkin=${l.id}&key=${l.key}</div>
-      <div style="font-size:.75rem;color:var(--warning);margin-bottom:14px">🔑 Key: <strong>${l.key}</strong></div>
+      <div style="font-size:.75rem;color:var(--warning);margin-bottom:14px">🔑 Key: <strong class="qr-key-val" data-key="${l.key}">••••••</strong> <button onclick="const s=this.previousElementSibling;const k=s.getAttribute('data-key');s.textContent=s.textContent==='••••••'?k:'••••••';" style="border:none;background:none;cursor:pointer;font-size:.85rem;vertical-align:middle" title="Key anzeigen/verbergen"><span class="ms" style="font-size:15px;color:var(--text-muted)">visibility</span></button></div>
       <div style="display:flex;gap:8px;justify-content:center">
         <button onclick="downloadQrPng('${l.id}','${l.name}')" style="padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.82rem">⬇️ PNG</button>
         <button onclick="printQrSingle('${l.id}','${l.name}','${l.icon}')" style="padding:8px 16px;background:rgba(255,255,255,.06);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;font-weight:600;cursor:pointer;font-size:.82rem">🖨️ Drucken</button>

@@ -489,6 +489,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.key === 'Enter') document.getElementById('loginPass').focus();
     });
   }
+  // Fehlermeldung ausblenden, sobald der Nutzer erneut tippt
+  ['loginEmail', 'loginPass'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => {
+      const le = document.getElementById('loginError');
+      if (le && le.style.display !== 'none') le.style.display = 'none';
+    });
+  });
 
   // Show loading overlay immediately on page load
   showLoading('Verbindung wird hergestellt...');
