@@ -5881,6 +5881,7 @@ const PERM_GROUPS = {
   ],
   'Planung': [
     { key: 'seeAllSchedules', label: 'Alle Arbeitspläne sehen' },
+    { key: 'seeOwnSchedule', label: 'Nur eigene Schichten sehen' },
     { key: 'editSchedules', label: 'Arbeitspläne bearbeiten' },
     { key: 'seeAllVacations', label: 'Alle Urlaubsanträge sehen' },
     { key: 'approveVacations', label: 'Urlaub genehmigen' },

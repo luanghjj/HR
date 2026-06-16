@@ -258,6 +258,11 @@ function getVisibleShifts() {
   }
   const me = EMPS.find(e => e.id === currentUser.empId);
   if (!me) return [];
+  // Stufe 3: nur eigene Schichten (wenn aktiviert)
+  if (can('seeOwnSchedule')) {
+    return SHIFTS.filter(s => s.empId === currentUser.empId);
+  }
+  // Stufe 2 (Standard): Schichten des eigenen Bereichs am eigenen Standort
   const myDepts = (me.dept || '').split(',').map(d => d.trim()).filter(Boolean);
   return SHIFTS.filter(s => empHasLoc(s, me.location) && myDepts.some(d => d === 'Alle' || d === s.dept));
 }

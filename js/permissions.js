@@ -8,7 +8,7 @@ const PERMS = {
   inhaber: {
     // ── OKYU HRM (16 keys) ──
     seeAllLocations: true, seeAllEmployees: true, editEmployees: true,
-    seeDepartments: true, editDepartments: true, seeAllSchedules: true, editSchedules: true,
+    seeDepartments: true, editDepartments: true, seeAllSchedules: true, editSchedules: true, seeOwnSchedule: false,
     seeAllVacations: true, approveVacations: true, seeAllSick: true,
     seeAllDocs: true, canExport: true, manageAccess: true, markLate: true,
     seeFinancials: true, editVacDays: true, editTraining: true,
@@ -17,7 +17,7 @@ const PERMS = {
   manager: {
     // ── OKYU HRM ──
     seeAllLocations: false, seeAllEmployees: true, editEmployees: true,
-    seeDepartments: true, editDepartments: true, seeAllSchedules: true, editSchedules: true,
+    seeDepartments: true, editDepartments: true, seeAllSchedules: true, editSchedules: true, seeOwnSchedule: false,
     seeAllVacations: true, approveVacations: true, seeAllSick: true,
     seeAllDocs: true, canExport: true, manageAccess: false, markLate: true,
     seeFinancials: false, editVacDays: false, editTraining: false,
@@ -26,7 +26,7 @@ const PERMS = {
   mitarbeiter: {
     // ── OKYU HRM ──
     seeAllLocations: false, seeAllEmployees: false, editEmployees: false,
-    seeDepartments: true, editDepartments: false, seeAllSchedules: false, editSchedules: false,
+    seeDepartments: true, editDepartments: false, seeAllSchedules: false, editSchedules: false, seeOwnSchedule: false,
     seeAllVacations: false, approveVacations: false, seeAllSick: false,
     seeAllDocs: false, canExport: false, manageAccess: false, markLate: false,
     seeFinancials: false, editVacDays: false, editTraining: false,
@@ -35,7 +35,7 @@ const PERMS = {
   azubi: {
     // ── OKYU HRM ──
     seeAllLocations: false, seeAllEmployees: false, editEmployees: false,
-    seeDepartments: true, editDepartments: false, seeAllSchedules: false, editSchedules: false,
+    seeDepartments: true, editDepartments: false, seeAllSchedules: false, editSchedules: false, seeOwnSchedule: false,
     seeAllVacations: false, approveVacations: false, seeAllSick: false,
     seeAllDocs: false, canExport: false, manageAccess: false, markLate: false,
     seeFinancials: false, editVacDays: false, editTraining: false,
