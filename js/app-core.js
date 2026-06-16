@@ -3488,8 +3488,8 @@ function renderSchedule(){
     scheduleView='day'; window._schedMobileDefaulted=true;
   }
 
-  // Mitarbeiter ohne verknüpften Mitarbeiter-Datensatz: Plan bleibt sonst leer.
-  if(isEmp && !me){
+  // Mitarbeiter/Azubi ohne verknüpften Mitarbeiter-Datensatz: Plan bleibt sonst leer.
+  if(!can('seeAllSchedules') && !me){
     pg.innerHTML = permBanner('Dein Konto ist noch nicht mit einem Mitarbeiter verknüpft. Bitte den Administrator kontaktieren (Zugangsverwaltung → Detail → Mitarbeiter verknüpfen).');
     return;
   }
@@ -5294,7 +5294,7 @@ async function createNewUser() {
 
   try {
     // E-Mail darf nicht doppelt vergeben sein
-    const { data: dup } = await sb.from('user_profiles').select('user_id').ilike('reg_email', email).maybeSingle();
+    const { data: dup } = await sb.from('user_profiles').select('user_id').ilike('reg_email', email).is('auth_user_id', null).maybeSingle();
     if (dup) { toast('Diese E-Mail ist bereits freigeschaltet.', 'err'); resetBtn(); return; }
 
     let empId, name, loc;
@@ -6181,6 +6181,7 @@ async function adDoResetPassword(userId) {
 async function adCreateLogin(userId) {
   const u = USERS.find(x => x.id === userId);
   if (!u) return;
+  if (!u.empId) { toast('Bitte zuerst einen Mitarbeiter verknüpfen, sonst bleibt der Arbeitsplan leer.', 'err'); return; }
   const email = (document.getElementById('adEmail')?.value || '').trim().toLowerCase();
   const pw = document.getElementById('adNewPw')?.value || '';
   if (!email || !email.includes('@')) { toast('Bitte gültige E-Mail eingeben', 'err'); return; }

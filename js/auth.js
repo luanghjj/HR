@@ -168,6 +168,11 @@ async function doLogin() {
     buildSidebar();
     showLoading('Daten werden geladen...');
     await loadDataFromSupabase();
+    // userRole erst NACH dem Laden setzen (Position kommt aus EMPS)
+    document.getElementById('userRole').innerHTML =
+      currentUser.role === 'inhaber' ? 'Geschäftsführung' :
+      currentUser.role === 'manager' ? 'Manager – ' + getLocationName(currentUser.location) :
+      EMPS.find(e => e.id === currentUser.empId)?.position || 'Mitarbeiter';
     buildLocationSelect();
     hideLoading();
     initApp();
@@ -238,9 +243,16 @@ async function doRegister() {
       .select('*').ilike('reg_email', email.toLowerCase()).is('auth_user_id', null).maybeSingle();
 
     if (invite) {
-      await sb.from('user_profiles')
+      const { error: claimErr } = await sb.from('user_profiles')
         .update({ auth_user_id: authData.user.id, status: 'active' })
         .eq('user_id', invite.user_id);
+      if (claimErr) {
+        loginError.textContent = 'Fehler beim Beanspruchen der Einladung: ' + claimErr.message;
+        loginError.style.display = 'block';
+        regBtn.disabled = false; regBtn.textContent = 'Konto erstellen';
+        await sb.auth.signOut().catch(() => {});
+        return;
+      }
       console.log('[Auth] ✓ Einladung beansprucht (Registrierung):', email);
       if (authData.session) {
         location.reload();   // direkt eingeloggt → App via Session-Check laden
@@ -444,15 +456,16 @@ async function checkExistingSession() {
       document.getElementById('loginScreen').classList.add('hidden');
       document.getElementById('app').classList.remove('hidden');
       document.getElementById('userName').textContent = currentUser.name;
-      document.getElementById('userRole').innerHTML =
-        currentUser.role === 'inhaber' ? 'Geschäftsführung' :
-        currentUser.role === 'manager' ? 'Manager – ' + getLocationName(currentUser.location) :
-        EMPS.find(e => e.id === currentUser.empId)?.position || 'Mitarbeiter';
       document.getElementById('userAvatar').textContent = currentUser.avatar;
 
       buildSidebar();
       showLoading('Sitzung wird wiederhergestellt...');
       await loadDataFromSupabase();
+      // userRole erst NACH dem Laden setzen (Position kommt aus EMPS)
+      document.getElementById('userRole').innerHTML =
+        currentUser.role === 'inhaber' ? 'Geschäftsführung' :
+        currentUser.role === 'manager' ? 'Manager – ' + getLocationName(currentUser.location) :
+        EMPS.find(e => e.id === currentUser.empId)?.position || 'Mitarbeiter';
       buildLocationSelect();
       hideLoading();
       initApp();
