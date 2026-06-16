@@ -516,6 +516,16 @@ async function syncBulkShifts(shiftsArray) {
  */
 async function syncCheckIn(record) {
   try {
+    // Idempotenz: existiert bereits ein offener Check-in für diesen MA?
+    const { data: open } = await sb.from('time_records')
+      .select('*').eq('emp_id', record.empId).is('check_out', null)
+      .order('check_in', { ascending: false }).limit(1).maybeSingle();
+    if (open) {
+      console.log('[Sync] Check-in bereits offen → bestehenden Datensatz nutzen:', open.id);
+      record.id = open.id;
+      record.checkIn = open.check_in;
+      return open;
+    }
     const { data, error } = await sb.from('time_records').insert({
       emp_id: record.empId,
       location: record.location,
@@ -531,6 +541,13 @@ async function syncCheckIn(record) {
       gps_suspicious: record.gpsSuspicious || false
     }).select().single();
     if (error) {
+      // 23505 = unique_violation → ein paralleler Check-in war schneller
+      if (error.code === '23505') {
+        const { data: existing } = await sb.from('time_records')
+          .select('*').eq('emp_id', record.empId).is('check_out', null)
+          .order('check_in', { ascending: false }).limit(1).maybeSingle();
+        if (existing) { record.id = existing.id; record.checkIn = existing.check_in; return existing; }
+      }
       console.warn('[Sync] Check-in error:', error.message);
       return null;
     }

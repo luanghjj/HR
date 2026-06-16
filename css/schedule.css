@@ -465,6 +465,12 @@
 }
 .sc2-grid-wrap .shift-block.verwaltung .shift-name { color: #e11d48; }
 
+.sc2-grid-wrap .shift-block.minijob {
+  background: rgba(20,184,166,.10);
+  border-color: #14b8a6;
+}
+.sc2-grid-wrap .shift-block.minijob .shift-name { color: #14b8a6; }
+
 .sc2-grid-wrap .shift-block.schule {
   background: rgba(0,180,216,.11);
   border-color: #00b4d8;
