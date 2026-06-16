@@ -6207,6 +6207,13 @@ async function saveAccountDetail(userId) {
   if (name && name !== u.name) await changeUserName(userId, name);
   if (role && role !== u.role) await changeUserRole(userId, role);
   if (pos != null) await changeUserPosition(userId, pos);
+  // Login-E-Mail speichern (nur wenn Feld editierbar = noch kein Login angelegt).
+  // Ohne Passwort = Einladung: MA meldet sich später per Google/Registrierung an.
+  const emailEl = document.getElementById('adEmail');
+  if (emailEl && !emailEl.readOnly) {
+    const email = (emailEl.value || '').trim().toLowerCase();
+    if (email !== (u.regEmail || '')) await saveUserEmail(userId, email);
+  }
   // 2. Berechtigungen (gleiche Logik wie savePermissions)
   await savePermissions(userId);
 }
