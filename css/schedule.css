@@ -504,6 +504,23 @@
 }
 .sc2-grid-wrap .compact-block.schule .compact-letter { color: #00b4d8; }
 
+/* Nicht verfügbar (Self-Service) */
+.sc2-grid-wrap .compact-block.is-unavail {
+  background: rgba(100,116,139,.12);
+  border: 1.5px dashed #64748b;
+}
+.sc2-grid-wrap .compact-block.is-unavail .compact-letter { color: #64748b; font-size: .7rem; }
+.sc2-grid-wrap .empty-cell-self {
+  min-height: 82px; border-radius: 14px;
+  border: 2px dashed var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .15s; color: var(--text-muted); opacity: .55;
+}
+.sc2-grid-wrap .empty-cell-self:hover {
+  border-color: #64748b; border-style: solid;
+  background: rgba(100,116,139,.06); color: #64748b; opacity: 1;
+}
+
 /* Ruhetag v2 */
 .sc2-grid-wrap .ruhetag-cell {
   min-height: 56px; border-radius: 11px;

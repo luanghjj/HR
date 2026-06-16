@@ -458,6 +458,27 @@ async function syncDeleteShift(shiftId) {
   } catch (e) { console.warn('[Sync]', e.message); }
 }
 
+// ═══ VERFÜGBARKEIT (Nicht verfügbar) ═══
+async function syncAddAvailability(av) {
+  try {
+    const { data, error } = await sb.from('availability').insert({
+      emp_id: av.empId, emp_name: av.empName, location: av.location || null,
+      date: av.date, reason: av.reason || ''
+    }).select().single();
+    if (error) { console.warn('[Sync] Availability error:', error.message); return null; }
+    av.id = data.id;
+    console.log('[Sync] ✓ Availability added:', av.empName, av.date);
+    return data.id;
+  } catch (e) { console.warn('[Sync]', e.message); return null; }
+}
+async function syncDeleteAvailability(avId) {
+  try {
+    if (avId == null) return;
+    await sb.from('availability').delete().eq('id', avId);
+    console.log('[Sync] ✓ Availability deleted:', avId);
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+
 /**
  * Save all generated shifts to Supabase (bulk insert)
  */

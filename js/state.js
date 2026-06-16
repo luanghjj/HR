@@ -33,6 +33,9 @@ let TIME_RECORDS = [];
 let activeCheckIn = null; // Current open check-in for this user
 let checkInTimer = null;  // Interval for live timer
 
+// Verfügbarkeit (Nicht verfügbar – Self-Service)
+let AVAILABILITY = [];
+
 // Aushilfe Planung
 let AUSHILFE_SLOTS = [];
 let aushilfePlanungMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);

@@ -35,7 +35,7 @@ function buildSidebar(){
   }
 
   // ── PLANUNG ──
-  const showSchedule = isCustom ? can('seeAllSchedules') : (can('seeAllSchedules') || ['mitarbeiter','azubi'].includes(currentUser.role));
+  const showSchedule = isCustom ? (can('seeAllSchedules') || can('seeOwnSchedule')) : (can('seeAllSchedules') || can('seeOwnSchedule') || ['mitarbeiter','azubi'].includes(currentUser.role));
   const showVacation = isCustom ? can('seeAllVacations') || can('approveVacations') : true;
   const showSick = isCustom ? can('seeAllSick') : true;
   if(showSchedule || showVacation || showSick){
@@ -3695,15 +3695,29 @@ function renderSchedule(){
           }
         }
 
+        // Nicht verfügbar (Self-Service) anzeigen, wenn kein Dienst gesetzt
+        if (!cellHas && empObj) {
+          const av = AVAILABILITY.find(a => a.empId===empObj.id && a.date===ds);
+          if (av) {
+            const isOwn = empObj.id === currentUser.empId;
+            h+=`<div class="shift-block compact-block is-unavail" ${isOwn?`onclick="toggleUnavailable(${empObj.id},'${ds}')" style="cursor:pointer" title="Klicken zum Aufheben"`:'title="Nicht verfügbar"'}><span class="compact-letter">NV</span></div>`;
+            cellHas = true;
+          }
+        }
+
         if(!cellHas){
           // Check if this is a Ruhetag for employee's location
           const ruheEmp = empObj || EMPS.find(e=>e.name===emp);
           const ruheLoc = ruheEmp?.location || '';
           const ruheType = getVacTypeForDate(ds, ruheLoc);
+          const isOwnRow = empObj && empObj.id === currentUser.empId;
           if(!ruheType){
             h+='<div class="ruhetag-cell"><span class="ruhetag-label">Ruhetag</span></div>';
           } else if(canEdit){
             h+=`<div class="empty-cell-add" onclick="quickAddShift('${emp}','${ds}',${_empObj2?.id??'null'})" title="Schicht hinzufügen"><span class="ms">add</span></div>`;
+          } else if(isOwnRow){
+            // Mitarbeiter: eigene Zelle → Self-Service (nicht verfügbar / Urlaub)
+            h+=`<div class="empty-cell-self" onclick="openSelfServiceCell(${empObj.id},'${ds}')" title="Nicht verfügbar / Urlaub beantragen"><span class="ms">more_horiz</span></div>`;
           } else {
             h+='<span style="color:var(--text-muted);font-size:.7rem">—</span>';
           }
@@ -3801,6 +3815,52 @@ function pickShiftLocation(emp) {
     popup.querySelectorAll('[data-loc]').forEach(b => b.onclick = () => finish(b.dataset.loc));
     popup.querySelector('#shiftLocCancel').onclick = () => finish(null);
   });
+}
+
+// ═══ SELF-SERVICE (Mitarbeiter: Nicht verfügbar / Urlaub) ═══
+function openSelfServiceCell(empId, date) {
+  if (empId !== currentUser.empId) return; // nur eigene Zelle
+  document.getElementById('selfServicePopup')?.remove();
+  const popup = document.createElement('div');
+  popup.id = 'selfServicePopup';
+  popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10001;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  popup.onclick = (e) => { if (e.target === popup) popup.remove(); };
+  popup.innerHTML = `<div style="background:var(--bg-card);border-radius:18px;padding:22px;width:320px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <h3 style="font-size:.95rem;font-weight:700;margin:0 0 4px">${formatDateDE(date)}</h3>
+    <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 16px">Was möchtest du melden?</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-primary" style="width:100%;justify-content:flex-start" onclick="toggleUnavailable(${empId},'${date}');document.getElementById('selfServicePopup').remove()"><span class="ms" style="font-size:18px">event_busy</span> Nicht verfügbar melden</button>
+      <button class="btn" style="width:100%;justify-content:flex-start" onclick="document.getElementById('selfServicePopup').remove();openVacationForDate('${date}')"><span class="ms" style="font-size:18px">beach_access</span> Urlaub beantragen</button>
+    </div>
+    <div style="margin-top:14px;text-align:right"><button class="btn btn-sm" onclick="document.getElementById('selfServicePopup').remove()">Abbrechen</button></div>
+  </div>`;
+  document.body.appendChild(popup);
+}
+async function toggleUnavailable(empId, date) {
+  if (empId !== currentUser.empId) return;
+  const emp = EMPS.find(e => e.id === empId);
+  if (!emp) return;
+  const existing = AVAILABILITY.find(a => a.empId === empId && a.date === date);
+  if (existing) {
+    AVAILABILITY = AVAILABILITY.filter(a => a !== existing);
+    await syncDeleteAvailability(existing.id);
+    toast('Verfügbarkeit aufgehoben', 'warn');
+  } else {
+    const av = { empId, empName: emp.name, location: (emp.location || '').split(',')[0].trim(), date, reason: '' };
+    AVAILABILITY.push(av);
+    await syncAddAvailability(av);
+    toast('Als nicht verfügbar gemeldet', 'success');
+  }
+  renderSchedule();
+}
+function openVacationForDate(date) {
+  openModal('addVacation');
+  // Datum vorbefüllen
+  setTimeout(() => {
+    const f = document.getElementById('mVF'), t = document.getElementById('mVTo');
+    if (f) f.value = date;
+    if (t) t.value = date;
+  }, 50);
 }
 
 function quickAddShift(empName, date, empId) {

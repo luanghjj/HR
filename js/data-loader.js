@@ -410,6 +410,24 @@ async function loadDataFromSupabase() {
       }
     } catch (_) { /* table may not exist yet, use default 1 */ }
 
+    // Load Verfügbarkeit (Nicht verfügbar) – aktueller + nächste 3 Monate
+    try {
+      const avStart = new Date(); avStart.setDate(1);
+      const avEnd = new Date(); avEnd.setMonth(avEnd.getMonth() + 3);
+      const { data: avs, error: avErr } = await sb.from('availability')
+        .select('*')
+        .gte('date', avStart.toISOString().split('T')[0])
+        .lte('date', avEnd.toISOString().split('T')[0]);
+      if (!avErr && avs) {
+        AVAILABILITY.length = 0;
+        avs.forEach(a => AVAILABILITY.push({
+          id: a.id, empId: a.emp_id, empName: a.emp_name || '',
+          location: a.location || '', date: a.date, reason: a.reason || ''
+        }));
+        console.log('[Data] ✓ ' + AVAILABILITY.length + ' Verfügbarkeits-Einträge geladen');
+      }
+    } catch (_) { /* table may not exist yet */ }
+
     // Load employee_submissions (Aushilfe worker list for admin view)
     try {
       const { data: subs, error: subsErr } = await sb.from('employee_submissions')
