@@ -11,6 +11,8 @@ let scheduleView = 'week';
 let scheduleDate = new Date();
 let scheduleSort = 'name';
 let scheduleDept = 'all';
+let scheduleShiftFilter = 'all'; // 'all' | 'on' (hat Schicht) | 'off' (ohne Schicht)
+let scheduleSearch = '';         // Suche nach Mitarbeitername
 let dragData = null;
 
 // Vacation calendar state

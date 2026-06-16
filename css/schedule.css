@@ -169,6 +169,25 @@
   font-size: .75rem; font-weight: 700; color: var(--accent);
   cursor: pointer; outline: none;
 }
+.sc2-filter-sep {
+  width: 1px; height: 20px; background: var(--border); margin: 0 4px;
+  display: inline-block;
+}
+.sc2-search-wrap {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 18px; padding: 4px 10px; color: var(--text-muted);
+}
+.sc2-search-wrap:focus-within { border-color: var(--accent); }
+.sc2-search-input {
+  border: none; background: transparent; outline: none;
+  font-size: .8rem; color: var(--text-primary); width: 150px; font-weight: 500;
+}
+.sc2-search-clear {
+  border: none; background: none; cursor: pointer; color: var(--text-muted);
+  display: flex; align-items: center; padding: 0;
+}
+.sc2-search-clear:hover { color: var(--danger); }
 
 /* ─── Grid Wrap (table container) ─── */
 .sc2-grid-wrap {

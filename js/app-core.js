@@ -3550,8 +3550,18 @@ function renderSchedule(){
           : [...new Set(deptsForLocation(effLoc).map(d=>d.name))];
         return names.sort().map(d=>`<button class="sc2-dept-pill${scheduleDept===d?' active':''}" onclick="scheduleDept='${d}';renderSchedule()">${d}</button>`).join('');
       })()}
+      <span class="sc2-filter-sep"></span>
+      <span class="sc2-filter-label">Status</span>
+      <button class="sc2-dept-pill${scheduleShiftFilter==='all'?' active':''}" onclick="scheduleShiftFilter='all';renderSchedule()" title="Alle Mitarbeiter">Alle</button>
+      <button class="sc2-dept-pill${scheduleShiftFilter==='on'?' active':''}" onclick="scheduleShiftFilter='on';renderSchedule()" title="Nur mit Schicht">ON</button>
+      <button class="sc2-dept-pill${scheduleShiftFilter==='off'?' active':''}" onclick="scheduleShiftFilter='off';renderSchedule()" title="Ohne Schicht">OFF</button>
     </div>
     <div class="sc2-filter-right">
+      <div class="sc2-search-wrap">
+        <span class="ms" style="font-size:1rem">search</span>
+        <input class="sc2-search-input" type="text" placeholder="Mitarbeiter suchen…" value="${(scheduleSearch||'').replace(/"/g,'&quot;')}" oninput="scheduleSearch=this.value;renderSchedule();const i=document.querySelector('.sc2-search-input');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length);}">
+        ${scheduleSearch?`<button class="sc2-search-clear" onclick="scheduleSearch='';renderSchedule()" title="Löschen"><span class="ms" style="font-size:.9rem">close</span></button>`:''}
+      </div>
       <span class="ms" style="font-size:1rem">sort</span> Sortieren nach:
       <select class="sc2-sort-sel" onchange="scheduleSort=this.value;renderSchedule()">
         <option value="name"${scheduleSort==='name'?' selected':''}>Name</option>
@@ -3569,10 +3579,25 @@ function renderSchedule(){
     document.getElementById('schedLabel').textContent=`${formatDateDE(isoDate(weekS))} – ${formatDateDE(isoDate(weekE))}`;
     let emps=[...new Set(shifts.filter(s=>{const d=new Date(s.date);return d>=weekS&&d<=weekE;}).map(s=>s.empName))];
     const dayD=[];for(let i=0;i<7;i++){const d=new Date(weekS);d.setDate(d.getDate()+i);dayD.push(isoDate(d));}
+    // "Hat Schicht diese Woche" – Basis für ON/OFF-Filter
+    const empsWithShift=new Set(emps);
     // Add employees with approved vacation or active sick in this week
     // (standortgefiltert – sonst tauchen Mitarbeiter fremder Standorte auf)
     getVisibleVacs().filter(v=>v.status==='approved'&&v.to>=dayD[0]&&v.from<=dayD[6]).forEach(v=>{if(!emps.includes(v.empName))emps.push(v.empName);});
     getVisibleSicks().filter(s=>s.status==='active'&&s.to>=dayD[0]&&s.from<=dayD[6]).forEach(s=>{if(!emps.includes(s.empName))emps.push(s.empName);});
+    // Für OFF/Alle: alle Mitarbeiter im aktuellen Geltungsbereich aufnehmen,
+    // damit auch Personen OHNE Schicht erscheinen (zum Einplanen).
+    if(scheduleShiftFilter==='off'||scheduleShiftFilter==='all'){
+      const scopeEmps=getVisibleEmps().filter(e=>(e.status==='active'||e.status==='aktiv'));
+      scopeEmps.forEach(e=>{if(!emps.includes(e.name))emps.push(e.name);});
+    }
+    // ON/OFF anwenden
+    if(scheduleShiftFilter==='on') emps=emps.filter(n=>empsWithShift.has(n));
+    else if(scheduleShiftFilter==='off') emps=emps.filter(n=>!empsWithShift.has(n));
+    // Bereich-Filter auf die (ggf. erweiterte) Liste anwenden
+    if(scheduleDept!=='all') emps=emps.filter(n=>{const e=EMPS.find(x=>x.name===n);if(!e)return true;const ds=(e.dept||'').split(',').map(d=>d.trim());return ds.includes(scheduleDept)||ds.includes('Alle');});
+    // Suche nach Name
+    if(scheduleSearch&&scheduleSearch.trim()){const q=scheduleSearch.trim().toLowerCase();emps=emps.filter(n=>n.toLowerCase().includes(q));}
     emps.sort();
     // Sort by selected criteria
     const sortBy=scheduleSort;
@@ -7171,7 +7196,7 @@ function exportReport(){
   const totalBrutto=emps.reduce((s,e)=>s+e.bruttoGehalt,0);
   let rows=emps.map(e=>`<tr><td>${e.name}</td><td>${getLocationName(e.location)}</td><td>${e.dept}</td><td>${e.position}</td><td>${e.vacTotal-e.vacUsed}</td><td>${e.sickDays}</td><td>${e.lateCount}</td>${isAdmin?`<td>${e.sollStunden}h</td><td>${formatEuro(e.bruttoGehalt)}</td><td>${formatEuro(calcHourly(e))}</td>`:''}</tr>`).join('');
   w.document.write(`<!DOCTYPE html><html><head><title>Personalbericht</title><style>body{font-family:'Segoe UI',sans-serif;padding:24px;color:#222;font-size:12px}h1{font-size:18px}h2{font-size:13px;color:#666;font-weight:normal;margin-bottom:16px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th,td{padding:6px 10px;border:1px solid #ddd;text-align:left}th{background:#f5f5f5;font-weight:700;font-size:10px;text-transform:uppercase}.total{font-weight:700;background:#f9f9f9}@media print{body{padding:0}}</style></head><body>
-  <h1>Personalbericht – OKYU HRM</h1><h2>Stand: ${formatDateDE(isoDate(new Date()))} · ${emps.length} Mitarbeiter</h2>
+  <h1>Personalbericht – timetrack HRM</h1><h2>Stand: ${formatDateDE(isoDate(new Date()))} · ${emps.length} Mitarbeiter</h2>
   <table><thead><tr><th>Name</th><th>Standort</th><th>Bereich</th><th>Position</th><th>Resturlaub</th><th>Krankentage</th><th>Verspätungen</th>${isAdmin?'<th>Soll-Std.</th><th>Brutto</th><th>€/Std.</th>':''}</tr></thead><tbody>${rows}
   ${isAdmin?`<tr class="total"><td colspan="7">Gesamt</td><td>${emps.reduce((s,e)=>s+e.sollStunden,0)}h</td><td>${formatEuro(totalBrutto)}</td><td>—</td></tr>`:''}</tbody></table>
   <script>window.print();<\/script></body></html>`);w.document.close();
@@ -8076,7 +8101,7 @@ function printQrSingle(locId,locName,icon){
   if(!img)return;
   const src=img.tagName==='IMG'?img.src:img.toDataURL('image/png');
   const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Arial,sans-serif;text-align:center}.c{padding:40px}h1{font-size:2rem;margin-bottom:8px}img{display:block;margin:0 auto 24px}</style></head><body><div class="c"><div style="font-size:3rem;margin-bottom:12px">${icon}</div><h1>${locName}</h1><p style="color:#666;margin-bottom:24px">📍 ${LOCS.find(lo=>lo.id===locId)?.city||''}</p><img src="${src}" width="280" height="280"><p style="font-size:1.1rem;font-weight:bold;margin-bottom:8px">📱 QR scannen zum Check-in</p><p style="color:#999;font-size:.9rem">OKYU HRM — Zeiterfassung</p></div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  w.document.write(`<!DOCTYPE html><html><head><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:Arial,sans-serif;text-align:center}.c{padding:40px}h1{font-size:2rem;margin-bottom:8px}img{display:block;margin:0 auto 24px}</style></head><body><div class="c"><div style="font-size:3rem;margin-bottom:12px">${icon}</div><h1>${locName}</h1><p style="color:#666;margin-bottom:24px">📍 ${LOCS.find(lo=>lo.id===locId)?.city||''}</p><img src="${src}" width="280" height="280"><p style="font-size:1.1rem;font-weight:bold;margin-bottom:8px">📱 QR scannen zum Check-in</p><p style="color:#999;font-size:.9rem">timetrack HRM — Zeiterfassung</p></div><script>setTimeout(()=>window.print(),300)<\/script></body></html>`);
   w.document.close();
 }
 
