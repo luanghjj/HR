@@ -3488,6 +3488,11 @@ function renderSchedule(){
     scheduleView='day'; window._schedMobileDefaulted=true;
   }
 
+  // Mitarbeiter ohne verknüpften Mitarbeiter-Datensatz: Plan bleibt sonst leer.
+  if(isEmp && !me){
+    pg.innerHTML = permBanner('Dein Konto ist noch nicht mit einem Mitarbeiter verknüpft. Bitte den Administrator kontaktieren (Zugangsverwaltung → Detail → Mitarbeiter verknüpfen).');
+    return;
+  }
   let banner=isEmp?permBanner(`Du siehst den Arbeitsplan deines Bereichs (${me?.dept||''} – ${getLocationName(me?.location||'')})`).trim():'';
   let shifts=getVisibleShifts();
   if(scheduleDept!=='all')shifts=shifts.filter(s=>{const sDepts=(s.dept||'').split(',').map(d=>d.trim());return sDepts.includes(scheduleDept)||sDepts.includes('Alle');});

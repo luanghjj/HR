@@ -85,11 +85,29 @@ async function doLogin() {
     }
 
     // Fetch user profile from user_profiles table
-    const { data: profile, error: profileError } = await sb
+    let { data: profile, error: profileError } = await sb
       .from('user_profiles')
       .select('*')
       .eq('auth_user_id', authData.user.id)
-      .single();
+      .maybeSingle();
+
+    // Kein verknüpftes Profil → vorautorisierte Einladung per E-Mail beanspruchen
+    if (!profile) {
+      const loginMail = (authData.user.email || email || '').trim().toLowerCase();
+      if (loginMail) {
+        const { data: invite } = await sb.from('user_profiles')
+          .select('*').ilike('reg_email', loginMail).is('auth_user_id', null).maybeSingle();
+        if (invite) {
+          const { error: claimErr } = await sb.from('user_profiles')
+            .update({ auth_user_id: authData.user.id, status: 'active' })
+            .eq('user_id', invite.user_id);
+          if (!claimErr) {
+            profile = { ...invite, auth_user_id: authData.user.id, status: 'active' };
+            console.log('[Auth] ✓ Einladung beim Login beansprucht:', loginMail);
+          }
+        }
+      }
+    }
 
     if (profileError || !profile) {
       loginError.textContent = 'Benutzerprofil nicht gefunden. Bitte Admin kontaktieren.';
@@ -100,10 +118,10 @@ async function doLogin() {
       return;
     }
 
-    // Check if account is pending approval (employee status = inactive)
+    // Check if account is pending approval (employee status = inactive/pending)
     if (profile.emp_id) {
       const { data: empCheck } = await sb.from('employees').select('status').eq('id', profile.emp_id).maybeSingle();
-      if (empCheck && empCheck.status === 'inactive') {
+      if (empCheck && ['inactive','inaktiv','pending'].includes(empCheck.status)) {
         await sb.auth.signOut();
         document.getElementById('loginSupabase').style.display = 'none';
         document.getElementById('loginRegister').style.display = 'none';
@@ -395,7 +413,7 @@ async function checkExistingSession() {
       // Profile exists — check if employee is still inactive (pending approval)
       if (profile.emp_id) {
         const { data: emp } = await sb.from('employees').select('status').eq('id', profile.emp_id).maybeSingle();
-        if (emp && emp.status === 'inactive') {
+        if (emp && ['inactive','inaktiv','pending'].includes(emp.status)) {
           hideLoading();
           document.getElementById('loginSupabase').style.display = 'none';
           document.getElementById('loginRegister').style.display = 'none';
