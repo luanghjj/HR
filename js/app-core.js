@@ -3531,7 +3531,7 @@ function renderSchedule(){
           <button onclick="this.closest('.sc2-more-wrap').classList.remove('open');openModal('saveTemplate')"><span class="ms">bookmark</span> Vorlagen</button>
         </div>
       </div>`:``}
-      ${canExp?`<button class="sc2-action-btn is-primary" onclick="exportPDF()"><span class="ms" style="font-size:1rem">picture_as_pdf</span> PDF Export</button>`:``}
+      ${canExp?`<button class="sc2-action-btn is-primary" onclick="openExportModal()"><span class="ms" style="font-size:1rem">picture_as_pdf</span> PDF Export</button>`:``}
       ${canEdit?`<button class="sc2-action-btn" onclick="openModal('addShift')" style="background:var(--accent);color:#fff;border-color:var(--accent)"><span class="ms" style="font-size:1rem">add</span> Schicht</button>`:``}
     </div>
   </div>
@@ -3620,7 +3620,7 @@ function renderSchedule(){
     h+='</tr></thead><tbody>';
     emps.forEach(emp=>{
       const _empObj2=EMPS.find(e=>e.name===emp);const _empPos=_empObj2?.position||'';const _empInitials=emp.split(' ').map(n=>n[0]).join('').substring(0,2);
-      h+=`<tr><td><div style="display:flex;align-items:center;gap:12px"><div class="sc2-emp-avatar">${_empInitials}</div><div><div class="sc2-emp-name">${emp}</div><div class="sc2-emp-pos">${_empPos}</div></div></div></td>`;
+      h+=`<tr data-emp="${(emp||'').replace(/"/g,'&quot;')}" data-dept="${(_empObj2?.dept||'').replace(/"/g,'&quot;')}"><td><div style="display:flex;align-items:center;gap:12px"><div class="sc2-emp-avatar">${_empInitials}</div><div><div class="sc2-emp-name">${emp}</div><div class="sc2-emp-pos">${_empPos}</div></div></div></td>`;
       let weekH=0;
       dayD.forEach(ds=>{
         const dayS=shifts.filter(s=>s.date===ds&&s.empName===emp);
@@ -4124,8 +4124,44 @@ async function confirmGenerateStandardWeek() {
   renderSchedule();
 }
 function deleteShift(id){if(!can('editSchedules'))return;const s=SHIFTS.find(x=>x.id===id);if(!s)return;if(!confirm(`${s.empName}: ${s.label} (${formatDateDE(s.date)}) löschen?`))return;SHIFTS=SHIFTS.filter(x=>x.id!==id);syncDeleteShift(id);toast('Schicht gelöscht','warn');renderSchedule();}
-function exportPDF(){if(!can('canExport'))return;const pc=document.getElementById('schedC').innerHTML;const lbl=document.getElementById('schedLabel').textContent;const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Arbeitsplan</title><style>body{font-family:'Segoe UI',Arial,sans-serif;padding:24px;color:#222}h1{font-size:20px}h2{font-size:14px;color:#666;font-weight:normal;margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;border:1px solid #ddd;font-size:12px;text-align:left}th{background:#f5f5f5;font-weight:700;text-transform:uppercase;font-size:10px}.shift-block{padding:3px 6px;border-radius:3px;font-size:11px;margin:2px 0;background:#f0f0f0;border-left:3px solid #666}.shift-block.kitchen{border-left-color:#e17055;background:#fef3ef}.shift-block.service{border-left-color:#74b9ff;background:#eef5ff}.shift-block.bar{border-left-color:#00b894;background:#eefaf6}.shift-block.is-sick{border-left-color:#d63031;background:#ffeaea}.shift-block.is-vacation{border-left-color:#0984e3;background:#eaf2ff}.shift-block.is-late{border-right:3px solid #e84393}.shift-name{font-weight:600}.shift-time{font-size:10px;color:#888}.shift-actions{display:none}.table-wrap{border:none}.table-header{display:none}.late-marker{color:#e84393;font-size:9px}.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}.cal-day{border:1px solid #ddd;padding:4px;min-height:50px;font-size:11px}.cal-day-header{font-size:10px;font-weight:700;text-align:center;padding:4px;background:#f5f5f5}.cal-day-num{font-weight:700}.cal-event{font-size:9px;padding:1px 4px;background:#eef;border-radius:2px;margin-top:2px}@media print{body{padding:0}}</style></head><body><h1>Arbeitsplan – ${currentUser.role==='inhaber'?'Alle Standorte':getLocationName(currentUser.location)}</h1><h2>${lbl}</h2>${pc}<script>window.print();<\/script></body></html>`);w.document.close();}
+function openExportModal(){
+  if(!can('canExport'))return;
+  const empOpts=getVisibleEmps().slice().sort((a,b)=>a.name.localeCompare(b.name)).map(e=>`<option value="${e.name.replace(/"/g,'&quot;')}">${e.name}</option>`).join('');
+  const deptOpts=[...new Set(getVisibleEmps().map(e=>e.dept).filter(Boolean))].sort().map(d=>`<option value="${d}">${d}</option>`).join('');
+  openModal('PDF Export', `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0"><input type="radio" name="expScope" value="all" checked onchange="document.getElementById('expEmpWrap').style.display='none';document.getElementById('expDeptWrap').style.display='none'"> <span style="font-weight:600">Alle anzeigen</span></label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0"><input type="radio" name="expScope" value="emp" onchange="document.getElementById('expEmpWrap').style.display='';document.getElementById('expDeptWrap').style.display='none'"> <span style="font-weight:600">Ein Mitarbeiter</span></label>
+        <div id="expEmpWrap" style="display:none;padding:4px 0 4px 26px"><select class="form-select" id="expEmpSel" style="width:100%">${empOpts}</select></div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0"><input type="radio" name="expScope" value="dept" onchange="document.getElementById('expDeptWrap').style.display='';document.getElementById('expEmpWrap').style.display='none'"> <span style="font-weight:600">Ein Bereich</span></label>
+        <div id="expDeptWrap" style="display:none;padding:4px 0 4px 26px"><select class="form-select" id="expDeptSel" style="width:100%">${deptOpts}</select></div>
+      </div>
+    </div>`,
+    `<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="doExportPDF()"><span class="ms" style="font-size:16px;vertical-align:middle">picture_as_pdf</span> Exportieren</button>`);
+}
+function doExportPDF(){
+  const scope=document.querySelector('input[name="expScope"]:checked')?.value||'all';
+  let val=null;
+  if(scope==='emp')val=document.getElementById('expEmpSel')?.value;
+  else if(scope==='dept')val=document.getElementById('expDeptSel')?.value;
+  closeModal();
+  exportPDF(scope,val);
+}
+function exportPDF(scope,val){if(!can('canExport'))return;
+  // HTML klonen, dann Zeilen nach scope filtern (nur Wochenansicht hat data-emp/data-dept)
+  const tmp=document.createElement('div');
+  tmp.innerHTML=document.getElementById('schedC').innerHTML;
+  if(scope==='emp'&&val){
+    tmp.querySelectorAll('tbody tr[data-emp]').forEach(tr=>{if(tr.getAttribute('data-emp')!==val)tr.remove();});
+  }else if(scope==='dept'&&val){
+    tmp.querySelectorAll('tbody tr[data-emp]').forEach(tr=>{const d=(tr.getAttribute('data-dept')||'').split(',').map(x=>x.trim());if(!d.includes(val)&&!d.includes('Alle'))tr.remove();});
+  }
+  const pc=tmp.innerHTML;
+  const lbl=document.getElementById('schedLabel').textContent;
+  const scopeLbl=scope==='emp'?` · ${val}`:scope==='dept'?` · Bereich ${val}`:'';
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Arbeitsplan</title><style>body{font-family:'Segoe UI',Arial,sans-serif;padding:24px;color:#222}h1{font-size:20px}h2{font-size:14px;color:#666;font-weight:normal;margin-bottom:16px}table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;border:1px solid #ddd;font-size:12px;text-align:left}th{background:#f5f5f5;font-weight:700;text-transform:uppercase;font-size:10px}.shift-block{padding:3px 6px;border-radius:3px;font-size:11px;margin:2px 0;background:#f0f0f0;border-left:3px solid #666}.shift-block.kitchen{border-left-color:#e17055;background:#fef3ef}.shift-block.service{border-left-color:#74b9ff;background:#eef5ff}.shift-block.bar{border-left-color:#00b894;background:#eefaf6}.shift-block.is-sick{border-left-color:#d63031;background:#ffeaea}.shift-block.is-vacation{border-left-color:#0984e3;background:#eaf2ff}.shift-block.is-late{border-right:3px solid #e84393}.shift-name{font-weight:600}.shift-time{font-size:10px;color:#888}.shift-actions{display:none}.table-wrap{border:none}.table-header{display:none}.late-marker{color:#e84393;font-size:9px}.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}.cal-day{border:1px solid #ddd;padding:4px;min-height:50px;font-size:11px}.cal-day-header{font-size:10px;font-weight:700;text-align:center;padding:4px;background:#f5f5f5}.cal-day-num{font-weight:700}.cal-event{font-size:9px;padding:1px 4px;background:#eef;border-radius:2px;margin-top:2px}@media print{body{padding:0}}</style></head><body><h1>Arbeitsplan – ${currentUser.role==='inhaber'?'Alle Standorte':getLocationName(currentUser.location)}${scopeLbl}</h1><h2>${lbl}</h2>${pc}<script>window.print();<\/script></body></html>`);w.document.close();}
 
 // ═══ AUSHILFE PLANUNG ═══
 
