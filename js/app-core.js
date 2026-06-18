@@ -572,8 +572,15 @@ function visibleAnnouncements(){
   return ANNOUNCEMENTS.filter(a=>{
     if(!a.location) return true; // alle Standorte
     if(myLoc==='all') return true;
-    return myLocs.includes(a.location);
+    const annLocs = a.location.split(',').map(l=>l.trim()).filter(Boolean);
+    return annLocs.some(l=>myLocs.includes(l)); // mind. ein gemeinsamer Standort
   });
+}
+
+// Standort-Label einer Mitteilung (kann mehrere Standorte umfassen)
+function annLocLabel(loc){
+  if(!loc) return 'Alle Standorte';
+  return loc.split(',').map(l=>l.trim()).filter(Boolean).map(l=>getLocationName(l)).join(', ');
 }
 
 // Banner-HTML der Mitteilungen für das Dashboard
@@ -582,7 +589,7 @@ function announcementBannerHtml(){
   if(!list.length) return '';
   const canManage = can('manageAnnouncements');
   return list.map(a=>{
-    const locLbl = a.location ? getLocationName(a.location) : 'Alle Standorte';
+    const locLbl = annLocLabel(a.location);
     const isImg = a.attachmentUrl && /\.(jpg|jpeg|png|webp|gif)$/i.test(a.attachmentName||a.attachmentUrl);
     const attHtml = a.attachmentUrl ? (isImg
       ? `<a href="${a.attachmentUrl}" target="_blank" style="display:inline-block;margin-top:8px"><img src="${a.attachmentUrl}" alt="${escapeHtml(a.attachmentName||'')}" style="max-width:220px;max-height:160px;border-radius:8px;border:1px solid var(--border)"></a>`
@@ -6412,7 +6419,7 @@ function renderNotifs(){
   const annHtml = visibleAnnouncements().map(a=>{
     const unread = !localStorage.getItem('ann_read_'+a.id);
     const att = a.attachmentUrl ? `<a href="${a.attachmentUrl}" target="_blank" onclick="event.stopPropagation()" style="font-size:.72rem;color:var(--accent);display:inline-block;margin-top:4px">📎 ${escapeHtml(a.attachmentName||'Anhang')}</a>` : '';
-    return `<div class="notif-item info ${unread?'unread':''}" onclick="markAnnouncementRead(${a.id})"><div class="notif-item-title">📢 ${escapeHtml(a.title)}</div><div class="notif-item-text">${escapeHtml(a.message)}</div>${att}<div class="notif-item-time">${a.location?getLocationName(a.location):'Alle Standorte'}</div></div>`;
+    return `<div class="notif-item info ${unread?'unread':''}" onclick="markAnnouncementRead(${a.id})"><div class="notif-item-title">📢 ${escapeHtml(a.title)}</div><div class="notif-item-text">${escapeHtml(a.message)}</div>${att}<div class="notif-item-time">${annLocLabel(a.location)}</div></div>`;
   }).join('');
   const notifHtml = getVisibleNotifs().map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}" onclick="markRead(${n.id})"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('');
   document.getElementById('notifList').innerHTML = (annHtml+notifHtml) || '<p style="padding:16px;color:var(--text-muted)">Keine Benachrichtigungen</p>';
@@ -6424,12 +6431,18 @@ function addNotif(type,title,text){NOTIFS.unshift({id:Date.now(),type,title,text
 // ═══ MITTEILUNGEN ERSTELLEN (Admin) ═══
 function openAnnouncementModal(){
   if(!can('manageAnnouncements'))return;
-  const locOpts = `<option value="">🌍 Alle Standorte</option>` + LOCS.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+  const locChecks = LOCS.map(l=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:.88rem"><input type="checkbox" class="annLocCb" value="${l.id}" onchange="document.getElementById('annLocAll').checked=false"> ${l.name}</label>`).join('');
   openModal('Neue Mitteilung', `
     <div class="form-grid">
       <div class="form-group full"><label class="form-label">Titel *</label><input class="form-input" id="annTitle" placeholder="z.B. Betriebsversammlung"></div>
       <div class="form-group full"><label class="form-label">Nachricht *</label><textarea class="form-textarea" id="annMsg" rows="4" placeholder="Inhalt der Mitteilung…"></textarea></div>
-      <div class="form-group full"><label class="form-label">Standort</label><select class="form-select" id="annLoc">${locOpts}</select></div>
+      <div class="form-group full"><label class="form-label">Standorte</label>
+        <div style="background:var(--bg-input);border-radius:10px;padding:10px 14px">
+          <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:.88rem;font-weight:700"><input type="checkbox" id="annLocAll" checked onchange="if(this.checked)document.querySelectorAll('.annLocCb').forEach(c=>c.checked=false)"> 🌍 Alle Standorte</label>
+          <div style="height:1px;background:var(--border);margin:4px 0"></div>
+          ${locChecks}
+        </div>
+      </div>
       <div class="form-group full"><label class="form-label">Anhang (PDF/Bild, optional)</label>
         <input type="file" id="annFile" accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-input" style="padding:8px"></div>
     </div>`,
@@ -6439,7 +6452,10 @@ async function saveAnnouncement(){
   if(!can('manageAnnouncements'))return;
   const title=(document.getElementById('annTitle')?.value||'').trim();
   const message=(document.getElementById('annMsg')?.value||'').trim();
-  const location=document.getElementById('annLoc')?.value||'';
+  // Standorte: "Alle" → null; sonst ausgewählte Standorte als Komma-Liste
+  const allChecked=document.getElementById('annLocAll')?.checked;
+  const picked=[...document.querySelectorAll('.annLocCb:checked')].map(c=>c.value);
+  const location = (allChecked || picked.length===0) ? null : picked.join(',');
   if(!title){toast('Bitte einen Titel eingeben','err');return;}
   if(!message){toast('Bitte eine Nachricht eingeben','err');return;}
   // Optionalen Anhang hochladen (Supabase Storage 'documents')
