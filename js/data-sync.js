@@ -485,7 +485,8 @@ async function syncAddAnnouncement(a) {
     const { data, error } = await sb.from('announcements').insert({
       title: a.title, message: a.message,
       location: a.location || null, created_by: a.createdBy || null, active: true,
-      attachment_url: a.attachmentUrl || null, attachment_name: a.attachmentName || null
+      attachment_url: a.attachmentUrl || null, attachment_name: a.attachmentName || null,
+      priority: a.priority || 'normal'
     }).select().single();
     if (error) { console.warn('[Sync] Announcement error:', error.message); return null; }
     a.id = data.id; a.createdAt = data.created_at;

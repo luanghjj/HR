@@ -595,10 +595,12 @@ function announcementBannerHtml(){
       ? `<a href="${a.attachmentUrl}" target="_blank" style="display:inline-block;margin-top:8px"><img src="${a.attachmentUrl}" alt="${escapeHtml(a.attachmentName||'')}" style="max-width:220px;max-height:160px;border-radius:8px;border:1px solid var(--border)"></a>`
       : `<a href="${a.attachmentUrl}" target="_blank" class="ann-banner-att"><span class="ms" style="font-size:16px;vertical-align:middle">picture_as_pdf</span> ${escapeHtml(a.attachmentName||'Anhang')}</a>`)
       : '';
-    return `<div class="ann-banner" id="annBanner_${a.id}">
+    const prio = a.priority || 'normal';
+    const prioLbl = prio==='wichtig'?'🔴 Wichtig':prio==='mittel'?'🟡 Mittel':'🟢 Normal';
+    return `<div class="ann-banner prio-${prio}" id="annBanner_${a.id}">
       <div class="ann-banner-icon">📢</div>
       <div class="ann-banner-body">
-        <div class="ann-banner-title">${escapeHtml(a.title)}</div>
+        <div class="ann-banner-title">${escapeHtml(a.title)} <span class="ann-prio-badge prio-${prio}">${prioLbl}</span></div>
         <div class="ann-banner-msg">${escapeHtml(a.message)}</div>
         ${attHtml}
         <div class="ann-banner-meta">${locLbl}</div>
@@ -6419,7 +6421,8 @@ function renderNotifs(){
   const annHtml = visibleAnnouncements().map(a=>{
     const unread = !localStorage.getItem('ann_read_'+a.id);
     const att = a.attachmentUrl ? `<a href="${a.attachmentUrl}" target="_blank" onclick="event.stopPropagation()" style="font-size:.72rem;color:var(--accent);display:inline-block;margin-top:4px">📎 ${escapeHtml(a.attachmentName||'Anhang')}</a>` : '';
-    return `<div class="notif-item info ${unread?'unread':''}" onclick="markAnnouncementRead(${a.id})"><div class="notif-item-title">📢 ${escapeHtml(a.title)}</div><div class="notif-item-text">${escapeHtml(a.message)}</div>${att}<div class="notif-item-time">${annLocLabel(a.location)}</div></div>`;
+    const pdot = a.priority==='wichtig'?'🔴 ':a.priority==='mittel'?'🟡 ':'';
+    return `<div class="notif-item info ${unread?'unread':''}" onclick="markAnnouncementRead(${a.id})"><div class="notif-item-title">📢 ${pdot}${escapeHtml(a.title)}</div><div class="notif-item-text">${escapeHtml(a.message)}</div>${att}<div class="notif-item-time">${annLocLabel(a.location)}</div></div>`;
   }).join('');
   const notifHtml = getVisibleNotifs().map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}" onclick="markRead(${n.id})"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('');
   document.getElementById('notifList').innerHTML = (annHtml+notifHtml) || '<p style="padding:16px;color:var(--text-muted)">Keine Benachrichtigungen</p>';
@@ -6436,6 +6439,12 @@ function openAnnouncementModal(){
     <div class="form-grid">
       <div class="form-group full"><label class="form-label">Titel *</label><input class="form-input" id="annTitle" placeholder="z.B. Betriebsversammlung"></div>
       <div class="form-group full"><label class="form-label">Nachricht *</label><textarea class="form-textarea" id="annMsg" rows="4" placeholder="Inhalt der Mitteilung…"></textarea></div>
+      <div class="form-group full"><label class="form-label">Wichtigkeit</label>
+        <select class="form-select" id="annPrio">
+          <option value="normal">🟢 Normal</option>
+          <option value="mittel">🟡 Mittel</option>
+          <option value="wichtig">🔴 Wichtig</option>
+        </select></div>
       <div class="form-group full"><label class="form-label">Standorte</label>
         <div style="background:var(--bg-input);border-radius:10px;padding:10px 14px">
           <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:.88rem;font-weight:700"><input type="checkbox" id="annLocAll" checked onchange="if(this.checked)document.querySelectorAll('.annLocCb').forEach(c=>c.checked=false)"> 🌍 Alle Standorte</label>
@@ -6452,6 +6461,7 @@ async function saveAnnouncement(){
   if(!can('manageAnnouncements'))return;
   const title=(document.getElementById('annTitle')?.value||'').trim();
   const message=(document.getElementById('annMsg')?.value||'').trim();
+  const priority=document.getElementById('annPrio')?.value||'normal';
   // Standorte: "Alle" → null; sonst ausgewählte Standorte als Komma-Liste
   const allChecked=document.getElementById('annLocAll')?.checked;
   const picked=[...document.querySelectorAll('.annLocCb:checked')].map(c=>c.value);
@@ -6473,7 +6483,7 @@ async function saveAnnouncement(){
       attachmentUrl=urlData.publicUrl; attachmentName=file.name;
     }catch(e){toast('Anhang-Fehler: '+e.message,'err');return;}
   }
-  const a={title,message,location:location||null,createdBy:currentUser?.id||'',createdAt:new Date().toISOString(),attachmentUrl,attachmentName};
+  const a={title,message,location:location||null,createdBy:currentUser?.id||'',createdAt:new Date().toISOString(),attachmentUrl,attachmentName,priority};
   await syncAddAnnouncement(a);
   ANNOUNCEMENTS.unshift(a);
   closeModal();

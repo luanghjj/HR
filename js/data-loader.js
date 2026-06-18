@@ -438,7 +438,8 @@ async function loadDataFromSupabase() {
           id: a.id, title: a.title || '', message: a.message || '',
           location: a.location || null, createdBy: a.created_by || '',
           createdAt: a.created_at,
-          attachmentUrl: a.attachment_url || null, attachmentName: a.attachment_name || null
+          attachmentUrl: a.attachment_url || null, attachmentName: a.attachment_name || null,
+          priority: a.priority || 'normal'
         }));
         console.log('[Data] ✓ ' + ANNOUNCEMENTS.length + ' Mitteilungen geladen');
       }
