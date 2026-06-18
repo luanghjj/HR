@@ -479,6 +479,28 @@ async function syncDeleteAvailability(avId) {
   } catch (e) { console.warn('[Sync]', e.message); }
 }
 
+// ═══ MITTEILUNGEN / ANNOUNCEMENTS ═══
+async function syncAddAnnouncement(a) {
+  try {
+    const { data, error } = await sb.from('announcements').insert({
+      title: a.title, message: a.message,
+      location: a.location || null, created_by: a.createdBy || null, active: true
+    }).select().single();
+    if (error) { console.warn('[Sync] Announcement error:', error.message); return null; }
+    a.id = data.id; a.createdAt = data.created_at;
+    console.log('[Sync] ✓ Announcement added:', a.title);
+    return data.id;
+  } catch (e) { console.warn('[Sync]', e.message); return null; }
+}
+async function syncDeleteAnnouncement(annId) {
+  try {
+    if (annId == null) return;
+    // Soft-delete: active=false (bleibt in DB, verschwindet bei allen)
+    await sb.from('announcements').update({ active: false }).eq('id', annId);
+    console.log('[Sync] ✓ Announcement zurückgezogen:', annId);
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+
 /**
  * Save all generated shifts to Supabase (bulk insert)
  */

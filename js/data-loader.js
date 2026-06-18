@@ -428,6 +428,21 @@ async function loadDataFromSupabase() {
       }
     } catch (_) { /* table may not exist yet */ }
 
+    // Load Mitteilungen / Announcements (aktive)
+    try {
+      const { data: anns, error: annErr } = await sb.from('announcements')
+        .select('*').eq('active', true).order('created_at', { ascending: false });
+      if (!annErr && anns) {
+        ANNOUNCEMENTS.length = 0;
+        anns.forEach(a => ANNOUNCEMENTS.push({
+          id: a.id, title: a.title || '', message: a.message || '',
+          location: a.location || null, createdBy: a.created_by || '',
+          createdAt: a.created_at
+        }));
+        console.log('[Data] ✓ ' + ANNOUNCEMENTS.length + ' Mitteilungen geladen');
+      }
+    } catch (_) { /* table may not exist yet */ }
+
     // Load employee_submissions (Aushilfe worker list for admin view)
     try {
       const { data: subs, error: subsErr } = await sb.from('employee_submissions')

@@ -405,3 +405,24 @@
 .dash-donut-legend-label { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .dash-donut-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .dash-donut-legend-val { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); font-family: 'Manrope', sans-serif; }
+
+/* ─── Mitteilungen / Announcement-Banner ─── */
+.ann-banner {
+  display: flex; align-items: flex-start; gap: 14px;
+  background: linear-gradient(135deg, rgba(99,102,241,.12), rgba(99,102,241,.04));
+  border: 1px solid rgba(99,102,241,.3);
+  border-left: 4px solid var(--accent);
+  border-radius: 14px; padding: 14px 16px; margin-bottom: 12px;
+}
+.ann-banner-icon { font-size: 1.4rem; line-height: 1; flex-shrink: 0; }
+.ann-banner-body { flex: 1; min-width: 0; }
+.ann-banner-title { font-weight: 800; font-size: .95rem; color: var(--text-primary); margin-bottom: 2px; }
+.ann-banner-msg { font-size: .85rem; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; }
+.ann-banner-meta { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin-top: 6px; }
+.ann-banner-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.ann-banner-close, .ann-banner-del {
+  border: none; background: none; cursor: pointer; color: var(--text-muted);
+  display: flex; align-items: center; padding: 2px; border-radius: 6px;
+}
+.ann-banner-close:hover { color: var(--text-primary); background: rgba(0,0,0,.05); }
+.ann-banner-del:hover { color: var(--danger); background: rgba(239,68,68,.08); }

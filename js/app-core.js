@@ -564,6 +564,53 @@ async function doCheckOut() {
 }
 
 // ═══ DASHBOARD ═══
+
+// Mitteilungen, die für den aktuellen Nutzer gelten (Standort-gefiltert)
+function visibleAnnouncements(){
+  const myLoc = currentUser?.location || '';
+  const myLocs = myLoc.split(',').map(l=>l.trim()).filter(Boolean);
+  return ANNOUNCEMENTS.filter(a=>{
+    if(!a.location) return true; // alle Standorte
+    if(myLoc==='all') return true;
+    return myLocs.includes(a.location);
+  });
+}
+
+// Banner-HTML der Mitteilungen für das Dashboard
+function announcementBannerHtml(){
+  const list = visibleAnnouncements().filter(a=>!localStorage.getItem('ann_dismissed_'+a.id));
+  if(!list.length) return '';
+  const canManage = can('manageAnnouncements');
+  return list.map(a=>{
+    const locLbl = a.location ? getLocationName(a.location) : 'Alle Standorte';
+    return `<div class="ann-banner" id="annBanner_${a.id}">
+      <div class="ann-banner-icon">📢</div>
+      <div class="ann-banner-body">
+        <div class="ann-banner-title">${escapeHtml(a.title)}</div>
+        <div class="ann-banner-msg">${escapeHtml(a.message)}</div>
+        <div class="ann-banner-meta">${locLbl}</div>
+      </div>
+      <div class="ann-banner-actions">
+        ${canManage?`<button class="ann-banner-del" onclick="deleteAnnouncement(${a.id})" title="Zurückziehen"><span class="ms" style="font-size:18px">delete</span></button>`:''}
+        <button class="ann-banner-close" onclick="dismissAnnouncement(${a.id})" title="Ausblenden"><span class="ms" style="font-size:18px">close</span></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function dismissAnnouncement(id){
+  localStorage.setItem('ann_dismissed_'+id,'1');
+  const el=document.getElementById('annBanner_'+id); if(el) el.remove();
+}
+async function deleteAnnouncement(id){
+  if(!can('manageAnnouncements'))return;
+  if(!confirm('Diese Mitteilung für alle zurückziehen?'))return;
+  ANNOUNCEMENTS = ANNOUNCEMENTS.filter(a=>a.id!==id);
+  await syncDeleteAnnouncement(id);
+  const el=document.getElementById('annBanner_'+id); if(el) el.remove();
+  toast('Mitteilung zurückgezogen','warn');
+  updateBadges();
+}
+
 function renderDashboard(){
   const pg=document.getElementById('page-dashboard');
   const emps=getVisibleEmps();
@@ -624,6 +671,7 @@ function renderDashboard(){
     let zeitHtml = renderZeiterfassungCard(me, todayShift);
 
     pg.innerHTML=`
+      ${announcementBannerHtml()}
       ${todayHtml}
       ${zeitHtml}
       ${upcomingHtml}
@@ -686,6 +734,9 @@ function renderDashboard(){
           <div class="dash-clock-date">${dateStr}</div>
         </div>
       </div>
+
+      ${can('manageAnnouncements')?`<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn btn-primary" onclick="openAnnouncementModal()"><span class="ms" style="font-size:16px;vertical-align:middle">campaign</span> Neue Mitteilung</button></div>`:''}
+      ${announcementBannerHtml()}
 
       <!-- Stat Cards -->
       <div class="dash-stats-grid">
@@ -1001,7 +1052,8 @@ function updateBadges(){
   const vb=document.getElementById('vacBadge'),sb=document.getElementById('sickBadge');
   if(vb){vb.style.display=pv?'':'none';vb.textContent=pv;}
   if(sb){sb.style.display=as?'':'none';sb.textContent=as;}
-  document.getElementById('notifDot').style.display=getVisibleNotifs().some(n=>n.unread)?'':'none';
+  const annUnread = visibleAnnouncements().some(a=>!localStorage.getItem('ann_read_'+a.id));
+  document.getElementById('notifDot').style.display=(getVisibleNotifs().some(n=>n.unread)||annUnread)?'':'none';
 }
 
 // ═══ DASHBOARD BANNER UPLOAD ═══
@@ -5959,7 +6011,8 @@ const PERM_GROUPS = {
     { key: 'editTraining', label: 'Ausbildung verwalten' }
   ],
   'System': [
-    { key: 'manageAccess', label: 'Zugangsverwaltung' }
+    { key: 'manageAccess', label: 'Zugangsverwaltung' },
+    { key: 'manageAnnouncements', label: 'Mitteilungen erstellen' }
   ],
   'Finanzen': [
     { key: 'seeFinancials', label: 'Gehalt & Finanzen sehen' },
@@ -6349,9 +6402,45 @@ async function savePermissions(userId) {
 
 // ═══ NOTIFICATIONS ═══
 function toggleNotifications(){document.getElementById('notifPanel').classList.toggle('open');document.getElementById('notifOverlay').classList.toggle('open');renderNotifs();}
-function renderNotifs(){document.getElementById('notifList').innerHTML=getVisibleNotifs().map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}" onclick="markRead(${n.id})"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('')||'<p style="padding:16px;color:var(--text-muted)">Keine Benachrichtigungen</p>';}
+function renderNotifs(){
+  const annHtml = visibleAnnouncements().map(a=>{
+    const unread = !localStorage.getItem('ann_read_'+a.id);
+    return `<div class="notif-item info ${unread?'unread':''}" onclick="markAnnouncementRead(${a.id})"><div class="notif-item-title">📢 ${escapeHtml(a.title)}</div><div class="notif-item-text">${escapeHtml(a.message)}</div><div class="notif-item-time">${a.location?getLocationName(a.location):'Alle Standorte'}</div></div>`;
+  }).join('');
+  const notifHtml = getVisibleNotifs().map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}" onclick="markRead(${n.id})"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('');
+  document.getElementById('notifList').innerHTML = (annHtml+notifHtml) || '<p style="padding:16px;color:var(--text-muted)">Keine Benachrichtigungen</p>';
+}
+function markAnnouncementRead(id){ localStorage.setItem('ann_read_'+id,'1'); renderNotifs(); updateBadges(); }
 function markRead(id){const n=NOTIFS.find(x=>x.id===id);if(n){n.unread=false;renderNotifs();updateBadges();}}
 function addNotif(type,title,text){NOTIFS.unshift({id:Date.now(),type,title,text,time:'Gerade eben',unread:true,forRole:['inhaber','manager']});updateBadges();}
+
+// ═══ MITTEILUNGEN ERSTELLEN (Admin) ═══
+function openAnnouncementModal(){
+  if(!can('manageAnnouncements'))return;
+  const locOpts = `<option value="">🌍 Alle Standorte</option>` + LOCS.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+  openModal('Neue Mitteilung', `
+    <div class="form-grid">
+      <div class="form-group full"><label class="form-label">Titel *</label><input class="form-input" id="annTitle" placeholder="z.B. Betriebsversammlung"></div>
+      <div class="form-group full"><label class="form-label">Nachricht *</label><textarea class="form-textarea" id="annMsg" rows="4" placeholder="Inhalt der Mitteilung…"></textarea></div>
+      <div class="form-group full"><label class="form-label">Standort</label><select class="form-select" id="annLoc">${locOpts}</select></div>
+    </div>`,
+    `<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="saveAnnouncement()"><span class="ms" style="font-size:16px;vertical-align:middle">campaign</span> Senden</button>`);
+}
+async function saveAnnouncement(){
+  if(!can('manageAnnouncements'))return;
+  const title=(document.getElementById('annTitle')?.value||'').trim();
+  const message=(document.getElementById('annMsg')?.value||'').trim();
+  const location=document.getElementById('annLoc')?.value||'';
+  if(!title){toast('Bitte einen Titel eingeben','err');return;}
+  if(!message){toast('Bitte eine Nachricht eingeben','err');return;}
+  const a={title,message,location:location||null,createdBy:currentUser?.id||'',createdAt:new Date().toISOString()};
+  await syncAddAnnouncement(a);
+  ANNOUNCEMENTS.unshift(a);
+  closeModal();
+  toast('Mitteilung gesendet ✓','success');
+  updateBadges();
+  if(getCurrentPage()==='dashboard') renderDashboard();
+}
 
 // ═══ MODALS ═══
 function openModal(type, bodyHtml, footerHtml){
