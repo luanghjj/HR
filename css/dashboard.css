@@ -426,3 +426,10 @@
 }
 .ann-banner-close:hover { color: var(--text-primary); background: rgba(0,0,0,.05); }
 .ann-banner-del:hover { color: var(--danger); background: rgba(239,68,68,.08); }
+.ann-banner-att {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 8px;
+  font-size: .8rem; font-weight: 600; color: var(--accent);
+  background: rgba(99,102,241,.08); padding: 4px 10px; border-radius: 8px;
+  text-decoration: none;
+}
+.ann-banner-att:hover { background: rgba(99,102,241,.16); }

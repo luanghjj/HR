@@ -583,11 +583,17 @@ function announcementBannerHtml(){
   const canManage = can('manageAnnouncements');
   return list.map(a=>{
     const locLbl = a.location ? getLocationName(a.location) : 'Alle Standorte';
+    const isImg = a.attachmentUrl && /\.(jpg|jpeg|png|webp|gif)$/i.test(a.attachmentName||a.attachmentUrl);
+    const attHtml = a.attachmentUrl ? (isImg
+      ? `<a href="${a.attachmentUrl}" target="_blank" style="display:inline-block;margin-top:8px"><img src="${a.attachmentUrl}" alt="${escapeHtml(a.attachmentName||'')}" style="max-width:220px;max-height:160px;border-radius:8px;border:1px solid var(--border)"></a>`
+      : `<a href="${a.attachmentUrl}" target="_blank" class="ann-banner-att"><span class="ms" style="font-size:16px;vertical-align:middle">picture_as_pdf</span> ${escapeHtml(a.attachmentName||'Anhang')}</a>`)
+      : '';
     return `<div class="ann-banner" id="annBanner_${a.id}">
       <div class="ann-banner-icon">📢</div>
       <div class="ann-banner-body">
         <div class="ann-banner-title">${escapeHtml(a.title)}</div>
         <div class="ann-banner-msg">${escapeHtml(a.message)}</div>
+        ${attHtml}
         <div class="ann-banner-meta">${locLbl}</div>
       </div>
       <div class="ann-banner-actions">
@@ -6405,7 +6411,8 @@ function toggleNotifications(){document.getElementById('notifPanel').classList.t
 function renderNotifs(){
   const annHtml = visibleAnnouncements().map(a=>{
     const unread = !localStorage.getItem('ann_read_'+a.id);
-    return `<div class="notif-item info ${unread?'unread':''}" onclick="markAnnouncementRead(${a.id})"><div class="notif-item-title">📢 ${escapeHtml(a.title)}</div><div class="notif-item-text">${escapeHtml(a.message)}</div><div class="notif-item-time">${a.location?getLocationName(a.location):'Alle Standorte'}</div></div>`;
+    const att = a.attachmentUrl ? `<a href="${a.attachmentUrl}" target="_blank" onclick="event.stopPropagation()" style="font-size:.72rem;color:var(--accent);display:inline-block;margin-top:4px">📎 ${escapeHtml(a.attachmentName||'Anhang')}</a>` : '';
+    return `<div class="notif-item info ${unread?'unread':''}" onclick="markAnnouncementRead(${a.id})"><div class="notif-item-title">📢 ${escapeHtml(a.title)}</div><div class="notif-item-text">${escapeHtml(a.message)}</div>${att}<div class="notif-item-time">${a.location?getLocationName(a.location):'Alle Standorte'}</div></div>`;
   }).join('');
   const notifHtml = getVisibleNotifs().map(n=>`<div class="notif-item ${n.type} ${n.unread?'unread':''}" onclick="markRead(${n.id})"><div class="notif-item-title">${n.title}</div><div class="notif-item-text">${n.text}</div><div class="notif-item-time">${n.time}</div></div>`).join('');
   document.getElementById('notifList').innerHTML = (annHtml+notifHtml) || '<p style="padding:16px;color:var(--text-muted)">Keine Benachrichtigungen</p>';
@@ -6423,6 +6430,8 @@ function openAnnouncementModal(){
       <div class="form-group full"><label class="form-label">Titel *</label><input class="form-input" id="annTitle" placeholder="z.B. Betriebsversammlung"></div>
       <div class="form-group full"><label class="form-label">Nachricht *</label><textarea class="form-textarea" id="annMsg" rows="4" placeholder="Inhalt der Mitteilung…"></textarea></div>
       <div class="form-group full"><label class="form-label">Standort</label><select class="form-select" id="annLoc">${locOpts}</select></div>
+      <div class="form-group full"><label class="form-label">Anhang (PDF/Bild, optional)</label>
+        <input type="file" id="annFile" accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-input" style="padding:8px"></div>
     </div>`,
     `<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="saveAnnouncement()"><span class="ms" style="font-size:16px;vertical-align:middle">campaign</span> Senden</button>`);
 }
@@ -6433,7 +6442,22 @@ async function saveAnnouncement(){
   const location=document.getElementById('annLoc')?.value||'';
   if(!title){toast('Bitte einen Titel eingeben','err');return;}
   if(!message){toast('Bitte eine Nachricht eingeben','err');return;}
-  const a={title,message,location:location||null,createdBy:currentUser?.id||'',createdAt:new Date().toISOString()};
+  // Optionalen Anhang hochladen (Supabase Storage 'documents')
+  let attachmentUrl=null, attachmentName=null;
+  const fileEl=document.getElementById('annFile');
+  const file=fileEl?.files?.[0];
+  if(file){
+    toast('Anhang wird hochgeladen…','info');
+    try{
+      const ext=file.name.split('.').pop();
+      const path=`announcements/ann_${Date.now()}.${ext}`;
+      const {error:upErr}=await sb.storage.from('documents').upload(path,file,{upsert:true});
+      if(upErr){toast('Anhang-Fehler: '+upErr.message,'err');return;}
+      const {data:urlData}=sb.storage.from('documents').getPublicUrl(path);
+      attachmentUrl=urlData.publicUrl; attachmentName=file.name;
+    }catch(e){toast('Anhang-Fehler: '+e.message,'err');return;}
+  }
+  const a={title,message,location:location||null,createdBy:currentUser?.id||'',createdAt:new Date().toISOString(),attachmentUrl,attachmentName};
   await syncAddAnnouncement(a);
   ANNOUNCEMENTS.unshift(a);
   closeModal();
