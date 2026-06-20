@@ -488,11 +488,11 @@ async function syncAddAnnouncement(a) {
       attachment_url: a.attachmentUrl || null, attachment_name: a.attachmentName || null,
       priority: a.priority || 'normal', mandatory: a.mandatory || false
     }).select().single();
-    if (error) { console.warn('[Sync] Announcement error:', error.message); return null; }
+    if (error) { console.warn('[Sync] Announcement error:', error.message); return { ok:false, error: error.message }; }
     a.id = data.id; a.createdAt = data.created_at;
     console.log('[Sync] ✓ Announcement added:', a.title);
-    return data.id;
-  } catch (e) { console.warn('[Sync]', e.message); return null; }
+    return { ok:true, id: data.id };
+  } catch (e) { console.warn('[Sync]', e.message); return { ok:false, error: e.message }; }
 }
 async function syncDeleteAnnouncement(annId) {
   try {

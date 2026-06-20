@@ -6565,7 +6565,8 @@ async function saveAnnouncement(){
     }catch(e){toast('Anhang-Fehler: '+e.message,'err');return;}
   }
   const a={title,message,location:location||null,createdBy:currentUser?.id||'',createdAt:new Date().toISOString(),attachmentUrl,attachmentName,priority,mandatory};
-  await syncAddAnnouncement(a);
+  const res=await syncAddAnnouncement(a);
+  if(!res||!res.ok){ toast('Fehler beim Speichern: '+((res&&res.error)||'unbekannt'),'err'); return; }
   ANNOUNCEMENTS.unshift(a);
   closeModal();
   toast('Mitteilung gesendet ✓','success');
