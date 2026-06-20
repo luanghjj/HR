@@ -38,6 +38,7 @@ let AVAILABILITY = [];
 
 // Mitteilungen / Announcements (Admin → alle)
 let ANNOUNCEMENTS = [];
+let ANNOUNCEMENT_READS = [];   // wer hat welche Pflicht-Mitteilung gelesen
 
 // Aushilfe Planung
 let AUSHILFE_SLOTS = [];

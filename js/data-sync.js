@@ -486,7 +486,7 @@ async function syncAddAnnouncement(a) {
       title: a.title, message: a.message,
       location: a.location || null, created_by: a.createdBy || null, active: true,
       attachment_url: a.attachmentUrl || null, attachment_name: a.attachmentName || null,
-      priority: a.priority || 'normal'
+      priority: a.priority || 'normal', mandatory: a.mandatory || false
     }).select().single();
     if (error) { console.warn('[Sync] Announcement error:', error.message); return null; }
     a.id = data.id; a.createdAt = data.created_at;
@@ -500,6 +500,16 @@ async function syncDeleteAnnouncement(annId) {
     // Soft-delete: active=false (bleibt in DB, verschwindet bei allen)
     await sb.from('announcements').update({ active: false }).eq('id', annId);
     console.log('[Sync] ✓ Announcement zurückgezogen:', annId);
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+async function syncMarkAnnouncementRead(annId, userId, empId, name) {
+  try {
+    if (annId == null || !userId) return;
+    await sb.from('announcement_reads').upsert({
+      announcement_id: annId, user_id: userId, emp_id: empId ?? null, name: name || '',
+      read_at: new Date().toISOString()
+    }, { onConflict: 'announcement_id,user_id' });
+    console.log('[Sync] ✓ Mitteilung gelesen:', annId, userId);
   } catch (e) { console.warn('[Sync]', e.message); }
 }
 

@@ -583,6 +583,52 @@ function annLocLabel(loc){
   return loc.split(',').map(l=>l.trim()).filter(Boolean).map(l=>getLocationName(l)).join(', ');
 }
 
+// Hat der aktuelle Nutzer diese Mitteilung bereits bestätigt?
+function hasReadAnnouncement(annId){
+  return ANNOUNCEMENT_READS.some(r=>r.announcementId===annId && r.userId===currentUser?.id);
+}
+
+// Pflicht-Mitteilungen, die der Nutzer noch NICHT bestätigt hat
+function pendingMandatoryAnnouncements(){
+  return visibleAnnouncements().filter(a=>a.mandatory && !hasReadAnnouncement(a.id));
+}
+
+// Vollbild-Overlay: zeigt offene Pflicht-Mitteilungen nacheinander
+function showMandatoryAnnouncements(){
+  const pending = pendingMandatoryAnnouncements();
+  document.getElementById('mandatoryOverlay')?.remove();
+  if(!pending.length) return;
+  const a = pending[0];
+  const prio = a.priority||'normal';
+  const prioLbl = prio==='wichtig'?'🔴 Wichtig':prio==='mittel'?'🟡 Mittel':'🟢 Normal';
+  const isImg = a.attachmentUrl && /\.(jpg|jpeg|png|webp|gif)$/i.test(a.attachmentName||a.attachmentUrl);
+  const attHtml = a.attachmentUrl ? (isImg
+    ? `<a href="${a.attachmentUrl}" target="_blank"><img src="${a.attachmentUrl}" style="max-width:100%;max-height:40vh;border-radius:10px;border:1px solid var(--border);margin-top:12px"></a>`
+    : `<a href="${a.attachmentUrl}" target="_blank" class="ann-banner-att" style="margin-top:12px"><span class="ms" style="font-size:16px;vertical-align:middle">picture_as_pdf</span> ${escapeHtml(a.attachmentName||'Anhang')}</a>`)
+    : '';
+  const ov = document.createElement('div');
+  ov.id = 'mandatoryOverlay';
+  ov.className = 'mandatory-overlay';
+  ov.innerHTML = `<div class="mandatory-card prio-${prio}">
+    <div class="mandatory-head"><span style="font-size:1.6rem">📢</span><span class="ann-prio-badge prio-${prio}">${prioLbl}</span>${pending.length>1?`<span class="mandatory-count">1 / ${pending.length}</span>`:''}</div>
+    <div class="mandatory-title">${escapeHtml(a.title)}</div>
+    <div class="mandatory-msg">${escapeHtml(a.message)}</div>
+    ${attHtml}
+    <div class="mandatory-meta">${annLocLabel(a.location)}</div>
+    <button class="btn btn-primary mandatory-btn" onclick="confirmMandatoryAnnouncement(${a.id})"><span class="ms" style="font-size:18px;vertical-align:middle">check_circle</span> Gelesen &amp; Verstanden</button>
+  </div>`;
+  document.body.appendChild(ov);
+}
+async function confirmMandatoryAnnouncement(annId){
+  const btn = document.querySelector('#mandatoryOverlay .mandatory-btn');
+  if(btn){ btn.disabled = true; btn.style.opacity='.6'; }
+  const me = EMPS.find(e=>e.id===currentUser?.empId);
+  await syncMarkAnnouncementRead(annId, currentUser?.id, currentUser?.empId, me?.name || currentUser?.name || '');
+  ANNOUNCEMENT_READS.push({ announcementId: annId, userId: currentUser?.id, empId: currentUser?.empId, name: me?.name||currentUser?.name||'', readAt: new Date().toISOString() });
+  updateBadges();
+  showMandatoryAnnouncements(); // nächste Pflicht-Mitteilung oder schließen
+}
+
 // Banner-HTML der Mitteilungen für das Dashboard
 function announcementBannerHtml(){
   const list = visibleAnnouncements().filter(a=>!localStorage.getItem('ann_dismissed_'+a.id));
@@ -606,6 +652,7 @@ function announcementBannerHtml(){
         <div class="ann-banner-meta">${locLbl}</div>
       </div>
       <div class="ann-banner-actions">
+        ${canManage&&a.mandatory?`<button class="ann-banner-del" onclick="openReadStatsModal(${a.id})" title="Gelesen von"><span class="ms" style="font-size:18px">visibility</span></button>`:''}
         ${canManage?`<button class="ann-banner-del" onclick="deleteAnnouncement(${a.id})" title="Zurückziehen"><span class="ms" style="font-size:18px">delete</span></button>`:''}
         <button class="ann-banner-close" onclick="dismissAnnouncement(${a.id})" title="Ausblenden"><span class="ms" style="font-size:18px">close</span></button>
       </div>
@@ -624,6 +671,38 @@ async function deleteAnnouncement(id){
   const el=document.getElementById('annBanner_'+id); if(el) el.remove();
   toast('Mitteilung zurückgezogen','warn');
   updateBadges();
+}
+
+// Admin: wer hat eine Pflicht-Mitteilung gelesen / wer noch nicht
+async function openReadStatsModal(annId){
+  if(!can('manageAnnouncements'))return;
+  const a = ANNOUNCEMENTS.find(x=>x.id===annId);
+  if(!a) return;
+  // Lesebestätigungen frisch laden
+  try{
+    const { data:reads } = await sb.from('announcement_reads').select('*').eq('announcement_id', annId);
+    if(reads){
+      ANNOUNCEMENT_READS = ANNOUNCEMENT_READS.filter(r=>r.announcementId!==annId);
+      reads.forEach(r=>ANNOUNCEMENT_READS.push({announcementId:r.announcement_id,userId:r.user_id,empId:r.emp_id,name:r.name||'',readAt:r.read_at}));
+    }
+  }catch(_){}
+  // Zielgruppe = aktive Mitarbeiter im Standort der Mitteilung
+  const annLocs = a.location ? a.location.split(',').map(l=>l.trim()).filter(Boolean) : null;
+  const target = EMPS.filter(e=>(e.status==='active'||e.status==='aktiv') && (!annLocs || empHasLoc(e, annLocs)));
+  const reads = ANNOUNCEMENT_READS.filter(r=>r.announcementId===annId);
+  const readEmpIds = new Set(reads.map(r=>r.empId));
+  const readByName = {}; reads.forEach(r=>{ if(r.empId!=null) readByName[r.empId]=r.readAt; });
+  const fmt = ts => { try{ return new Date(ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(_){return '';} };
+  const gelesen = target.filter(e=>readEmpIds.has(e.id));
+  const offen = target.filter(e=>!readEmpIds.has(e.id));
+  const row = (e, withTime) => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.85rem"><div class="emp-avatar" style="width:26px;height:26px;font-size:.62rem">${e.avatar||e.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div><span style="flex:1">${escapeHtml(e.name)}</span>${withTime&&readByName[e.id]?`<span style="font-size:.72rem;color:var(--text-muted)">${fmt(readByName[e.id])}</span>`:''}</div>`;
+  openModal('Gelesen: '+a.title, `
+    <div style="font-size:.9rem;font-weight:700;margin-bottom:12px">Gelesen ${gelesen.length} / ${target.length}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div><div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:#059669;margin-bottom:6px">✓ Gelesen (${gelesen.length})</div>${gelesen.map(e=>row(e,true)).join('')||'<span style="color:var(--text-muted);font-size:.8rem">—</span>'}</div>
+      <div><div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:#dc2626;margin-bottom:6px">✕ Offen (${offen.length})</div>${offen.map(e=>row(e,false)).join('')||'<span style="color:var(--text-muted);font-size:.8rem">—</span>'}</div>
+    </div>`,
+    `<button class="btn" onclick="closeModal()">Schließen</button>`);
 }
 
 function renderDashboard(){
@@ -6454,6 +6533,7 @@ function openAnnouncementModal(){
       </div>
       <div class="form-group full"><label class="form-label">Anhang (PDF/Bild, optional)</label>
         <input type="file" id="annFile" accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-input" style="padding:8px"></div>
+      <div class="form-group full"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.9rem;font-weight:600"><input type="checkbox" id="annMandatory"> ⚠️ Pflicht-Mitteilung (Vollbild, muss bestätigt werden)</label></div>
     </div>`,
     `<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="saveAnnouncement()"><span class="ms" style="font-size:16px;vertical-align:middle">campaign</span> Senden</button>`);
 }
@@ -6462,6 +6542,7 @@ async function saveAnnouncement(){
   const title=(document.getElementById('annTitle')?.value||'').trim();
   const message=(document.getElementById('annMsg')?.value||'').trim();
   const priority=document.getElementById('annPrio')?.value||'normal';
+  const mandatory=document.getElementById('annMandatory')?.checked||false;
   // Standorte: "Alle" → null; sonst ausgewählte Standorte als Komma-Liste
   const allChecked=document.getElementById('annLocAll')?.checked;
   const picked=[...document.querySelectorAll('.annLocCb:checked')].map(c=>c.value);
@@ -6483,7 +6564,7 @@ async function saveAnnouncement(){
       attachmentUrl=urlData.publicUrl; attachmentName=file.name;
     }catch(e){toast('Anhang-Fehler: '+e.message,'err');return;}
   }
-  const a={title,message,location:location||null,createdBy:currentUser?.id||'',createdAt:new Date().toISOString(),attachmentUrl,attachmentName,priority};
+  const a={title,message,location:location||null,createdBy:currentUser?.id||'',createdAt:new Date().toISOString(),attachmentUrl,attachmentName,priority,mandatory};
   await syncAddAnnouncement(a);
   ANNOUNCEMENTS.unshift(a);
   closeModal();
@@ -8382,6 +8463,9 @@ function initApp(){
   window.addEventListener('resize',()=>{document.getElementById('menuBtn').style.display=window.innerWidth<=900?'':'none';});
   // QR Check-in: detect URL params after app is ready
   detectQrCheckin();
+
+  // Pflicht-Mitteilungen vor App-Nutzung anzeigen
+  showMandatoryAnnouncements();
 
   // Re-detect QR when page is shown again (mobile: scan QR → brings back same tab)
   window.addEventListener('pageshow', (e) => {

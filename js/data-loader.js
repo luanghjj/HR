@@ -439,9 +439,23 @@ async function loadDataFromSupabase() {
           location: a.location || null, createdBy: a.created_by || '',
           createdAt: a.created_at,
           attachmentUrl: a.attachment_url || null, attachmentName: a.attachment_name || null,
-          priority: a.priority || 'normal'
+          priority: a.priority || 'normal',
+          mandatory: a.mandatory || false
         }));
         console.log('[Data] ✓ ' + ANNOUNCEMENTS.length + ' Mitteilungen geladen');
+      }
+    } catch (_) { /* table may not exist yet */ }
+
+    // Load Lesebestätigungen für Pflicht-Mitteilungen
+    try {
+      const { data: reads, error: rErr } = await sb.from('announcement_reads').select('*');
+      if (!rErr && reads) {
+        ANNOUNCEMENT_READS.length = 0;
+        reads.forEach(r => ANNOUNCEMENT_READS.push({
+          announcementId: r.announcement_id, userId: r.user_id,
+          empId: r.emp_id, name: r.name || '', readAt: r.read_at
+        }));
+        console.log('[Data] ✓ ' + ANNOUNCEMENT_READS.length + ' Lesebestätigungen geladen');
       }
     } catch (_) { /* table may not exist yet */ }
 
