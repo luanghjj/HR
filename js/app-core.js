@@ -3846,9 +3846,20 @@ function renderSchedule(){
     getVisibleSicks().filter(s=>s.status==='active'&&s.to>=dayD[0]&&s.from<=dayD[6]).forEach(s=>{if(!emps.includes(s.empName))emps.push(s.empName);});
     // Für OFF/Alle: alle Mitarbeiter im aktuellen Geltungsbereich aufnehmen,
     // damit auch Personen OHNE Schicht erscheinen (zum Einplanen).
+    // Ausnahme: Personen ohne Zugang (user_profiles) UND ohne zukünftige Schicht
+    // werden nicht angezeigt, da sie vermutlich deaktiviert sind.
     if(scheduleShiftFilter==='off'||scheduleShiftFilter==='all'){
+      const futureWindow = new Date(); futureWindow.setDate(futureWindow.getDate() + 28);
+      const futureStr = isoDate(futureWindow);
+      const todayStr = isoDate(new Date());
       const scopeEmps=getVisibleEmps().filter(e=>(e.status==='active'||e.status==='aktiv'));
-      scopeEmps.forEach(e=>{if(!emps.includes(e.name))emps.push(e.name);});
+      scopeEmps.forEach(e=>{
+        if(emps.includes(e.name)) return; // already added (has shift)
+        // Show if: has a Zugang (user account) OR has an upcoming shift in next 4 weeks
+        const hasZugang = USERS.some(u => u.empId === e.id);
+        const hasFutureShift = SHIFTS.some(s => s.empId === e.id && s.date >= todayStr && s.date <= futureStr && !s.isSick && !s.isVacation);
+        if(hasZugang || hasFutureShift) emps.push(e.name);
+      });
     }
     // ON/OFF anwenden
     if(scheduleShiftFilter==='on') emps=emps.filter(n=>empsWithShift.has(n));
@@ -6154,6 +6165,17 @@ async function deleteUser(userId){
         // Remove from local EMPS
         const ei = EMPS.findIndex(e => e.id === emp.id);
         if(ei >= 0) EMPS.splice(ei, 1);
+
+        // Remove all future + current week shifts from local cache
+        // so Arbeitsplan doesn't show the deleted person
+        const today = isoDate(new Date());
+        const shiftsBefore = SHIFTS.length;
+        for(let si = SHIFTS.length - 1; si >= 0; si--){
+          if(SHIFTS[si].empId === emp.id && SHIFTS[si].date >= today){
+            SHIFTS.splice(si, 1);
+          }
+        }
+        console.log(`[DeleteUser] Removed ${shiftsBefore - SHIFTS.length} future shifts from cache`);
       }
 
       // 3. Delete auth user via admin API (requires service role — backend call)
