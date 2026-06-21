@@ -3567,9 +3567,8 @@ function renderDepts(){
             return `<select
               id="${selectId}"
               class="dept-leitung-select"
-              title="Leitung auswählen"
-              onclick="event.stopPropagation()"
-              onchange="saveDeptHead(${JSON.stringify(dept.id)}, this.value)"
+              title="Leitung ausw\u00e4hlen"
+              data-dept-id="${dept.id}"
             >${opts}</select>`;
           })() : `<div class="dept-leitung-name">${dept.head||'—'}</div>`}
         </div>
@@ -3674,6 +3673,20 @@ function renderDepts(){
   }
 
   pg.innerHTML=html;
+
+  // Attach Leitung dropdowns via JS (not inline handlers)
+  // to avoid event bubbling issues with accordion header onclick
+  document.querySelectorAll('.dept-leitung-select').forEach(sel => {
+    // Prevent click from toggling accordion
+    sel.addEventListener('click', e => e.stopPropagation());
+    sel.addEventListener('mousedown', e => e.stopPropagation());
+    sel.addEventListener('change', e => {
+      e.stopPropagation();
+      const deptId = sel.dataset.deptId;
+      const newHead = sel.value;
+      saveDeptHead(deptId, newHead);
+    });
+  });
 }
 
 // ═══ SCHEDULE ═══
