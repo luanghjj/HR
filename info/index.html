@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +9,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     :root {
       --bg: #f8f9fb;
@@ -26,8 +33,8 @@
       --success-bg: #ecfdf5;
       --radius: 12px;
       --radius-sm: 8px;
-      --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-      --shadow-lg: 0 10px 25px rgba(0,0,0,.08), 0 4px 10px rgba(0,0,0,.04);
+      --shadow: 0 1px 3px rgba(0, 0, 0, .06), 0 1px 2px rgba(0, 0, 0, .04);
+      --shadow-lg: 0 10px 25px rgba(0, 0, 0, .08), 0 4px 10px rgba(0, 0, 0, .04);
     }
 
     body {
@@ -47,30 +54,36 @@
       color: #fff;
       position: relative;
     }
+
     .page-header::after {
       content: '';
       position: absolute;
       bottom: -24px;
-      left: 0; right: 0;
+      left: 0;
+      right: 0;
       height: 48px;
       background: var(--bg);
       border-radius: 24px 24px 0 0;
     }
+
     .page-header h1 {
       font-size: 1.5rem;
       font-weight: 700;
       letter-spacing: -0.02em;
       margin-bottom: 0.35rem;
     }
+
     .page-header p {
       font-size: 0.88rem;
       opacity: 0.85;
       max-width: 400px;
       margin: 0 auto;
     }
+
     .header-icon {
-      width: 52px; height: 52px;
-      background: rgba(255,255,255,0.18);
+      width: 52px;
+      height: 52px;
+      background: rgba(255, 255, 255, 0.18);
       border-radius: 14px;
       display: inline-flex;
       align-items: center;
@@ -99,9 +112,11 @@
       border: 1px solid var(--border);
       transition: box-shadow 0.2s;
     }
+
     .form-section:hover {
       box-shadow: var(--shadow-lg);
     }
+
     .section-title {
       font-size: 0.8rem;
       font-weight: 600;
@@ -113,8 +128,10 @@
       align-items: center;
       gap: 0.5rem;
     }
+
     .section-title .icon {
-      width: 28px; height: 28px;
+      width: 28px;
+      height: 28px;
       background: var(--accent-light);
       border-radius: 7px;
       display: inline-flex;
@@ -127,14 +144,17 @@
     .field {
       margin-bottom: 1rem;
     }
+
     .field:last-child {
       margin-bottom: 0;
     }
+
     .field-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0.75rem;
     }
+
     label {
       display: block;
       font-size: 0.78rem;
@@ -143,11 +163,15 @@
       margin-bottom: 0.3rem;
       letter-spacing: 0.01em;
     }
+
     label .required {
       color: var(--danger);
       margin-left: 2px;
     }
-    input, select, textarea {
+
+    input,
+    select,
+    textarea {
       width: 100%;
       padding: 0.65rem 0.85rem;
       font-size: 0.9rem;
@@ -159,21 +183,31 @@
       transition: border-color 0.2s, box-shadow 0.2s;
       outline: none;
     }
-    input:focus, select:focus, textarea:focus {
+
+    input:focus,
+    select:focus,
+    textarea:focus {
       border-color: var(--border-focus);
-      box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
     }
-    input::placeholder, textarea::placeholder {
+
+    input::placeholder,
+    textarea::placeholder {
       color: var(--text-muted);
     }
-    input.error, select.error, textarea.error {
+
+    input.error,
+    select.error,
+    textarea.error {
       border-color: var(--danger);
-      box-shadow: 0 0 0 3px rgba(239,68,68,0.1);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
     }
+
     textarea {
       resize: vertical;
       min-height: 80px;
     }
+
     select {
       cursor: pointer;
       appearance: none;
@@ -182,25 +216,31 @@
       background-position: right 0.8rem center;
       padding-right: 2.2rem;
     }
+
     .field-hint {
       font-size: 0.7rem;
       color: var(--text-muted);
       margin-top: 0.2rem;
     }
+
     .field-error {
       font-size: 0.72rem;
       color: var(--danger);
       margin-top: 0.25rem;
       display: none;
     }
+
     .field-error.show {
       display: block;
     }
+
+    ok
 
     /* ── Submit Button ── */
     .submit-wrap {
       margin-top: 0.5rem;
     }
+
     .btn-submit {
       width: 100%;
       padding: 0.85rem;
@@ -213,31 +253,41 @@
       border-radius: var(--radius);
       cursor: pointer;
       transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
-      box-shadow: 0 4px 14px rgba(79,70,229,0.35);
+      box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
       letter-spacing: 0.01em;
     }
+
     .btn-submit:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(79,70,229,0.4);
+      box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
     }
+
     .btn-submit:active:not(:disabled) {
       transform: translateY(0);
     }
+
     .btn-submit:disabled {
       opacity: 0.6;
       cursor: not-allowed;
     }
+
     .btn-submit .spinner {
       display: inline-block;
-      width: 18px; height: 18px;
-      border: 2.5px solid rgba(255,255,255,0.3);
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(255, 255, 255, 0.3);
       border-top-color: #fff;
       border-radius: 50%;
       animation: spin 0.6s linear infinite;
       vertical-align: middle;
       margin-right: 0.5rem;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
 
     /* ── Alert Banner ── */
     .alert {
@@ -250,16 +300,21 @@
       align-items: center;
       gap: 0.5rem;
     }
-    .alert.show { display: flex; }
+
+    .alert.show {
+      display: flex;
+    }
+
     .alert-error {
       background: var(--danger-bg);
       color: var(--danger);
-      border: 1px solid rgba(239,68,68,0.15);
+      border: 1px solid rgba(239, 68, 68, 0.15);
     }
+
     .alert-success {
       background: var(--success-bg);
       color: #065f46;
-      border: 1px solid rgba(16,185,129,0.15);
+      border: 1px solid rgba(16, 185, 129, 0.15);
     }
 
     /* ── Success Screen ── */
@@ -268,11 +323,14 @@
       text-align: center;
       padding: 3rem 1.5rem;
     }
+
     .success-screen.show {
       display: block;
     }
+
     .success-icon {
-      width: 80px; height: 80px;
+      width: 80px;
+      height: 80px;
       background: var(--success-bg);
       border-radius: 50%;
       display: inline-flex;
@@ -282,16 +340,24 @@
       margin-bottom: 1.25rem;
       animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
+
     @keyframes pop {
-      0% { transform: scale(0); }
-      100% { transform: scale(1); }
+      0% {
+        transform: scale(0);
+      }
+
+      100% {
+        transform: scale(1);
+      }
     }
+
     .success-screen h2 {
       font-size: 1.35rem;
       font-weight: 700;
       margin-bottom: 0.5rem;
       color: var(--text);
     }
+
     .success-screen p {
       color: var(--text-secondary);
       font-size: 0.9rem;
@@ -309,13 +375,26 @@
 
     /* ── Responsive ── */
     @media (max-width: 480px) {
-      .page-header { padding: 2rem 1rem 3rem; }
-      .page-header h1 { font-size: 1.3rem; }
-      .field-row { grid-template-columns: 1fr; gap: 1rem; }
-      .form-section { padding: 1.25rem; }
+      .page-header {
+        padding: 2rem 1rem 3rem;
+      }
+
+      .page-header h1 {
+        font-size: 1.3rem;
+      }
+
+      .field-row {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+
+      .form-section {
+        padding: 1.25rem;
+      }
     }
   </style>
 </head>
+
 <body>
 
   <!-- Header -->
@@ -384,7 +463,8 @@
         <div class="field-row">
           <div class="field">
             <label for="steuer_id">Steuer-ID <span class="required">*</span></label>
-            <input type="text" id="steuer_id" name="steuer_id" placeholder="12345678901" maxlength="11" inputmode="numeric" required>
+            <input type="text" id="steuer_id" name="steuer_id" placeholder="12345678901" maxlength="11"
+              inputmode="numeric" required>
             <div class="field-hint">11-stellige Nummer</div>
             <div class="field-error" id="err_steuer_id">Bitte gültige 11-stellige Steuer-ID eingeben</div>
           </div>
@@ -405,7 +485,8 @@
 
         <div class="field">
           <label for="krankenversicherung">Krankenversicherung <span class="required">*</span></label>
-          <input type="text" id="krankenversicherung" name="krankenversicherung" placeholder="z.B. AOK Baden-Württemberg" required>
+          <input type="text" id="krankenversicherung" name="krankenversicherung"
+            placeholder="z.B. AOK Baden-Württemberg" required>
           <div class="field-error" id="err_krankenversicherung">Bitte Krankenversicherung eingeben</div>
         </div>
 
@@ -444,7 +525,8 @@
 
         <div class="field">
           <label for="adresse">Adresse <span class="required">*</span></label>
-          <textarea id="adresse" name="adresse" placeholder="Straße und Hausnummer&#10;PLZ Stadt" rows="3" required></textarea>
+          <textarea id="adresse" name="adresse" placeholder="Straße und Hausnummer&#10;PLZ Stadt" rows="3"
+            required></textarea>
           <div class="field-hint">Straße, PLZ und Stadt</div>
           <div class="field-error" id="err_adresse">Bitte vollständige Adresse eingeben</div>
         </div>
@@ -496,7 +578,7 @@
     const alertText = document.getElementById('alertErrorText');
 
     // ── Validation ──
-    const REQUIRED = ['familienname','vorname','geburtstag','nationalitaet','steuer_id','steuerklasse','krankenversicherung','sv_nummer','iban','email','telefon','adresse','tshirt_groesse'];
+    const REQUIRED = ['familienname', 'vorname', 'geburtstag', 'nationalitaet', 'steuer_id', 'steuerklasse', 'krankenversicherung', 'sv_nummer', 'iban', 'email', 'telefon', 'adresse', 'tshirt_groesse'];
 
     function clearErrors() {
       document.querySelectorAll('.field-error').forEach(e => e.classList.remove('show'));
@@ -662,7 +744,7 @@
     });
 
     // ── Auto-format IBAN ──
-    document.getElementById('iban').addEventListener('input', function() {
+    document.getElementById('iban').addEventListener('input', function () {
       let v = this.value.replace(/\s/g, '').toUpperCase();
       // Add spaces every 4 chars
       v = v.replace(/(.{4})/g, '$1 ').trim();
@@ -670,4 +752,5 @@
     });
   </script>
 </body>
+
 </html>

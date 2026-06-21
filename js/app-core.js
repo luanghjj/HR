@@ -3426,6 +3426,29 @@ function saveLate(empId){if(!can('markLate')&&!can('editSchedules'))return;const
 // Standard-Bereiche, falls für einen Standort (noch) keine departments-Zeilen
 // in der DB existieren (aktuell nur Origami gepflegt → Enso/Okyu/OMoi leer).
 const STANDARD_BEREICHE = ['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob','Minijob'];
+
+/** Save Leitung (head) for a department to Supabase */
+async function saveDeptHead(deptId, newHead) {
+  // Synthetic dept (no real DB row) – skip
+  if (String(deptId).startsWith('syn_')) {
+    toast('Kein DB-Eintrag für diesen Bereich – bitte zuerst Bereich anlegen.', 'warn');
+    return;
+  }
+  try {
+    const { error } = await supabase
+      .from('departments')
+      .update({ head: newHead })
+      .eq('id', deptId);
+    if (error) throw error;
+    // Update local state so UI stays in sync without full reload
+    const dept = DEPTS.find(d => d.id === deptId);
+    if (dept) dept.head = newHead;
+    toast(`Leitung gesetzt: ${newHead || '—'}`);
+  } catch (err) {
+    console.error('saveDeptHead failed:', err.message);
+    toast('Fehler beim Speichern der Leitung: ' + err.message, 'err');
+  }
+}
 const _BEREICH_COLORS = {'Küche':'#fdcb6e','Service':'#74b9ff','Bar':'#00b894','Sushi':'#fd79a8','Ausbildung':'#e17055','Verwaltung':'#a29bfe','Minijob':'#14b8a6'};
 
 /** Bereiche eines Standorts; synthetisiert Standard-Set, wenn DB keine hat. */
@@ -3513,7 +3536,26 @@ function renderDepts(){
         <div class="dept-divider"></div>
         <div class="dept-leitung-block">
           <div class="dept-leitung-label">Leitung</div>
-          <div class="dept-leitung-name">${dept.head||'—'}</div>
+          ${can('editDepartments') ? (() => {
+            // Employees of this specific location, active only, sorted by name
+            const leitungEmps = EMPS
+              .filter(e => empHasLoc(e, loc) && (e.status === 'active' || e.status === 'aktiv'))
+              .sort((a, b) => a.name.localeCompare(b.name));
+            const selectId = `leitung_${dept.id}_${loc}`;
+            const opts = `<option value="—">— Keine Leitung</option>` +
+              leitungEmps.map(e =>
+                `<option value="${e.name.replace(/"/g,'&quot;')}"${
+                  (dept.head === e.name) ? ' selected' : ''
+                }>${e.name}</option>`
+              ).join('');
+            return `<select
+              id="${selectId}"
+              class="dept-leitung-select"
+              title="Leitung auswählen"
+              onclick="event.stopPropagation()"
+              onchange="saveDeptHead(${JSON.stringify(dept.id)}, this.value)"
+            >${opts}</select>`;
+          })() : `<div class="dept-leitung-name">${dept.head||'—'}</div>`}
         </div>
         <div class="dept-stats">
           <div class="dept-stat-badge is-active"><span class="dept-stat-label">👥 Aktiv</span><span class="dept-stat-val">${activeCount}</span></div>
