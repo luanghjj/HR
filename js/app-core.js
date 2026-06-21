@@ -3429,25 +3429,40 @@ const STANDARD_BEREICHE = ['Küche','Sushi','Service','Bar','Ausbildung','Verwal
 
 /** Save Leitung (head) for a department to Supabase */
 async function saveDeptHead(deptId, newHead) {
+  console.log('[Leitung] saveDeptHead called:', { deptId, newHead, deptIdType: typeof deptId });
+
   // Synthetic dept (no real DB row) – skip
   if (String(deptId).startsWith('syn_')) {
     toast('Kein DB-Eintrag für diesen Bereich – bitte zuerst Bereich anlegen.', 'warn');
     return;
   }
+
+  // Normalize to number if possible (Supabase SERIAL = integer)
+  const numId = Number(deptId);
+  const queryId = isNaN(numId) ? deptId : numId;
+
   try {
-    const { error } = await sb
+    console.log('[Leitung] Updating in Supabase: id=', queryId, 'head=', newHead);
+    const { data, error } = await sb
       .from('departments')
       .update({ head: newHead })
-      .eq('id', deptId);
+      .eq('id', queryId)
+      .select('id, head');
+    console.log('[Leitung] Supabase response:', { data, error });
     if (error) throw error;
-    // Update local state so UI stays in sync without full reload
-    // Use == (not ===) to handle number vs string id from Supabase
-    const dept = DEPTS.find(d => d.id == deptId);
-    if (dept) dept.head = newHead;
+
+    // Update local DEPTS cache
+    const deptLocal = DEPTS.find(d => d.id == queryId);
+    if (deptLocal) {
+      deptLocal.head = newHead;
+      console.log('[Leitung] Local cache updated for id=', queryId);
+    } else {
+      console.warn('[Leitung] id not found in DEPTS. DEPTS ids:', DEPTS.map(d => d.id));
+    }
     toast(`Leitung gesetzt: ${newHead || '—'}`);
   } catch (err) {
-    console.error('saveDeptHead failed:', err.message);
-    toast('Fehler beim Speichern der Leitung: ' + err.message, 'err');
+    console.error('[Leitung] Save failed:', err.message);
+    toast('Fehler beim Speichern: ' + err.message, 'err');
   }
 }
 const _BEREICH_COLORS = {'Küche':'#fdcb6e','Service':'#74b9ff','Bar':'#00b894','Sushi':'#fd79a8','Ausbildung':'#e17055','Verwaltung':'#a29bfe','Minijob':'#14b8a6'};
