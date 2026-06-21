@@ -3435,13 +3435,14 @@ async function saveDeptHead(deptId, newHead) {
     return;
   }
   try {
-    const { error } = await supabase
+    const { error } = await sb
       .from('departments')
       .update({ head: newHead })
       .eq('id', deptId);
     if (error) throw error;
     // Update local state so UI stays in sync without full reload
-    const dept = DEPTS.find(d => d.id === deptId);
+    // Use == (not ===) to handle number vs string id from Supabase
+    const dept = DEPTS.find(d => d.id == deptId);
     if (dept) dept.head = newHead;
     toast(`Leitung gesetzt: ${newHead || '—'}`);
   } catch (err) {
