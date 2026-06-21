@@ -3496,15 +3496,23 @@ async function saveDeptHead(deptId, newHead) {
 }
 const _BEREICH_COLORS = {'Küche':'#fdcb6e','Service':'#74b9ff','Bar':'#00b894','Sushi':'#fd79a8','Ausbildung':'#e17055','Verwaltung':'#a29bfe','Minijob':'#14b8a6'};
 
-/** Bereiche eines Standorts; synthetisiert Standard-Set, wenn DB keine hat. */
+/** Bereiche eines Standorts.
+ *  Gibt DB-Rows zurück; fehlende Standard-Bereiche werden als Synthetic ergänzt. */
 function deptsForLocation(loc){
   if(!loc || loc==='all') return DEPTS;
   const rows = DEPTS.filter(d => empHasLoc({location:d.location}, loc));
-  if(rows.length) return rows;
-  return STANDARD_BEREICHE.map((name,i)=>({
-    id:'syn_'+loc+'_'+i, name, location:loc, head:'—', count:0,
-    color:_BEREICH_COLORS[name]||'#94a3b8'
-  }));
+  // Names already saved to DB for this location
+  const realNames = new Set(rows.map(d => d.name));
+  // Add synthetic placeholders for standard Bereiche not yet in DB
+  const unique = [...new Set(STANDARD_BEREICHE)]; // dedupe Minijob
+  const synRows = unique
+    .filter(name => !realNames.has(name))
+    .map(name => ({
+      id: 'syn_' + loc + '_' + name.toLowerCase().replace(/[^a-z]/g,''),
+      name, location: loc, head: '—', count: 0,
+      color: _BEREICH_COLORS[name] || '#94a3b8'
+    }));
+  return [...rows, ...synRows];
 }
 
 // Liefert die anzuzeigenden Bereich-Karten als {dept, loc}. Bei "Alle Standorte"
