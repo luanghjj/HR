@@ -6211,22 +6211,27 @@ async function deleteUser(userId){
 
       // 2. Delete employee record
       if(emp){
+        const today = isoDate(new Date());
+
+        // 2a. Delete ALL future shifts from Supabase (so they don't come back on refresh)
+        const { error: shiftsErr } = await sb.from('shifts')
+          .delete()
+          .eq('emp_id', emp.id)
+          .gte('shift_date', today);
+        if(shiftsErr) console.warn('[DeleteUser] Shifts delete error:', shiftsErr.message);
+        else console.log('[DeleteUser] ✓ Future shifts deleted from DB for emp', emp.id);
+
+        // 2b. Delete employee record
         const { error: empErr } = await sb.from('employees').delete().eq('id', emp.id);
         if(empErr) console.warn('[DeleteUser] Employee delete error:', empErr.message);
-        // Remove from local EMPS
+
+        // 2c. Update local caches
         const ei = EMPS.findIndex(e => e.id === emp.id);
         if(ei >= 0) EMPS.splice(ei, 1);
-
-        // Remove all future + current week shifts from local cache
-        // so Arbeitsplan doesn't show the deleted person
-        const today = isoDate(new Date());
-        const shiftsBefore = SHIFTS.length;
+        // Remove future shifts from local SHIFTS cache
         for(let si = SHIFTS.length - 1; si >= 0; si--){
-          if(SHIFTS[si].empId === emp.id && SHIFTS[si].date >= today){
-            SHIFTS.splice(si, 1);
-          }
+          if(SHIFTS[si].empId === emp.id && SHIFTS[si].date >= today) SHIFTS.splice(si, 1);
         }
-        console.log(`[DeleteUser] Removed ${shiftsBefore - SHIFTS.length} future shifts from cache`);
       }
 
       // 3. Delete auth user via admin API (requires service role — backend call)
