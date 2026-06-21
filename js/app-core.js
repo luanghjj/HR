@@ -3427,39 +3427,68 @@ function saveLate(empId){if(!can('markLate')&&!can('editSchedules'))return;const
 // in der DB existieren (aktuell nur Origami gepflegt → Enso/Okyu/OMoi leer).
 const STANDARD_BEREICHE = ['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob','Minijob'];
 
-/** Save Leitung (head) for a department to Supabase */
+/** Save Leitung (head) for a department to Supabase.
+ *  If the dept is synthetic (no DB row yet), auto-creates it first. */
 async function saveDeptHead(deptId, newHead) {
-  console.log('[Leitung] saveDeptHead called:', { deptId, newHead, deptIdType: typeof deptId });
+  console.log('[Leitung] saveDeptHead called:', { deptId, newHead });
 
-  // Synthetic dept (no real DB row) – skip
-  if (String(deptId).startsWith('syn_')) {
-    toast('Kein DB-Eintrag für diesen Bereich – bitte zuerst Bereich anlegen.', 'warn');
-    return;
-  }
-
-  // Normalize to number if possible (Supabase SERIAL = integer)
-  const numId = Number(deptId);
-  const queryId = isNaN(numId) ? deptId : numId;
+  const isSynthetic = String(deptId).startsWith('syn_');
 
   try {
-    console.log('[Leitung] Updating in Supabase: id=', queryId, 'head=', newHead);
+    if (isSynthetic) {
+      // Parse synthetic id: 'syn_{loc}_{index}'
+      // Find the matching synthetic dept from current render state
+      const sel = document.querySelector(`.dept-leitung-select[data-dept-id="${deptId}"]`);
+      if (!sel) { toast('Bereich nicht gefunden.', 'warn'); return; }
+
+      // Get dept name + location from nearest card
+      const card = sel.closest('.dept-card');
+      if (!card) { toast('Bereich nicht gefunden.', 'warn'); return; }
+      const deptName = card.querySelector('.dept-card-name')?.textContent?.trim() || '';
+      // Extract location from synthetic id: syn_{loc}_{i}
+      const parts = deptId.split('_');
+      parts.shift(); // remove 'syn'
+      parts.pop();   // remove index
+      const locId = parts.join('_');
+      const color = _BEREICH_COLORS[deptName] || '#94a3b8';
+
+      console.log('[Leitung] Auto-creating dept:', { deptName, locId, color, head: newHead });
+
+      const { data: inserted, error: insertErr } = await sb
+        .from('departments')
+        .insert({ name: deptName, location: locId, head: newHead, color })
+        .select('id, name, location, head, color')
+        .single();
+
+      if (insertErr) throw insertErr;
+
+      // Add to local DEPTS cache
+      DEPTS.push(inserted);
+      // Update select's data-dept-id so future changes use the real id
+      sel.dataset.deptId = inserted.id;
+      console.log('[Leitung] ✓ Dept created & head saved:', inserted);
+      toast(`Bereich angelegt & Leitung gesetzt: ${newHead || '—'}`);
+      return;
+    }
+
+    // Normalize to number (Supabase SERIAL = integer)
+    const queryId = isNaN(Number(deptId)) ? deptId : Number(deptId);
+
+    console.log('[Leitung] Updating dept id=', queryId, 'head=', newHead);
     const { data, error } = await sb
       .from('departments')
       .update({ head: newHead })
       .eq('id', queryId)
       .select('id, head');
+
     console.log('[Leitung] Supabase response:', { data, error });
     if (error) throw error;
 
-    // Update local DEPTS cache
+    // Update local cache
     const deptLocal = DEPTS.find(d => d.id == queryId);
-    if (deptLocal) {
-      deptLocal.head = newHead;
-      console.log('[Leitung] Local cache updated for id=', queryId);
-    } else {
-      console.warn('[Leitung] id not found in DEPTS. DEPTS ids:', DEPTS.map(d => d.id));
-    }
+    if (deptLocal) deptLocal.head = newHead;
     toast(`Leitung gesetzt: ${newHead || '—'}`);
+
   } catch (err) {
     console.error('[Leitung] Save failed:', err.message);
     toast('Fehler beim Speichern: ' + err.message, 'err');
