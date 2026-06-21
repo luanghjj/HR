@@ -3503,16 +3503,50 @@ function deptsForLocation(loc){
   const rows = DEPTS.filter(d => empHasLoc({location:d.location}, loc));
   // Names already saved to DB for this location
   const realNames = new Set(rows.map(d => d.name));
-  // Add synthetic placeholders for standard Bereiche not yet in DB
+  // Load hidden synthetic bereiche from localStorage
+  const hiddenKey = 'hidden_bereiche_' + loc;
+  const hidden = new Set(JSON.parse(localStorage.getItem(hiddenKey) || '[]'));
+  // Add synthetic placeholders for standard Bereiche not yet in DB and not hidden
   const unique = [...new Set(STANDARD_BEREICHE)]; // dedupe Minijob
   const synRows = unique
-    .filter(name => !realNames.has(name))
+    .filter(name => !realNames.has(name) && !hidden.has(name))
     .map(name => ({
       id: 'syn_' + loc + '_' + name.toLowerCase().replace(/[^a-z]/g,''),
       name, location: loc, head: '—', count: 0,
       color: _BEREICH_COLORS[name] || '#94a3b8'
     }));
   return [...rows, ...synRows];
+}
+
+/** Hide or delete a Bereich.
+ *  Synthetic (no DB row) → store in localStorage.
+ *  Real DB row → DELETE from departments. */
+async function hideDept(deptId, deptName, loc) {
+  const isSyn = String(deptId).startsWith('syn_');
+  if (!confirm(`Bereich "${deptName}" ausblenden?`)) return;
+  if (isSyn) {
+    const hiddenKey = 'hidden_bereiche_' + loc;
+    const hidden = new Set(JSON.parse(localStorage.getItem(hiddenKey) || '[]'));
+    hidden.add(deptName);
+    localStorage.setItem(hiddenKey, JSON.stringify([...hidden]));
+    toast(`"${deptName}" ausgeblendet`);
+  } else {
+    const numId = isNaN(Number(deptId)) ? deptId : Number(deptId);
+    const { error } = await sb.from('departments').delete().eq('id', numId);
+    if (error) { toast('Fehler: ' + error.message, 'err'); return; }
+    const idx = DEPTS.findIndex(d => d.id == numId);
+    if (idx >= 0) DEPTS.splice(idx, 1);
+    toast(`"${deptName}" gelöscht`);
+  }
+  renderDepts();
+}
+
+/** Reset all hidden synthetic Bereiche for a location */
+function resetHiddenDepts(loc) {
+  const hiddenKey = 'hidden_bereiche_' + loc;
+  localStorage.removeItem(hiddenKey);
+  toast('Alle Bereiche wieder eingeblendet');
+  renderDepts();
 }
 
 // Liefert die anzuzeigenden Bereich-Karten als {dept, loc}. Bei "Alle Standorte"
@@ -3554,6 +3588,7 @@ function renderDepts(){
       <p class="dept-page-sub">Verwalten Sie Ihre Teams, verfolgen Sie die Personalkosten und optimieren Sie die Schichtplanung.</p>
     </div>
     ${can('editDepartments')?`<button class="dept-add-btn" onclick="openModal('addDept')"><span class="ms">add</span> Neuer Bereich</button>`:''}
+    ${can('editDepartments') && scopeLoc && scopeLoc!=='all' ? `<button class="dept-reset-btn" onclick="resetHiddenDepts('${scopeLoc}')" title="Ausgeblendete Bereiche wiederherstellen"><span class="ms">visibility</span> Alle anzeigen</button>` : ''}
   </div>
   <div class="dept-accordion">`;
 
@@ -3617,6 +3652,13 @@ function renderDepts(){
         </div>
         ${isAdmin?`<div class="dept-divider"></div><div class="dept-cost-block"><div class="dept-cost-label">Personalkosten</div><div class="dept-cost-val">${formatEuro(totalCost)}</div></div>`:''}
         <span class="ms dept-toggle-arrow">expand_more</span>
+        ${can('editDepartments') ? `<button
+          class="dept-hide-btn"
+          title="Bereich ausblenden"
+          data-dept-id="${dept.id}"
+          data-dept-name="${dept.name.replace(/"/g,'&quot;')}"
+          data-dept-loc="${loc}"
+        ><span class="ms">close</span></button>` : ''}
       </div>
 
       <div class="dept-card-body" id="${deptId}">
@@ -3723,6 +3765,15 @@ function renderDepts(){
       const newHead = sel.value;
       saveDeptHead(deptId, newHead);
     });
+  });
+
+  // Attach hide-btn listeners
+  document.querySelectorAll('.dept-hide-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      hideDept(btn.dataset.deptId, btn.dataset.deptName, btn.dataset.deptLoc);
+    });
+    btn.addEventListener('mousedown', e => e.stopPropagation());
   });
 }
 

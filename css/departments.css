@@ -503,3 +503,53 @@
   color: var(--text-muted);
 }
 .dept-empty .ms { font-size: 3rem; margin-bottom: 12px; display: block; }
+
+/* ─── Bereich ausblenden × ─── */
+.dept-hide-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-left: 8px;
+  flex-shrink: 0;
+  transition: background .15s, color .15s;
+  opacity: 0;
+  pointer-events: none;
+}
+.dept-hide-btn .ms { font-size: 1rem; }
+.dept-card-header:hover .dept-hide-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+.dept-hide-btn:hover {
+  background: rgba(239,68,68,.12);
+  color: #ef4444;
+}
+
+/* ─── Reset-Button "Alle anzeigen" ─── */
+.dept-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.dept-reset-btn:hover {
+  background: var(--bg-card);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.dept-reset-btn .ms { font-size: .95rem; }
