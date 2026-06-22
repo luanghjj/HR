@@ -6209,29 +6209,31 @@ async function deleteUser(userId){
       const { error: profErr } = await sb.from('user_profiles').delete().eq('user_id', userId);
       if(profErr){ toast('Profil-Fehler: ' + profErr.message, 'err'); overlay.remove(); return; }
 
-      // 2. Delete employee record
-      if(emp){
+      // 2. Find linked employee (by empId or by name as fallback)
+      const linkedEmp = emp || EMPS.find(e => e.name === u.name);
+      if(linkedEmp){
         const today = isoDate(new Date());
 
-        // 2a. Delete ALL future shifts from Supabase (so they don't come back on refresh)
-        const { error: shiftsErr } = await sb.from('shifts')
+        // 2a. Delete ALL future shifts from Supabase
+        await sb.from('shifts')
           .delete()
-          .eq('emp_id', emp.id)
+          .eq('emp_id', linkedEmp.id)
           .gte('shift_date', today);
-        if(shiftsErr) console.warn('[DeleteUser] Shifts delete error:', shiftsErr.message);
-        else console.log('[DeleteUser] ✓ Future shifts deleted from DB for emp', emp.id);
 
-        // 2b. Delete employee record
-        const { error: empErr } = await sb.from('employees').delete().eq('id', emp.id);
-        if(empErr) console.warn('[DeleteUser] Employee delete error:', empErr.message);
+        // 2b. Set employee status = 'inactive' in DB (keep record for history)
+        await sb.from('employees')
+          .update({ status: 'inactive' })
+          .eq('id', linkedEmp.id);
 
-        // 2c. Update local caches
-        const ei = EMPS.findIndex(e => e.id === emp.id);
-        if(ei >= 0) EMPS.splice(ei, 1);
-        // Remove future shifts from local SHIFTS cache
+        // 2c. Update local EMPS cache
+        const localEmp = EMPS.find(e => e.id === linkedEmp.id);
+        if(localEmp) localEmp.status = 'inactive';
+
+        // 2d. Remove future shifts from local SHIFTS cache
         for(let si = SHIFTS.length - 1; si >= 0; si--){
-          if(SHIFTS[si].empId === emp.id && SHIFTS[si].date >= today) SHIFTS.splice(si, 1);
+          if(SHIFTS[si].empId === linkedEmp.id && SHIFTS[si].date >= today) SHIFTS.splice(si, 1);
         }
+        console.log('[DeleteUser] ✓ Employee set inactive & future shifts cleared:', linkedEmp.name);
       }
 
       // 3. Delete auth user via admin API (requires service role — backend call)
