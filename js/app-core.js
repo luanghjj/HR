@@ -3574,9 +3574,13 @@ function deptCardsFor(scopeLoc){
 
 function renderDepts(){
   const pg=document.getElementById('page-departments');
-  if(!can('seeAllEmployees')){pg.innerHTML=permBanner('Bereichsübersicht ist nur für Manager und Inhaber verfügbar.');return;}
+  // Mitarbeiter dürfen Bereiche sehen, aber nicht bearbeiten
+  const isReadOnly = !can('seeAllEmployees');
   const _uLoc=currentUser.location;const _isAll=_uLoc==='all';
-  const scopeLoc=_isAll?currentLocation:_uLoc;
+  // Mitarbeiter: nur eigene Standort-Bereiche anzeigen
+  const scopeLoc=isReadOnly
+    ? (currentUser.location !== 'all' ? currentUser.location.split(',')[0] : 'all')
+    : (_isAll ? currentLocation : _uLoc);
   const deptCards=deptCardsFor(scopeLoc);
   const isAdmin=SHOW_SALARY && can('seeFinancials');
   const today=isoDate(new Date());
@@ -3587,8 +3591,8 @@ function renderDepts(){
       <h2 class="dept-page-title">Abteilungsübersicht</h2>
       <p class="dept-page-sub">Verwalten Sie Ihre Teams, verfolgen Sie die Personalkosten und optimieren Sie die Schichtplanung.</p>
     </div>
-    ${can('editDepartments')?`<button class="dept-add-btn" onclick="openModal('addDept')"><span class="ms">add</span> Neuer Bereich</button>`:''}
-    ${can('editDepartments') && scopeLoc && scopeLoc!=='all' ? `<button class="dept-reset-btn" onclick="resetHiddenDepts('${scopeLoc}')" title="Ausgeblendete Bereiche wiederherstellen"><span class="ms">visibility</span> Alle anzeigen</button>` : ''}
+    ${!isReadOnly && can('editDepartments')?`<button class="dept-add-btn" onclick="openModal('addDept')"><span class="ms">add</span> Neuer Bereich</button>`:''}
+    ${!isReadOnly && can('editDepartments') && scopeLoc && scopeLoc!=='all' ? `<button class="dept-reset-btn" onclick="resetHiddenDepts('${scopeLoc}')" title="Ausgeblendete Bereiche wiederherstellen"><span class="ms">visibility</span> Alle anzeigen</button>` : ''}
   </div>
   <div class="dept-accordion">`;
 
@@ -3624,7 +3628,7 @@ function renderDepts(){
         <div class="dept-divider"></div>
         <div class="dept-leitung-block">
           <div class="dept-leitung-label">Leitung</div>
-          ${can('editDepartments') ? (() => {
+          ${(!isReadOnly && can('editDepartments')) ? (() => {
             // Employees of this specific location, active only, sorted by name
             const leitungEmps = EMPS
               .filter(e => empHasLoc(e, loc) && (e.status === 'active' || e.status === 'aktiv'))
@@ -3650,9 +3654,9 @@ function renderDepts(){
           <div class="dept-stat-badge is-vacation"><span class="dept-stat-label">🏖️ Urlaub</span><span class="dept-stat-val">${vacCount}</span></div>
           <div class="dept-stat-badge is-dienst"><span class="dept-stat-label">📋 Dienst</span><span class="dept-stat-val">${todayShifts.length}</span></div>
         </div>
-        ${isAdmin?`<div class="dept-divider"></div><div class="dept-cost-block"><div class="dept-cost-label">Personalkosten</div><div class="dept-cost-val">${formatEuro(totalCost)}</div></div>`:''}
+        ${!isReadOnly && isAdmin?`<div class="dept-divider"></div><div class="dept-cost-block"><div class="dept-cost-label">Personalkosten</div><div class="dept-cost-val">${formatEuro(totalCost)}</div></div>`:''}
         <span class="ms dept-toggle-arrow">expand_more</span>
-        ${can('editDepartments') ? `<button
+        ${(!isReadOnly && can('editDepartments')) ? `<button
           class="dept-hide-btn"
           title="Bereich ausblenden"
           data-dept-id="${dept.id}"
