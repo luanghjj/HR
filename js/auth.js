@@ -485,8 +485,11 @@ async function doGoogleLogin() {
     const loginError = document.getElementById('loginError');
     loginError.style.display = 'none';
 
-    // Determine redirect URL (Vercel production or localhost)
-    const redirectTo = window.location.origin + window.location.pathname;
+    // Always redirect back to the production domain after Google OAuth
+    const isProd = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+    const redirectTo = isProd
+      ? 'https://timetrack.live'
+      : window.location.origin + window.location.pathname;
     console.log('[Auth] Google OAuth redirectTo:', redirectTo);
 
     const { data, error } = await sb.auth.signInWithOAuth({
