@@ -3524,6 +3524,11 @@ function hideDept(deptId, deptName, loc) {
   openBereicManager(loc);
 }
 
+/** Shared ID sanitizer for Bereiche-Manager rows */
+function bmSafeId(name) {
+  return 'bm_row_' + name.replace(/[^a-z0-9]/gi, '_');
+}
+
 /** Toggle ẩn/hiện một Bereich theo tên */
 function toggleBereiche(name, loc) {
   const hiddenKey = 'hidden_bereiche_' + loc;
@@ -3534,17 +3539,21 @@ function toggleBereiche(name, loc) {
     hidden.add(name);
   }
   localStorage.setItem(hiddenKey, JSON.stringify([...hidden]));
-  // Re-render the modal rows in-place (no full page reload)
-  const row = document.getElementById('bm_row_' + CSS.escape(name));
+
+  // Update modal row in-place
+  const isHidden = hidden.has(name);
+  const row = document.getElementById(bmSafeId(name));
   if (row) {
-    const isHidden = hidden.has(name);
     row.classList.toggle('bm-row-hidden', isHidden);
-    const btn = row.querySelector('.bm-toggle-btn');
-    const ic  = row.querySelector('.bm-toggle-icon');
-    if (btn) btn.title = isHidden ? 'Einblenden' : 'Ausblenden';
-    if (ic)  ic.textContent = isHidden ? 'visibility_off' : 'visibility';
+    const statusEl = row.querySelector('.bm-status');
+    const iconEl   = row.querySelector('.bm-toggle-icon');
+    const btnEl    = row.querySelector('.bm-toggle-btn');
+    if (statusEl) statusEl.textContent = isHidden ? 'Ausgeblendet' : 'Sichtbar';
+    if (iconEl)   iconEl.textContent   = isHidden ? 'visibility_off' : 'visibility';
+    if (btnEl)    btnEl.title          = isHidden ? 'Einblenden' : 'Ausblenden';
   }
-  // Also re-render dept page in background
+
+  // Re-render dept page behind modal
   renderDepts();
 }
 
@@ -3571,9 +3580,8 @@ function openBereicManager(loc) {
 
   const rows = allBereiche.map(b => {
     const isHid = hidden.has(b.name);
-    const safeId = b.name.replace(/[^a-zA-Z0-9äöüÄÖÜß ]/g, '_');
     return `
-    <div class="bm-row${isHid ? ' bm-row-hidden' : ''}" id="bm_row_${safeId}">
+    <div class="bm-row${isHid ? ' bm-row-hidden' : ''}" id="${bmSafeId(b.name)}">
       <div class="bm-row-left">
         <span class="bm-dot" style="background:${b.color}"></span>
         <span class="bm-name">${b.name}</span>
@@ -3582,7 +3590,7 @@ function openBereicManager(loc) {
       <div class="bm-row-right">
         <span class="bm-status">${isHid ? 'Ausgeblendet' : 'Sichtbar'}</span>
         <button class="bm-toggle-btn" title="${isHid ? 'Einblenden' : 'Ausblenden'}"
-          onclick="toggleBereiche(${JSON.stringify(b.name)}, ${JSON.stringify(loc)}); this.closest('.bm-row').classList.toggle('bm-row-hidden'); this.previousElementSibling.textContent = this.closest('.bm-row').classList.contains('bm-row-hidden') ? 'Ausgeblendet' : 'Sichtbar'; this.querySelector('.bm-toggle-icon').textContent = this.closest('.bm-row').classList.contains('bm-row-hidden') ? 'visibility_off' : 'visibility'">
+          onclick="toggleBereiche(${JSON.stringify(b.name)}, ${JSON.stringify(loc)})">
           <span class="ms bm-toggle-icon">${isHid ? 'visibility_off' : 'visibility'}</span>
         </button>
       </div>
