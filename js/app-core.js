@@ -3518,35 +3518,99 @@ function deptsForLocation(loc){
   return [...rows, ...synRows];
 }
 
-/** Hide or delete a Bereich.
- *  Synthetic (no DB row) → store in localStorage.
- *  Real DB row → DELETE from departments. */
-async function hideDept(deptId, deptName, loc) {
-  const isSyn = String(deptId).startsWith('syn_');
-  if (!confirm(`Bereich "${deptName}" ausblenden?`)) return;
-  if (isSyn) {
-    const hiddenKey = 'hidden_bereiche_' + loc;
-    const hidden = new Set(JSON.parse(localStorage.getItem(hiddenKey) || '[]'));
-    hidden.add(deptName);
-    localStorage.setItem(hiddenKey, JSON.stringify([...hidden]));
-    toast(`"${deptName}" ausgeblendet`);
+/** Ẩn một Bereich (synthetic → localStorage) */
+function hideDept(deptId, deptName, loc) {
+  // Just open the manager modal focused on this location
+  openBereicManager(loc);
+}
+
+/** Toggle ẩn/hiện một Bereich theo tên */
+function toggleBereiche(name, loc) {
+  const hiddenKey = 'hidden_bereiche_' + loc;
+  const hidden = new Set(JSON.parse(localStorage.getItem(hiddenKey) || '[]'));
+  if (hidden.has(name)) {
+    hidden.delete(name);
   } else {
-    const numId = isNaN(Number(deptId)) ? deptId : Number(deptId);
-    const { error } = await sb.from('departments').delete().eq('id', numId);
-    if (error) { toast('Fehler: ' + error.message, 'err'); return; }
-    const idx = DEPTS.findIndex(d => d.id == numId);
-    if (idx >= 0) DEPTS.splice(idx, 1);
-    toast(`"${deptName}" gelöscht`);
+    hidden.add(name);
   }
+  localStorage.setItem(hiddenKey, JSON.stringify([...hidden]));
+  // Re-render the modal rows in-place (no full page reload)
+  const row = document.getElementById('bm_row_' + CSS.escape(name));
+  if (row) {
+    const isHidden = hidden.has(name);
+    row.classList.toggle('bm-row-hidden', isHidden);
+    const btn = row.querySelector('.bm-toggle-btn');
+    const ic  = row.querySelector('.bm-toggle-icon');
+    if (btn) btn.title = isHidden ? 'Einblenden' : 'Ausblenden';
+    if (ic)  ic.textContent = isHidden ? 'visibility_off' : 'visibility';
+  }
+  // Also re-render dept page in background
   renderDepts();
 }
 
-/** Reset all hidden synthetic Bereiche for a location */
-function resetHiddenDepts(loc) {
+/** Öffnet das Bereiche-Manager-Modal für einen Standort */
+function openBereicManager(loc) {
+  if (!loc || loc === 'all') {
+    // If all locations, pick current
+    loc = typeof currentLocation !== 'undefined' && currentLocation !== 'all'
+      ? currentLocation
+      : (LOCS[0]?.id || '');
+  }
   const hiddenKey = 'hidden_bereiche_' + loc;
-  localStorage.removeItem(hiddenKey);
-  toast('Alle Bereiche wieder eingeblendet');
-  renderDepts();
+  const hidden = new Set(JSON.parse(localStorage.getItem(hiddenKey) || '[]'));
+  const locName = LOCS.find(l => l.id === loc)?.name || loc;
+
+  // All bereiche for this location: real DB + all standard (including hidden)
+  const realRows = DEPTS.filter(d => empHasLoc({location: d.location}, loc));
+  const realNames = new Set(realRows.map(d => d.name));
+  const unique = [...new Set(STANDARD_BEREICHE)];
+  const allBereiche = [
+    ...realRows.map(d => ({ name: d.name, color: d.color || _BEREICH_COLORS[d.name] || '#94a3b8', isReal: true })),
+    ...unique.filter(n => !realNames.has(n)).map(n => ({ name: n, color: _BEREICH_COLORS[n] || '#94a3b8', isReal: false }))
+  ];
+
+  const rows = allBereiche.map(b => {
+    const isHid = hidden.has(b.name);
+    const safeId = b.name.replace(/[^a-zA-Z0-9äöüÄÖÜß ]/g, '_');
+    return `
+    <div class="bm-row${isHid ? ' bm-row-hidden' : ''}" id="bm_row_${safeId}">
+      <div class="bm-row-left">
+        <span class="bm-dot" style="background:${b.color}"></span>
+        <span class="bm-name">${b.name}</span>
+        ${b.isReal ? '<span class="bm-tag-real">DB</span>' : ''}
+      </div>
+      <div class="bm-row-right">
+        <span class="bm-status">${isHid ? 'Ausgeblendet' : 'Sichtbar'}</span>
+        <button class="bm-toggle-btn" title="${isHid ? 'Einblenden' : 'Ausblenden'}"
+          onclick="toggleBereiche(${JSON.stringify(b.name)}, ${JSON.stringify(loc)}); this.closest('.bm-row').classList.toggle('bm-row-hidden'); this.previousElementSibling.textContent = this.closest('.bm-row').classList.contains('bm-row-hidden') ? 'Ausgeblendet' : 'Sichtbar'; this.querySelector('.bm-toggle-icon').textContent = this.closest('.bm-row').classList.contains('bm-row-hidden') ? 'visibility_off' : 'visibility'">
+          <span class="ms bm-toggle-icon">${isHid ? 'visibility_off' : 'visibility'}</span>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bereicManagerOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)';
+  overlay.innerHTML = `
+  <div style="background:var(--bg-card);border-radius:20px;width:480px;max-width:94vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.4);overflow:hidden">
+    <div style="padding:22px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-weight:700;font-size:1rem">Bereiche verwalten</div>
+        <div style="font-size:.8rem;color:var(--text-muted);margin-top:2px">${locName} · ${allBereiche.length} Bereiche</div>
+      </div>
+      <button onclick="document.getElementById('bereicManagerOverlay').remove()" style="background:var(--bg-input);border:none;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted)">
+        <span class="ms">close</span>
+      </button>
+    </div>
+    <div style="overflow-y:auto;padding:12px 16px;flex:1">${rows}</div>
+    <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
+      <button onclick="localStorage.removeItem('hidden_bereiche_${loc}');renderDepts();document.getElementById('bereicManagerOverlay').remove();toast('Alle Bereiche eingeblendet')" style="background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:9px 18px;font-size:.82rem;font-weight:600;color:var(--text-secondary);cursor:pointer">Alle einblenden</button>
+      <button onclick="document.getElementById('bereicManagerOverlay').remove()" style="background:var(--accent);border:none;border-radius:10px;padding:9px 18px;font-size:.82rem;font-weight:600;color:#fff;cursor:pointer">Fertig</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
 }
 
 // Liefert die anzuzeigenden Bereich-Karten als {dept, loc}. Bei "Alle Standorte"
@@ -3592,7 +3656,7 @@ function renderDepts(){
       <p class="dept-page-sub">Verwalten Sie Ihre Teams, verfolgen Sie die Personalkosten und optimieren Sie die Schichtplanung.</p>
     </div>
     ${!isReadOnly && can('editDepartments')?`<button class="dept-add-btn" onclick="openModal('addDept')"><span class="ms">add</span> Neuer Bereich</button>`:''}
-    ${!isReadOnly && can('editDepartments') && scopeLoc && scopeLoc!=='all' ? `<button class="dept-reset-btn" onclick="resetHiddenDepts('${scopeLoc}')" title="Ausgeblendete Bereiche wiederherstellen"><span class="ms">visibility</span> Alle anzeigen</button>` : ''}
+    ${!isReadOnly && can('editDepartments') && scopeLoc && scopeLoc!=='all' ? `<button class="dept-reset-btn" onclick="openBereicManager('${scopeLoc}')" title="Bereiche ein- und ausblenden"><span class="ms">tune</span> Bereiche verwalten</button>` : ''}
   </div>
   <div class="dept-accordion">`;
 
