@@ -157,6 +157,24 @@ function calcHourly(employee) {
   return Math.round(employee.bruttoGehalt / employee.sollStunden * 100) / 100;
 }
 
+/** Anzahl Schichten im aktuellen Monat (ohne krank/Urlaub) */
+function calcMonthShiftCount(employeeId) {
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  return SHIFTS.filter(s => s.empId === employeeId && !s.isSick && !s.isVacation
+    && (() => { const d = new Date(s.date); return d.getFullYear() === year && d.getMonth() === month; })()
+  ).length;
+}
+
+/** Netto-Stunden aktueller Monat = Plan-Stunden − (Anzahl Schichten × Pause) */
+function calcNetHours(employee) {
+  const gross = calcPlanHours(employee.id);
+  const pauseMin = employee.pauseMinutes ?? 30;
+  const count = calcMonthShiftCount(employee.id);
+  const net = gross - (count * pauseMin / 60);
+  return Math.max(0, Math.round(net * 10) / 10);
+}
+
 /** Calculate monthly salary from hourly rate */
 function calcMonthlyFromHourly(hourlyRate, plannedHours) {
   return Math.round(hourlyRate * plannedHours * 100) / 100;

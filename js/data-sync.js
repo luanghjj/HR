@@ -128,6 +128,7 @@ async function syncEmployeeField(empId, field, value) {
       // New detail fields
       employmentType: 'employment_type', hourlyRate: 'hourly_rate',
       weeklyHours: 'weekly_hours', monthlyHours: 'monthly_hours',
+      pauseMinutes: 'pause_minutes',
       taxClass: 'tax_class', taxId: 'tax_id', svNumber: 'sv_number',
       healthInsurance: 'health_insurance', iban: 'iban',
       nationality: 'nationality', address: 'address',

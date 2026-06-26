@@ -1915,6 +1915,19 @@ function viewEmp(id){
         <input class="form-input" type="number" value="${e.weeklyHours||''}" ${ro} ${canEdit?`onchange="updateEmpField(${e.id},'weeklyHours',this.value)"`:''}></div>
       <div class="form-group"><label class="form-label">Std/Monat</label>
         <input class="form-input" type="number" value="${e.monthlyHours||''}" ${ro} ${canEdit?`onchange="updateEmpField(${e.id},'monthlyHours',this.value)"`:''}></div>
+      <div class="form-group"><label class="form-label">Pause / Schicht (Min.)</label>
+        <input class="form-input" type="number" min="0" step="5" value="${e.pauseMinutes??30}" ${ro} ${canEdit?`onchange="updateEmpField(${e.id},'pauseMinutes',this.value)"`:''}></div>
+      ${(()=>{
+        const gross=calcPlanHours(e.id), net=calcNetHours(e), cnt=calcMonthShiftCount(e.id), pm=e.pauseMinutes??30;
+        const warn=(e.employmentType==='Minijob') && net>43.5; // ~538€ bei Mindestlohn – nur Warnung
+        const col=warn?'var(--danger)':'var(--success)';
+        return `<div class="form-group full"><label class="form-label">Stunden diesen Monat (netto)</label>
+          <div style="font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:${col};padding:6px 0">
+            ${net} h ${warn?'<span class="badge badge-danger" style="font-size:.6rem;vertical-align:middle">⚠ Minijob-Grenze</span>':''}
+          </div>
+          <div style="font-size:.72rem;color:var(--text-muted)">Plan ${gross}h − ${cnt} Schicht${cnt!==1?'en':''} × ${pm}min Pause</div>
+        </div>`;
+      })()}
     </div>
 
     <!-- ═══ STEUER & SV ═══ -->

@@ -98,6 +98,7 @@ async function loadDataFromSupabase() {
         hourlyRate: parseFloat(e.hourly_rate) || 0,
         weeklyHours: parseFloat(e.weekly_hours) || 0,
         monthlyHours: parseFloat(e.monthly_hours) || 0,
+        pauseMinutes: e.pause_minutes ?? 30,
         // Steuer & SV
         taxClass: escapeHtml(e.tax_class || ''),
         taxId: escapeHtml(e.tax_id || ''),
