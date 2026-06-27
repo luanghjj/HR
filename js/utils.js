@@ -166,12 +166,22 @@ function calcMonthShiftCount(employeeId) {
   ).length;
 }
 
-/** Netto-Stunden aktueller Monat = Plan-Stunden − (Anzahl Schichten × Pause) */
+/** Summe Verspätungs-Minuten im aktuellen Monat */
+function calcMonthLateMinutes(employeeId) {
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  return SHIFTS.filter(s => s.empId === employeeId && s.isLate && !s.isSick && !s.isVacation
+    && (() => { const d = new Date(s.date); return d.getFullYear() === year && d.getMonth() === month; })()
+  ).reduce((sum, s) => sum + (s.lateMin || 0), 0);
+}
+
+/** Netto-Stunden aktueller Monat = Plan-Stunden − (Schichten × Pause) − Verspätung */
 function calcNetHours(employee) {
   const gross = calcPlanHours(employee.id);
   const pauseMin = employee.pauseMinutes ?? 30;
   const count = calcMonthShiftCount(employee.id);
-  const net = gross - (count * pauseMin / 60);
+  const lateMin = calcMonthLateMinutes(employee.id);
+  const net = gross - (count * pauseMin / 60) - (lateMin / 60);
   return Math.max(0, Math.round(net * 10) / 10);
 }
 

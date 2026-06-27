@@ -1770,7 +1770,7 @@ async function fetchMonthlyHours(empId){
   let rows = [];
   try {
     const { data, error } = await sb.from('shifts')
-      .select('shift_date,shift_from,shift_to,is_sick,is_vacation')
+      .select('shift_date,shift_from,shift_to,is_sick,is_vacation,is_late,late_min')
       .eq('emp_id', empId)
       .gte('shift_date', iso(start))
       .lte('shift_date', iso(end));
@@ -1780,7 +1780,7 @@ async function fetchMonthlyHours(empId){
   const buckets = [];
   for (let i=0;i<6;i++){
     const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-    buckets.push({ y:d.getFullYear(), m:d.getMonth(), label:`${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}`, brutto:0, count:0 });
+    buckets.push({ y:d.getFullYear(), m:d.getMonth(), label:`${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}`, brutto:0, count:0, lateMin:0 });
   }
   rows.forEach(s=>{
     if (s.is_sick || s.is_vacation) return;
@@ -1791,11 +1791,12 @@ async function fetchMonthlyHours(empId){
     const [th,tm] = (s.shift_to||'0:0').split(':').map(Number);
     b.brutto += (th+tm/60)-(fh+fm/60);
     b.count++;
+    if (s.is_late) b.lateMin += (s.late_min || 0);
   });
   return buckets.map(b=>{
     const brutto = Math.round(b.brutto*10)/10;
-    const netto = Math.max(0, Math.round((b.brutto - b.count*pauseMin/60)*10)/10);
-    return { label:b.label, brutto, netto, count:b.count };
+    const netto = Math.max(0, Math.round((b.brutto - b.count*pauseMin/60 - b.lateMin/60)*10)/10);
+    return { label:b.label, brutto, netto, count:b.count, lateMin:b.lateMin };
   });
 }
 async function openMonthlyHoursModal(empId){
@@ -1991,14 +1992,14 @@ function viewEmp(id){
       <div class="form-group"><label class="form-label">Pause / Schicht (Min.)</label>
         <input class="form-input" type="number" min="0" step="5" value="${e.pauseMinutes??30}" ${ro} ${canEdit?`onchange="updateEmpField(${e.id},'pauseMinutes',this.value)"`:''}></div>
       ${(()=>{
-        const gross=calcPlanHours(e.id), net=calcNetHours(e), cnt=calcMonthShiftCount(e.id), pm=e.pauseMinutes??30;
+        const gross=calcPlanHours(e.id), net=calcNetHours(e), cnt=calcMonthShiftCount(e.id), pm=e.pauseMinutes??30, late=calcMonthLateMinutes(e.id);
         const warn=(e.employmentType==='Minijob') && net>43.5; // ~538€ bei Mindestlohn – nur Warnung
         const col=warn?'var(--danger)':'var(--success)';
         return `<div class="form-group full"><label class="form-label">Stunden diesen Monat (netto)</label>
           <div style="font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:${col};padding:6px 0">
             ${net} h ${warn?'<span class="badge badge-danger" style="font-size:.6rem;vertical-align:middle">⚠ Minijob-Grenze</span>':''}
           </div>
-          <div style="font-size:.72rem;color:var(--text-muted)">Plan ${gross}h − ${cnt} Schicht${cnt!==1?'en':''} × ${pm}min Pause</div>
+          <div style="font-size:.72rem;color:var(--text-muted)">Plan ${gross}h − ${cnt} Schicht${cnt!==1?'en':''} × ${pm}min Pause${late>0?` − ${late}min Verspätung`:''}</div>
           <button class="btn btn-sm" style="margin-top:8px" onclick="openMonthlyHoursModal(${e.id})"><span class="ms" style="font-size:15px;vertical-align:middle">bar_chart</span> Monatsverlauf (6 Monate)</button>
         </div>`;
       })()}
