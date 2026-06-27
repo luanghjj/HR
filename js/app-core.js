@@ -1756,6 +1756,79 @@ function applyMitColVisibility() {
 }
 // Apply on page load after render
 const _origRenderEmpRows = typeof renderEmpRows === 'function' ? renderEmpRows : null;
+
+// ═══ MONATSSTUNDEN (letzte 6 Monate, aus Supabase) ═══
+const MINIJOB_MAX_H = 43.5; // ~538€ bei Mindestlohn – nur Warnung
+async function fetchMonthlyHours(empId){
+  const emp = EMPS.find(e=>e.id===empId);
+  const pauseMin = emp?.pauseMinutes ?? 30;
+  const now = new Date();
+  // Start = erster Tag, 5 Monate zurück; Ende = letzter Tag aktueller Monat
+  const start = new Date(now.getFullYear(), now.getMonth()-5, 1);
+  const end = new Date(now.getFullYear(), now.getMonth()+1, 0);
+  const iso = d => d.toISOString().split('T')[0];
+  let rows = [];
+  try {
+    const { data, error } = await sb.from('shifts')
+      .select('shift_date,shift_from,shift_to,is_sick,is_vacation')
+      .eq('emp_id', empId)
+      .gte('shift_date', iso(start))
+      .lte('shift_date', iso(end));
+    if (!error && data) rows = data;
+  } catch(_) { /* ignore */ }
+  // 6 Monatsbuckets vorbereiten (neu → alt)
+  const buckets = [];
+  for (let i=0;i<6;i++){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    buckets.push({ y:d.getFullYear(), m:d.getMonth(), label:`${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}`, brutto:0, count:0 });
+  }
+  rows.forEach(s=>{
+    if (s.is_sick || s.is_vacation) return;
+    const d = new Date(s.shift_date);
+    const b = buckets.find(x=>x.y===d.getFullYear() && x.m===d.getMonth());
+    if (!b) return;
+    const [fh,fm] = (s.shift_from||'0:0').split(':').map(Number);
+    const [th,tm] = (s.shift_to||'0:0').split(':').map(Number);
+    b.brutto += (th+tm/60)-(fh+fm/60);
+    b.count++;
+  });
+  return buckets.map(b=>{
+    const brutto = Math.round(b.brutto*10)/10;
+    const netto = Math.max(0, Math.round((b.brutto - b.count*pauseMin/60)*10)/10);
+    return { label:b.label, brutto, netto, count:b.count };
+  });
+}
+async function openMonthlyHoursModal(empId){
+  if (empId==null) { toast('Kein Mitarbeiter verknüpft','warn'); return; }
+  const emp = EMPS.find(e=>e.id===empId);
+  if (!emp) { toast('Mitarbeiter nicht gefunden','err'); return; }
+  const pauseMin = emp.pauseMinutes ?? 30;
+  const isMini = emp.employmentType==='Minijob';
+  openModal('Monatsstunden: '+emp.name,
+    `<div id="monthlyHoursBody" style="font-size:.85rem;color:var(--text-muted)">Wird geladen…</div>`,
+    `<button class="btn" onclick="closeModal()">Schließen</button>`);
+  const data = await fetchMonthlyHours(empId);
+  const body = document.getElementById('monthlyHoursBody');
+  if (!body) return;
+  if (!data.some(d=>d.count>0)) { body.innerHTML='<p style="color:var(--text-muted)">Keine Daten in den letzten 6 Monaten.</p>'; return; }
+  const rows = data.map(d=>{
+    const warn = isMini && d.netto>MINIJOB_MAX_H;
+    return `<tr>
+      <td style="font-weight:600">${d.label}</td>
+      <td style="text-align:right;font-family:'Space Mono',monospace">${d.brutto} h</td>
+      <td style="text-align:right;font-family:'Space Mono',monospace;font-weight:700;color:${warn?'var(--danger)':'var(--success)'}">${d.netto} h${warn?' ⚠':''}</td>
+      <td style="text-align:center;color:var(--text-muted)">${d.count}</td>
+    </tr>`;
+  }).join('');
+  body.innerHTML = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:8px">Pause: ${pauseMin} Min./Schicht${isMini?' · Minijob-Grenze '+MINIJOB_MAX_H+'h':''}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+      <thead><tr style="border-bottom:1px solid var(--border);text-align:left">
+        <th style="padding:6px 4px">Monat</th><th style="padding:6px 4px;text-align:right">Brutto</th><th style="padding:6px 4px;text-align:right">Netto</th><th style="padding:6px 4px;text-align:center">Schichten</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 function viewEmp(id){
   const e=EMPS.find(x=>x.id===id);if(!e)return;
 
@@ -1926,6 +1999,7 @@ function viewEmp(id){
             ${net} h ${warn?'<span class="badge badge-danger" style="font-size:.6rem;vertical-align:middle">⚠ Minijob-Grenze</span>':''}
           </div>
           <div style="font-size:.72rem;color:var(--text-muted)">Plan ${gross}h − ${cnt} Schicht${cnt!==1?'en':''} × ${pm}min Pause</div>
+          <button class="btn btn-sm" style="margin-top:8px" onclick="openMonthlyHoursModal(${e.id})"><span class="ms" style="font-size:15px;vertical-align:middle">bar_chart</span> Monatsverlauf (6 Monate)</button>
         </div>`;
       })()}
     </div>
@@ -4030,7 +4104,7 @@ function renderSchedule(){
     h+='</tr></thead><tbody>';
     emps.forEach(emp=>{
       const _empObj2=EMPS.find(e=>e.name===emp);const _empPos=_empObj2?.position||'';const _empInitials=emp.split(' ').map(n=>n[0]).join('').substring(0,2);
-      h+=`<tr data-emp="${(emp||'').replace(/"/g,'&quot;')}" data-dept="${(_empObj2?.dept||'').replace(/"/g,'&quot;')}"><td><div style="display:flex;align-items:center;gap:12px"><div class="sc2-emp-avatar">${_empInitials}</div><div><div class="sc2-emp-name">${emp}</div><div class="sc2-emp-pos">${_empPos}</div></div></div></td>`;
+      h+=`<tr data-emp="${(emp||'').replace(/"/g,'&quot;')}" data-dept="${(_empObj2?.dept||'').replace(/"/g,'&quot;')}"><td><div style="display:flex;align-items:center;gap:12px"><div class="sc2-emp-avatar">${_empInitials}</div><div><div class="sc2-emp-name"${_empObj2?.id!=null?` onclick="openMonthlyHoursModal(${_empObj2.id})" style="cursor:pointer" title="Monatsstunden ansehen"`:''}>${emp}</div><div class="sc2-emp-pos">${_empPos}</div></div></div></td>`;
       let weekH=0;
       dayD.forEach(ds=>{
         const dayS=shifts.filter(s=>s.date===ds&&s.empName===emp);
