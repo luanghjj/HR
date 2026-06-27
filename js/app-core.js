@@ -1817,7 +1817,7 @@ async function openMonthlyHoursModal(empId){
     return `<tr>
       <td style="font-weight:600">${d.label}</td>
       <td style="text-align:right;font-family:'Space Mono',monospace">${d.brutto} h</td>
-      <td style="text-align:right;font-family:'Space Mono',monospace;font-weight:700;color:${warn?'var(--danger)':'var(--success)'}">${d.netto} h${warn?' ⚠':''}</td>
+      <td style="text-align:right;font-family:'Space Mono',monospace;font-weight:700;color:${warn?'var(--danger)':'var(--success)'}">${d.netto} h${warn?' ⚠':''}${d.lateMin>0?`<div style="font-size:.62rem;font-weight:400;color:#d97706">− ${d.lateMin} min (Verspätung)</div>`:''}</td>
       <td style="text-align:center;color:var(--text-muted)">${d.count}</td>
     </tr>`;
   }).join('');
