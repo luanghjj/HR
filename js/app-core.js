@@ -680,12 +680,13 @@ async function openReadStatsModal(annId){
   if(!a) return;
   // Lesebestätigungen frisch laden
   try{
-    const { data:reads } = await sb.from('announcement_reads').select('*').eq('announcement_id', annId);
-    if(reads){
+    const { data:reads, error } = await sb.from('announcement_reads').select('*').eq('announcement_id', annId);
+    if(error){ toast('Lesedaten konnten nicht aktualisiert werden','warn'); }
+    else if(reads){
       ANNOUNCEMENT_READS = ANNOUNCEMENT_READS.filter(r=>r.announcementId!==annId);
       reads.forEach(r=>ANNOUNCEMENT_READS.push({announcementId:r.announcement_id,userId:r.user_id,empId:r.emp_id,name:r.name||'',readAt:r.read_at}));
     }
-  }catch(_){}
+  }catch(e){ toast('Lesedaten-Fehler: '+e.message,'warn'); }
   // Zielgruppe = aktive Mitarbeiter im Standort der Mitteilung
   const annLocs = a.location ? a.location.split(',').map(l=>l.trim()).filter(Boolean) : null;
   const target = EMPS.filter(e=>(e.status==='active'||e.status==='aktiv') && (!annLocs || empHasLoc(e, annLocs)));
@@ -2134,8 +2135,9 @@ async function deleteEmployee(empId, empName) {
 // ═══ PAYMENT FILTER (Monat wechseln in Mitarbeitertabelle) ═══
 async function reloadPayStatusForMonth(monthStr) {
   const monthDate = monthStr + '-01';
-  const { data } = await sb.from('payment_status').select('*').eq('month', monthDate);
-  // Rebuild cache
+  const { data, error } = await sb.from('payment_status').select('*').eq('month', monthDate);
+  if (error) { toast('Zahlungsdaten konnten nicht geladen werden','err'); return; }
+  // Rebuild cache (nur bei Erfolg)
   Object.keys(PAY_STATUS_CACHE).forEach(k => delete PAY_STATUS_CACHE[k]);
   if (data) data.forEach(p => { PAY_STATUS_CACHE[p.emp_id] = p; });
   renderEmpRows(getVisibleEmps());
@@ -2149,7 +2151,8 @@ async function renderDashPayOverview(monthStr) {
   el.innerHTML = '<span style="color:var(--text-muted);font-size:.82rem">Lädt…</span>';
 
   const monthDate = monthStr + '-01';
-  const { data: payRows } = await sb.from('payment_status').select('*').eq('month', monthDate);
+  const { data: payRows, error: payErr } = await sb.from('payment_status').select('*').eq('month', monthDate);
+  if (payErr) { el.innerHTML = '<span style="color:var(--danger);font-size:.82rem">Zahlungsdaten konnten nicht geladen werden.</span>'; return; }
   const rows = payRows || [];
 
   const emps = getVisibleEmps().filter(e => e.bruttoGehalt > 0);
@@ -3508,7 +3511,7 @@ function openLateModal(empId){
   document.getElementById('modalFooter').innerHTML=`<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="saveLate(${empId})">Vermerken</button>`;
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
-function saveLate(empId){if(!can('markLate')&&!can('editSchedules'))return;const e=EMPS.find(x=>x.id===empId);const m=parseInt(document.getElementById('mLM').value)||0;if(m<=0)return;e.lateCount++;syncEmployeeField(e.id,'lateCount',e.lateCount);const d=document.getElementById('mLD').value;const sh=SHIFTS.find(s=>s.empId===empId&&s.date===d);if(sh){sh.isLate=true;sh.lateMin=m;syncUpdateShift(sh);}addNotif('late','Verspätung',`${e.name}: ${m} Min.`);closeModal();toast(`Verspätung vermerkt`,'warn');renderPage(getCurrentPage());}
+async function saveLate(empId){if(!can('markLate')&&!can('editSchedules'))return;const e=EMPS.find(x=>x.id===empId);if(!e){toast('Mitarbeiter nicht gefunden','err');return;}const m=parseInt(document.getElementById('mLM').value)||0;if(m<=0)return;const d=document.getElementById('mLD').value;const sh=SHIFTS.find(s=>s.empId===empId&&s.date===d);if(sh){sh.isLate=true;sh.lateMin=m;syncUpdateShift(sh);}const nv=e.lateCount+1;const ok=await syncEmployeeField(e.id,'lateCount',nv);if(ok!==false)e.lateCount=nv;addNotif('late','Verspätung',`${e.name}: ${m} Min.`);closeModal();toast(`Verspätung vermerkt`,'warn');renderPage(getCurrentPage());}
 
 // ═══ DEPARTMENTS ═══
 // Standard-Bereiche, falls für einen Standort (noch) keine departments-Zeilen
@@ -4519,7 +4522,7 @@ function updateShiftFromModal(id){
   syncUpdateShift(s);
   closeModal();toast('Schicht aktualisiert ✓');renderSchedule();
 }
-function markSick(id){if(!can('editSchedules'))return;const s=SHIFTS.find(x=>x.id===id);if(!s)return;s.isSick=!s.isSick;s.isVacation=false;const e=EMPS.find(x=>x.id===s.empId);if(s.isSick){if(e){e.sickDays++;syncEmployeeField(e.id,'sickDays',e.sickDays);}addNotif('sick','Krank',`${s.empName}: ${formatDateDE(s.date)}`);}else{if(e){e.sickDays=Math.max(0,e.sickDays-1);syncEmployeeField(e.id,'sickDays',e.sickDays);}}syncUpdateShift(s);renderSchedule();}
+async function markSick(id){if(!can('editSchedules'))return;const s=SHIFTS.find(x=>x.id===id);if(!s)return;s.isSick=!s.isSick;s.isVacation=false;const e=EMPS.find(x=>x.id===s.empId);renderSchedule();const ok=await syncUpdateShift(s);if(ok===false){s.isSick=!s.isSick;toast('Fehler beim Speichern','err');renderSchedule();return;}if(e){const delta=s.isSick?1:-1;const nv=Math.max(0,e.sickDays+delta);const okF=await syncEmployeeField(e.id,'sickDays',nv);if(okF!==false)e.sickDays=nv;}if(s.isSick)addNotif('sick','Krank',`${s.empName}: ${formatDateDE(s.date)}`);renderSchedule();}
 function markVac(id){
   if(!can('editSchedules'))return;
   const s=SHIFTS.find(x=>x.id===id);if(!s)return;
@@ -4548,7 +4551,7 @@ function markLateShift(id){if(!can('markLate')&&!can('editSchedules'))return;con
   document.getElementById('modalBody').innerHTML=`<div class="form-grid"><div class="form-group full"><label class="form-label">Schicht</label><div class="form-input" style="background:var(--bg-secondary);cursor:default">${s.label} · ${formatDateDE(s.date)} · ${s.from}–${s.to}</div></div><div class="form-group full"><label class="form-label">Minuten verspätet</label><input class="form-input" type="number" id="mlsMin" min="1" value="${s.lateMin||15}"></div></div>`;
   document.getElementById('modalFooter').innerHTML=`<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="saveLateShift(${id})">Vermerken</button>`;
   document.getElementById('modalOverlay').classList.remove('hidden');}
-function saveLateShift(id){const s=SHIFTS.find(x=>x.id===id);if(!s)return;const m=parseInt(document.getElementById('mlsMin').value);if(!m||m<=0){toast('Bitte gültige Minutenzahl eingeben','err');return;}s.isLate=true;s.lateMin=m;const e=EMPS.find(x=>x.id===s.empId);if(e){e.lateCount++;syncEmployeeField(e.id,'lateCount',e.lateCount);}addNotif('late','Verspätung',`${s.empName}: ${m} Min.`);syncUpdateShift(s);closeModal();toast('Verspätung vermerkt','warn');renderSchedule();}
+async function saveLateShift(id){const s=SHIFTS.find(x=>x.id===id);if(!s)return;const m=parseInt(document.getElementById('mlsMin').value);if(!m||m<=0){toast('Bitte gültige Minutenzahl eingeben','err');return;}s.isLate=true;s.lateMin=m;const e=EMPS.find(x=>x.id===s.empId);if(e){const nv=e.lateCount+1;const ok=await syncEmployeeField(e.id,'lateCount',nv);if(ok!==false)e.lateCount=nv;}addNotif('late','Verspätung',`${s.empName}: ${m} Min.`);syncUpdateShift(s);closeModal();toast('Verspätung vermerkt','warn');renderSchedule();}
 function copyWeek(){const ws2=getWeekStart(scheduleDate);const nw=new Date(ws2);nw.setDate(nw.getDate()+7);let c=0;
   for(let d=0;d<7;d++){const sd=new Date(ws2);sd.setDate(sd.getDate()+d);const dd=new Date(nw);dd.setDate(dd.getDate()+d);const sds=isoDate(sd),dds=isoDate(dd);
     const src=getVisibleShifts().filter(s=>s.date===sds);SHIFTS=SHIFTS.filter(s=>s.date!==dds);
@@ -5343,8 +5346,8 @@ function renderVacation(){
   vc.innerHTML=`<div class="vac-bento"><div class="vac-cal-card"><div class="vac-cal-toolbar"><div><h3 class="vac-cal-month">${MONTHS_DE[m]} ${y}</h3><p class="vac-cal-sub">${vacs.filter(v=>v.status==='approved').length} genehmigte Abwesenheiten</p></div><div class="vac-cal-nav"><button class="vac-nav-btn" onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()-1);renderVacation()"><span class="ms">chevron_left</span></button><button class="vac-today-btn" onclick="vacationCalendarMonth=new Date();renderVacation()">Heute</button><button class="vac-nav-btn" onclick="vacationCalendarMonth.setMonth(vacationCalendarMonth.getMonth()+1);renderVacation()"><span class="ms">chevron_right</span></button></div></div><div class="vac-cal-grid">${calCells}</div><div class="vac-legend"><div class="vac-legend-item"><div class="vac-legend-dot" style="background:var(--accent)"></div>Urlaub</div><div class="vac-legend-item"><div class="vac-legend-dot" style="background:var(--danger)"></div>Krankheit</div><div class="vac-legend-item"><div class="vac-legend-dot" style="background:#10b981"></div>Fortbildung</div></div></div><div class="vac-side-panel"><div class="vac-panel-card"><div class="vac-panel-header"><h4 class="vac-panel-title">Offene Antr\u00e4ge</h4><span class="vac-badge-count">${pendingVacs.length}</span></div>${pendingList.length?pendingList.map(v=>`<div class="vac-req-item"><div class="vac-req-avatar">${v.empName.split(' ').map(n=>n[0]).join('').substring(0,2)}</div><div class="vac-req-info"><div class="vac-req-name">${v.empName}</div><div class="vac-req-dates">${formatDateDE(v.from)} - ${formatDateDE(v.to)} (${v.days}T)</div></div>${can('approveVacations')?`<div class="vac-req-actions"><button class="vac-btn-approve" onclick="appVac(${v.id})" title="Antrag von ${v.empName} genehmigen" aria-label="Antrag von ${v.empName} genehmigen"><span class="ms">check</span></button><button class="vac-btn-reject" onclick="rejVac(${v.id})" title="Antrag von ${v.empName} ablehnen" aria-label="Antrag von ${v.empName} ablehnen"><span class="ms">close</span></button></div>`:''}</div>`).join(''):'<p class="vac-empty">Keine offenen Antr\u00e4ge</p>'}${pendingVacs.length>5?`<button class="vac-see-all" onclick="vacationTab='requests';renderVacation()">Alle Antr\u00e4ge sehen</button>`:''}</div></div></div>`;
 }
 
-function appVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(v){v.status='approved';syncVacationStatus(v.id,'approved');const e=EMPS.find(x=>x.id===v.empId);if(e){e.vacUsed+=v.days;syncEmployeeField(e.id,'vacUsed',e.vacUsed);}addNotif('vacation','Urlaub genehmigt',v.empName);toast('Genehmigt');renderVacation();updateBadges();}}
-function rejVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(v){v.status='rejected';syncVacationStatus(v.id,'rejected');addNotif('vacation','Urlaub abgelehnt',v.empName);toast('Abgelehnt','err');renderVacation();updateBadges();}}
+async function appVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(!v)return;const prev=v.status;v.status='approved';renderVacation();updateBadges();const ok=await syncVacationStatus(v.id,'approved');if(!ok){v.status=prev;toast('Fehler beim Speichern – nicht genehmigt','err');renderVacation();updateBadges();return;}const e=EMPS.find(x=>x.id===v.empId);if(e){e.vacUsed+=v.days;const okF=await syncEmployeeField(e.id,'vacUsed',e.vacUsed);if(!okF){e.vacUsed-=v.days;}}addNotif('vacation','Urlaub genehmigt',v.empName);toast('Genehmigt');renderVacation();updateBadges();}
+async function rejVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(!v)return;const prev=v.status;v.status='rejected';renderVacation();updateBadges();const ok=await syncVacationStatus(v.id,'rejected');if(!ok){v.status=prev;toast('Fehler beim Speichern','err');renderVacation();updateBadges();return;}addNotif('vacation','Urlaub abgelehnt',v.empName);toast('Abgelehnt','err');renderVacation();updateBadges();}
 
 // ═══ SICK ═══
 function renderSick(){
@@ -7264,10 +7267,11 @@ async function uploadAU(sickId, input) {
       sick.auUrl = urlData.publicUrl;
       sick.auFileName = file.name;
       // Update in DB
-      await sb.from('sick_leaves').update({
+      const { error: dbErr } = await sb.from('sick_leaves').update({
         has_au: true,
         au_url: sick.auUrl
       }).eq('id', sickId);
+      if (dbErr) { toast('Fehler beim Speichern: ' + dbErr.message, 'err'); return; }
     }
     toast('AU hochgeladen ✓');
     renderPage('sick');

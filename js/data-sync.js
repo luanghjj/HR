@@ -86,9 +86,10 @@ async function syncAddVacation(vac) {
 async function syncVacationStatus(vacId, status) {
   try {
     const { error } = await sb.from('vacations').update({ status }).eq('id', vacId);
-    if (error) console.warn('[Sync] Vacation status error:', error.message);
-    else console.log('[Sync] ✓ Vacation', vacId, '→', status);
-  } catch (e) { console.warn('[Sync]', e.message); }
+    if (error) { console.warn('[Sync] Vacation status error:', error.message); return false; }
+    console.log('[Sync] ✓ Vacation', vacId, '→', status);
+    return true;
+  } catch (e) { console.warn('[Sync]', e.message); return false; }
 }
 
 /**
@@ -140,9 +141,10 @@ async function syncEmployeeField(empId, field, value) {
     };
     const col = colMap[field] || field;
     const { error } = await sb.from('employees').update({ [col]: value }).eq('id', empId);
-    if (error) console.warn('[Sync] Field error:', error.message);
-    else console.log('[Sync] ✓', field, '=', value, 'for emp', empId);
-  } catch (e) { console.warn('[Sync]', e.message); }
+    if (error) { console.warn('[Sync] Field error:', error.message); return false; }
+    console.log('[Sync] ✓', field, '=', value, 'for emp', empId);
+    return true;
+  } catch (e) { console.warn('[Sync]', e.message); return false; }
 }
 
 /**
@@ -443,9 +445,10 @@ async function syncUpdateShift(shift) {
       shift_to: shift.to,
       label: shift.label || ''
     }).eq('id', shift.id);
-    if (error) console.warn('[Sync] Shift update error:', error.message);
-    else console.log('[Sync] ✓ Shift updated:', shift.id);
-  } catch (e) { console.warn('[Sync]', e.message); }
+    if (error) { console.warn('[Sync] Shift update error:', error.message); return false; }
+    console.log('[Sync] ✓ Shift updated:', shift.id);
+    return true;
+  } catch (e) { console.warn('[Sync]', e.message); return false; }
 }
 
 /**
