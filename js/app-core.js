@@ -2119,9 +2119,22 @@ function viewEmp(id){
 // ═══ DELETE EMPLOYEE (Inhaber only) ═══
 async function deleteEmployee(empId, empName) {
   if (!can('editEmployees')) return;
-  const confirmed = confirm(`⚠️ Mitarbeiter wirklich löschen?\n\n"${empName}" wird dauerhaft aus der Datenbank entfernt.\nDiese Aktion kann NICHT rückgängig gemacht werden!`);
+  const confirmed = confirm(`⚠️ Mitarbeiter wirklich löschen?\n\n"${empName}" wird dauerhaft entfernt – inkl. ALLER Schichten, Urlaube, Krankmeldungen, Zeiterfassung & Dokumente.\nDiese Aktion kann NICHT rückgängig gemacht werden!`);
   if (!confirmed) return;
   try {
+    // Abhängige Datensätze zuerst löschen (Foreign-Key-Constraints).
+    // Auch ALTE/zukünftige Schichten in der DB, die im UI gar nicht sichtbar sind.
+    const childTables = [
+      'shifts', 'vacations', 'sick_leaves', 'time_records', 'availability',
+      'documents', 'schule_schedule', 'ausbildungsnachweise', 'azubi_bewertungen',
+      'payment_status'
+    ];
+    for (const t of childTables) {
+      try { await sb.from(t).delete().eq('emp_id', empId); } catch(_) { /* Tabelle existiert evtl. nicht */ }
+    }
+    // Verknüpftes Login-Profil entkoppeln (emp_id → null), damit kein FK bricht
+    try { await sb.from('user_profiles').update({ emp_id: null }).eq('emp_id', empId); } catch(_) {}
+
     const { error } = await sb.from('employees').delete().eq('id', empId);
     if (error) { toast('❌ Fehler: ' + error.message, 'danger'); return; }
     // Remove from local array
