@@ -14,6 +14,7 @@ let scheduleDept = 'all';
 let scheduleShiftFilter = 'all'; // 'all' | 'on' (hat Schicht) | 'off' (ohne Schicht)
 let scheduleSearch = '';         // Suche nach Mitarbeitername
 let dragData = null;
+let copyShiftId = null;   // ID der Schicht im "Kopieren"-Modus
 
 // Vacation calendar state
 let vacationCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);

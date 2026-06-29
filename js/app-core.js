@@ -4065,7 +4065,12 @@ function renderSchedule(){
     </div>
   </div>`;
 
-  pg.innerHTML=banner+controls+'<div id="schedC"></div>';
+  let copyBar='';
+  if(copyShiftId!=null){
+    const cs=SHIFTS.find(x=>x.id===copyShiftId);
+    if(cs) copyBar=`<div class="sc2-copy-bar"><span class="ms" style="font-size:1.1rem">content_copy</span> Kopier-Modus: <strong>${cs.label} ${cs.from}–${cs.to}</strong> – auf ein freies Feld tippen zum Einfügen.<button class="sc2-copy-cancel" onclick="cancelCopyShift()">Abbrechen</button></div>`;
+  }
+  pg.innerHTML=banner+controls+copyBar+'<div id="schedC"></div>';
 
   const c=document.getElementById('schedC');
   if(scheduleView==='week'){
@@ -4160,7 +4165,7 @@ function renderSchedule(){
               ${canEdit?`draggable="true" ondragstart="onDragStart(event,${s.id})" ondragend="onDragEnd(event)"`:''}  data-sid="${s.id}">
               <div class="shift-name">${s.label}${s.isLate?' <span class="late-marker">⏰+'+s.lateMin+'m</span>':''}</div>
               <div class="shift-time">${s.from}–${s.to}</div>
-              ${canEdit?`<div class="shift-actions"><button class="shift-action-btn sick-btn" onclick="event.stopPropagation();markSick(${s.id})" title="Krank">🏥</button><button class="shift-action-btn vac-btn" onclick="event.stopPropagation();markVac(${s.id})" title="Urlaub">🏖️</button><button class="shift-action-btn late-btn" onclick="event.stopPropagation();markLateShift(${s.id})" title="Verspätet">⏰</button><button class="shift-action-btn" onclick="event.stopPropagation();deleteShift(${s.id})" title="Löschen" style="color:var(--danger)">🗑️</button></div>`:''}</div>`;
+              ${canEdit?`<div class="shift-actions"><button class="shift-action-btn" onclick="event.stopPropagation();startCopyShift(${s.id})" title="Kopieren">📋</button><button class="shift-action-btn sick-btn" onclick="event.stopPropagation();markSick(${s.id})" title="Krank">🏥</button><button class="shift-action-btn vac-btn" onclick="event.stopPropagation();markVac(${s.id})" title="Urlaub">🏖️</button><button class="shift-action-btn late-btn" onclick="event.stopPropagation();markLateShift(${s.id})" title="Verspätet">⏰</button><button class="shift-action-btn" onclick="event.stopPropagation();deleteShift(${s.id})" title="Löschen" style="color:var(--danger)">🗑️</button></div>`:''}</div>`;
           }
         });
 
@@ -4219,7 +4224,11 @@ function renderSchedule(){
           if(!ruheType){
             h+='<div class="ruhetag-cell"><span class="ruhetag-label">Ruhetag</span></div>';
           } else if(canEdit){
-            h+=`<div class="empty-cell-add" onclick="quickAddShift('${emp}','${ds}',${_empObj2?.id??'null'})" title="Schicht hinzufügen"><span class="ms">add</span></div>`;
+            if(copyShiftId!=null){
+              h+=`<div class="empty-cell-paste" onclick="pasteShiftTo('${emp}','${ds}',${_empObj2?.id??'null'})" title="Hierhin kopieren"><span class="ms">content_paste</span></div>`;
+            } else {
+              h+=`<div class="empty-cell-add" onclick="quickAddShift('${emp}','${ds}',${_empObj2?.id??'null'})" title="Schicht hinzufügen"><span class="ms">add</span></div>`;
+            }
           } else if(isOwnRow){
             // Mitarbeiter: eigene Zelle → Self-Service (nicht verfügbar / Urlaub)
             h+=`<div class="empty-cell-self" onclick="openSelfServiceCell(${empObj.id},'${ds}')" title="Nicht verfügbar / Urlaub beantragen"><span class="ms">more_horiz</span></div>`;
@@ -4445,10 +4454,37 @@ async function saveQuickShift() {
 // ═══ MOBILE BOTTOM SHEET FOR SHIFT ACTIONS ═══
 function isMobileView() { return window.innerWidth <= 768; }
 
+// ═══ SCHICHT KOPIEREN (Copy & Paste auf dem Plan) ═══
+function startCopyShift(shiftId){
+  if(!can('editSchedules'))return;
+  copyShiftId = shiftId;
+  renderSchedule();
+}
+function cancelCopyShift(){
+  copyShiftId = null;
+  renderSchedule();
+}
+async function pasteShiftTo(empName, date, empId){
+  if(!can('editSchedules')||copyShiftId==null)return;
+  const src = SHIFTS.find(x=>x.id===copyShiftId);
+  if(!src){ copyShiftId=null; renderSchedule(); return; }
+  const emp = (empId!=null && EMPS.find(e=>e.id===empId)) || EMPS.find(e=>e.name===empName);
+  if(!emp){ toast('Mitarbeiter nicht gefunden','err'); return; }
+  // Standort: aktueller wenn der MA dort arbeitet, sonst sein erster
+  const empLocs=(emp.location||'').split(',').map(l=>l.trim()).filter(Boolean);
+  const shiftLoc=(currentLocation!=='all'&&empLocs.includes(currentLocation))?currentLocation:(empLocs[0]||emp.location);
+  // Ruhetag prüfen
+  if(!getVacTypeForDate(date, shiftLoc)){ toast('Ruhetag – keine Schicht möglich','warn'); return; }
+  const ns={id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:shiftLoc,date,from:src.from,to:src.to,label:src.label,colorClass:getDeptColorClass(emp.dept),isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false};
+  SHIFTS.push(ns);
+  await syncAddShift(ns);
+  toast(`Schicht kopiert → ${emp.name.split(' ')[0]} ${formatDateDE(date)}`,'success');
+  renderSchedule(); // bleibt im Kopier-Modus → mehrfaches Einfügen möglich
+}
+
 function openShiftBS(shiftId, shiftType) {
   const s = SHIFTS.find(x => x.id === shiftId);
   if (!s) return;
-
   const overlay = document.getElementById('shiftBsOverlay');
   const panel = document.getElementById('shiftBsPanel');
   const title = document.getElementById('shiftBsTitle');
@@ -4468,6 +4504,7 @@ function openShiftBS(shiftId, shiftType) {
   } else {
     btns = `
       <button class="shift-bs-btn edit" onclick="closeShiftBS();editShift(${shiftId})"><span class="bs-icon">✏️</span><span class="bs-label">Bearbeiten</span></button>
+      <button class="shift-bs-btn" onclick="closeShiftBS();startCopyShift(${shiftId})"><span class="bs-icon">📋</span><span class="bs-label">Kopieren</span></button>
       <button class="shift-bs-btn sick" onclick="closeShiftBS();markSick(${shiftId})"><span class="bs-icon">🏥</span><span class="bs-label">Krank</span></button>
       <button class="shift-bs-btn vac" onclick="closeShiftBS();markVac(${shiftId})"><span class="bs-icon">🏖️</span><span class="bs-label">Urlaub</span></button>
       <button class="shift-bs-btn late" onclick="closeShiftBS();markLateShift(${shiftId})"><span class="bs-icon">⏰</span><span class="bs-label">Verspätet</span></button>
