@@ -214,6 +214,18 @@ function empHasLoc(entity, locFilter) {
   return eLocs.some(el => fLocs.includes(el));
 }
 
+/** Prüft, ob ein Bereich-Wert (kann komma-separiert sein, z.B. "Küche,Service")
+ *  einen gesuchten Bereich enthält. "Alle" matcht immer.
+ *  @param {string} deptValue - z.B. "Küche,Service" oder "Küche"
+ *  @param {string} target - gesuchter Bereich
+ */
+function deptMatches(deptValue, target) {
+  if (!deptValue) return false;
+  if (target === 'all' || target === 'Alle') return true;
+  const ds = deptValue.split(',').map(d => d.trim());
+  return ds.includes(target) || ds.includes('Alle');
+}
+
 /** Get employees visible to current user */
 function getVisibleEmps() {
   if (can('seeAllEmployees')) {
@@ -292,7 +304,7 @@ function getVisibleShifts() {
   }
   // Stufe 2 (Standard): Schichten des eigenen Bereichs am eigenen Standort
   const myDepts = (me.dept || '').split(',').map(d => d.trim()).filter(Boolean);
-  return SHIFTS.filter(s => empHasLoc(s, me.location) && myDepts.some(d => d === 'Alle' || d === s.dept));
+  return SHIFTS.filter(s => empHasLoc(s, me.location) && myDepts.some(d => d === 'Alle' || deptMatches(s.dept, d)));
 }
 
 /** Get documents visible to current user */

@@ -1050,7 +1050,7 @@ function renderDashboard(){
     const _dlr=document.getElementById('dashLocRows');
     if(_dlr){
       const locRows=LOCS.map((loc,i)=>{
-        const locShifts=todayShifts.filter(s=>s.location===loc.id);
+        const locShifts=todayShifts.filter(s=>empHasLoc(s,loc.id));
         const locCheckins=todayCheckins.filter(r=>locShifts.find(s=>s.empId===r.empId));
         const pct=locShifts.length>0?Math.round(locCheckins.length/locShifts.length*100):0;
         const dotColors=['var(--accent)','#a5b4fc','#cbd5e1'];
@@ -1677,7 +1677,7 @@ function filterEmps(q){const emps=getVisibleEmps().filter(e=>e.name.toLowerCase(
 function filterEmpsByDept(dept,btn){
   document.querySelectorAll('.mit-dept-pill').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
-  const emps=dept==='all'?getVisibleEmps():getVisibleEmps().filter(e=>e.dept===dept);
+  const emps=dept==='all'?getVisibleEmps():getVisibleEmps().filter(e=>deptMatches(e.dept,dept));
   renderEmpRows(emps);
 }
 
@@ -3759,7 +3759,7 @@ function renderDepts(){
   if(!deptCards.length) html+=`<div class="dept-empty"><span class="ms">domain</span><p>Keine Bereiche gefunden.</p></div>`;
 
   deptCards.forEach(({dept,loc})=>{
-    const deptEmps=EMPS.filter(e=>e.dept===dept.name&&empHasLoc(e,loc));
+    const deptEmps=EMPS.filter(e=>deptMatches(e.dept,dept.name)&&empHasLoc(e,loc));
     const activeCount=deptEmps.filter(e=>e.status==='active').length;
     const sickCount=deptEmps.filter(e=>e.status==='sick').length;
     const vacCount=deptEmps.filter(e=>e.status==='vacation').length;
@@ -3767,7 +3767,7 @@ function renderDepts(){
     const sollHours=deptEmps.reduce((s,e)=>s+e.sollStunden,0);
     const hoursPct=sollHours>0?Math.round(totalHours/sollHours*100):0;
     const totalCost=isAdmin?deptEmps.reduce((s,e)=>s+e.bruttoGehalt,0):0;
-    const todayShifts=SHIFTS.filter(s=>s.dept===dept.name&&s.location===loc&&s.date===today&&!s.isSick&&!s.isVacation);
+    const todayShifts=SHIFTS.filter(s=>deptMatches(s.dept,dept.name)&&empHasLoc(s,loc)&&s.date===today&&!s.isSick&&!s.isVacation);
     const deptId='dept_'+dept.id+'_'+loc;
     const city=LOCS.find(l=>l.id===loc)?.name||LOCS.find(l=>l.id===loc)?.city||'';
     const pctColor=hoursPct>=90?'#10b981':hoursPct>=70?'#f59e0b':'#ef4444';
@@ -3883,14 +3883,14 @@ function renderDepts(){
   html+=`</div>`;
 
   if(isAdmin && deptCards.length){
-    const totalCostAll=deptCards.reduce((sum,{dept,loc})=>sum+EMPS.filter(e=>e.dept===dept.name&&empHasLoc(e,loc)).reduce((s,e)=>s+e.bruttoGehalt,0),0);
+    const totalCostAll=deptCards.reduce((sum,{dept,loc})=>sum+EMPS.filter(e=>deptMatches(e.dept,dept.name)&&empHasLoc(e,loc)).reduce((s,e)=>s+e.bruttoGehalt,0),0);
     const avgPct=deptCards.length>0?Math.round(deptCards.map(({dept,loc})=>{
-      const de=EMPS.filter(e=>e.dept===dept.name&&empHasLoc(e,loc));
+      const de=EMPS.filter(e=>deptMatches(e.dept,dept.name)&&empHasLoc(e,loc));
       const th=de.reduce((s,e)=>s+calcPlanHours(e.id),0);
       const sh=de.reduce((s,e)=>s+e.sollStunden,0);
       return sh>0?th/sh*100:0;
     }).reduce((a,b)=>a+b,0)/deptCards.length):0;
-    const totalToday=SHIFTS.filter(s=>s.date===today&&deptCards.some(({dept,loc})=>dept.name===s.dept&&loc===s.location)&&!s.isSick&&!s.isVacation).length;
+    const totalToday=SHIFTS.filter(s=>s.date===today&&deptCards.some(({dept,loc})=>deptMatches(s.dept,dept.name)&&empHasLoc(s,loc))&&!s.isSick&&!s.isVacation).length;
 
     html+=`
     <div class="dept-insight-grid">
@@ -4088,7 +4088,7 @@ function renderSchedule(){
     const sortBy=scheduleSort;
     if(sortBy==='dept'){
       emps.sort((a,b)=>{
-        const da=EMPS.find(e=>e.name===a)?.dept||'';const db=EMPS.find(e=>e.name===b)?.dept||'';
+        const da=(EMPS.find(e=>e.name===a)?.dept||'').split(',')[0].trim();const db=(EMPS.find(e=>e.name===b)?.dept||'').split(',')[0].trim();
         return da.localeCompare(db)||a.localeCompare(b);
       });
     } else if(sortBy==='hours'){
