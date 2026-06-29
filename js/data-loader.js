@@ -17,6 +17,14 @@ async function loadDataFromSupabase() {
   try {
     console.log('[Data] Loading from Supabase...');
 
+    // Lite-Load: normale Mitarbeiter/Azubi laden NICHT die admin-/finanzlastigen
+    // Tabellen (gehaelter, payment_status, employee_submissions, closed_months,
+    // checklists, shift_templates). Azubi behält die Ausbildungstabellen.
+    const _role = currentUser?.role;
+    const liteLoad = !!currentUser && _role !== 'inhaber' && _role !== 'manager'
+      && !(typeof can === 'function' && can('seeAllEmployees'));
+    const isAzubi = _role === 'azubi';
+
     // Load user profiles (USERS array)
     const { data: profiles, error: profErr } = await sb.from('user_profiles').select('*');
     if (profErr) console.warn('[Data] user_profiles:', profErr.message);
@@ -234,7 +242,8 @@ async function loadDataFromSupabase() {
       }));
     }
 
-    // Load Azubi data: training logs
+    // Load Azubi data: training logs (nur Azubi/Admin)
+    if (!liteLoad || isAzubi) {
     const { data: nachweise } = await sb.from('ausbildungsnachweise').select('*').order('woche_start', { ascending: false });
     if (nachweise) {
       AUSBILDUNGSNACHWEISE.length = 0;
@@ -262,6 +271,7 @@ async function loadDataFromSupabase() {
         kommentar: b.kommentar || ''
       }));
     }
+    } // end Azubi-Daten
 
     // Load time records (today + last 30 days for history)
     const trStart = new Date();
@@ -306,7 +316,8 @@ async function loadDataFromSupabase() {
       ) || null;
     }
 
-    // Load checklists (graceful – table may not exist yet)
+    // Load checklists (graceful – table may not exist yet); nur Admin
+    if (!liteLoad) {
     const { data: chkData, error: chkErr } = await sb
       .from('checklists').select('*').order('id');
     if (!chkErr && chkData && chkData.length > 0) {
@@ -335,9 +346,13 @@ async function loadDataFromSupabase() {
       }));
     }
     // else: keep static SAVED_TEMPLATES from data.js as fallback
+    } // end Admin-only (checklists, templates)
+
 
     console.log(`[Data] ✓ Loaded: ${LOCS.length} locations, ${DEPTS.length} depts, ${EMPS.length} employees, ${VACS.length} vacations, ${SICKS.length} sick leaves, ${DOCS.length} documents, ${CHECKLISTS.length} checklists, ${SAVED_TEMPLATES.length} templates, ${SCHULE_SCHEDULE.length} school days, ${AUSBILDUNGSNACHWEISE.length} training logs, ${AZUBI_BEWERTUNGEN.length} evaluations, ${TIME_RECORDS.length} time records`);
 
+    // Finanz-/Admin-Tabellen: nur für Admin/Manager laden
+    if (!liteLoad) {
     // Load payment_status for current month (for table display)
     const nowM = new Date();
     const curMonth = nowM.getFullYear() + '-' + String(nowM.getMonth()+1).padStart(2,'0') + '-01';
@@ -368,6 +383,8 @@ async function loadDataFromSupabase() {
       CLOSED_MONTHS.clear();
       if (!closedErr && closedData) closedData.forEach(r => CLOSED_MONTHS.add(r.month));
     } catch(_) { /* table not yet created – ignore */ }
+    } // end Finanz-/Admin-Tabellen
+
 
     // Load Aushilfe slots (current + future, 3 months ahead)
     const aushilfeStart = new Date();
@@ -460,7 +477,8 @@ async function loadDataFromSupabase() {
       }
     } catch (_) { /* table may not exist yet */ }
 
-    // Load employee_submissions (Aushilfe worker list for admin view)
+    // Load employee_submissions (Aushilfe worker list for admin view); nur Admin
+    if (!liteLoad) {
     try {
       const { data: subs, error: subsErr } = await sb.from('employee_submissions')
         .select('*')
@@ -489,6 +507,8 @@ async function loadDataFromSupabase() {
         console.log('[Data] ✓ ' + AUSHILFE_SUBMISSIONS.length + ' Aushilfe submissions loaded');
       }
     } catch (_) { /* employee_submissions may not exist */ }
+    } // end Admin-only (employee_submissions)
+
 
 
     // Run auto-checkout after data load
