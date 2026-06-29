@@ -652,9 +652,9 @@ function announcementBannerHtml(){
         <div class="ann-banner-meta">${locLbl}</div>
       </div>
       <div class="ann-banner-actions">
-        ${canManage&&a.mandatory?`<button class="ann-banner-del" onclick="openReadStatsModal(${a.id})" title="Gelesen von"><span class="ms" style="font-size:18px">visibility</span></button>`:''}
-        ${canManage?`<button class="ann-banner-del" onclick="deleteAnnouncement(${a.id})" title="Zurückziehen"><span class="ms" style="font-size:18px">delete</span></button>`:''}
-        <button class="ann-banner-close" onclick="dismissAnnouncement(${a.id})" title="Ausblenden"><span class="ms" style="font-size:18px">close</span></button>
+        ${canManage&&a.mandatory?`<button class="ann-banner-del" onclick="openReadStatsModal(${a.id})" title="Gelesen von" aria-label="Gelesen von anzeigen"><span class="ms" style="font-size:18px">visibility</span></button>`:''}
+        ${canManage?`<button class="ann-banner-del" onclick="deleteAnnouncement(${a.id})" title="Zurückziehen" aria-label="Mitteilung zurückziehen"><span class="ms" style="font-size:18px">delete</span></button>`:''}
+        <button class="ann-banner-close" onclick="dismissAnnouncement(${a.id})" title="Ausblenden" aria-label="Mitteilung ausblenden"><span class="ms" style="font-size:18px">close</span></button>
       </div>
     </div>`;
   }).join('');

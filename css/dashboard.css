@@ -443,7 +443,8 @@
 .ann-banner-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .ann-banner-close, .ann-banner-del {
   border: none; background: none; cursor: pointer; color: var(--text-muted);
-  display: flex; align-items: center; padding: 2px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  min-width: 40px; min-height: 40px; padding: 6px; border-radius: 8px;
 }
 .ann-banner-close:hover { color: var(--text-primary); background: rgba(0,0,0,.05); }
 .ann-banner-del:hover { color: var(--danger); background: rgba(239,68,68,.08); }
