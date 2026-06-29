@@ -808,6 +808,9 @@ function renderDashboard(){
     const bannerStyle = bannerImg ? `background-image:url('${bannerImg}');background-size:cover;background-position:center;` : '';
     const locLogos = {origami:'🍣',enso:'🍜',okyu:'🍱',omoistuttgart:'☕'};
     const locLogo = locLogos[currentLocation] || locLogos[currentUser.location] || '🏢';
+    // Cache: Plan-Stunden je MA einmal berechnen (statt 4× im Template)
+    const _totalPlanH = emps.reduce((s,e)=>s+calcPlanHours(e.id),0);
+    const _totalSoll = emps.reduce((s,e)=>s+e.sollStunden,0);
 
     pg.innerHTML=`
       <!-- Welcome Banner -->
@@ -937,26 +940,26 @@ function renderDashboard(){
                 <svg width="160" height="160" viewBox="0 0 160 160">
                   <circle cx="80" cy="80" r="62" fill="transparent" stroke="var(--bg-input)" stroke-width="18"/>
                   <circle cx="80" cy="80" r="62" fill="transparent" stroke="rgba(59,79,210,.55)"
-                    stroke-dasharray="${2*Math.PI*62}" stroke-dashoffset="${2*Math.PI*62*(1-Math.min(emps.reduce((s,e)=>s+calcPlanHours(e.id),0)/(emps.reduce((s,e)=>s+e.sollStunden,0)||1),1))}"
+                    stroke-dasharray="${2*Math.PI*62}" stroke-dashoffset="${2*Math.PI*62*(1-Math.min(_totalPlanH/(_totalSoll||1),1))}"
                     stroke-linecap="round" stroke-width="18"/>
                   <circle cx="80" cy="80" r="38" fill="transparent" stroke="var(--bg-input)" stroke-width="18"/>
                   <circle cx="80" cy="80" r="38" fill="transparent" stroke="#818cf8"
-                    stroke-dasharray="${2*Math.PI*38}" stroke-dashoffset="${2*Math.PI*38*(1-Math.min(emps.reduce((s,e)=>s+calcPlanHours(e.id),0)/(emps.reduce((s,e)=>s+e.sollStunden,0)||1),1))}"
+                    stroke-dasharray="${2*Math.PI*38}" stroke-dashoffset="${2*Math.PI*38*(1-Math.min(_totalPlanH/(_totalSoll||1),1))}"
                     stroke-linecap="round" stroke-width="18"/>
                 </svg>
                 <div class="dash-donut-center">
                   <div class="dash-donut-center-lbl">Ist-Stunden</div>
-                  <div class="dash-donut-center-val">${emps.reduce((s,e)=>s+calcPlanHours(e.id),0)}</div>
+                  <div class="dash-donut-center-val">${_totalPlanH}</div>
                 </div>
               </div>
               <div class="dash-donut-legend">
                 <div class="dash-donut-legend-item">
                   <div class="dash-donut-legend-label"><span class="dash-donut-legend-dot" style="background:rgba(59,79,210,.55)"></span>Soll</div>
-                  <div class="dash-donut-legend-val">${emps.reduce((s,e)=>s+e.sollStunden,0)}h</div>
+                  <div class="dash-donut-legend-val">${_totalSoll}h</div>
                 </div>
                 <div class="dash-donut-legend-item">
                   <div class="dash-donut-legend-label"><span class="dash-donut-legend-dot" style="background:#818cf8"></span>Ist (geplant)</div>
-                  <div class="dash-donut-legend-val">${emps.reduce((s,e)=>s+calcPlanHours(e.id),0)}h</div>
+                  <div class="dash-donut-legend-val">${_totalPlanH}h</div>
                 </div>
               </div>
             </div>
@@ -2154,6 +2157,7 @@ async function renderDashPayOverview(monthStr) {
   const { data: payRows, error: payErr } = await sb.from('payment_status').select('*').eq('month', monthDate);
   if (payErr) { el.innerHTML = '<span style="color:var(--danger);font-size:.82rem">Zahlungsdaten konnten nicht geladen werden.</span>'; return; }
   const rows = payRows || [];
+  const rowMap = new Map(rows.map(r => [r.emp_id, r])); // O(1)-Lookup statt rows.find()
 
   const emps = getVisibleEmps().filter(e => e.bruttoGehalt > 0);
   const totalUeb = emps.filter(e => (e.nettoGehalt || (e.bruttoGehalt - (e.barGehalt||0))) > 0).length;
@@ -2168,8 +2172,8 @@ async function renderDashPayOverview(monthStr) {
   // Totals
   const totalUebSum = emps.reduce((s,e) => s + Math.max(0, e.bruttoGehalt-(e.barGehalt||0)), 0);
   const totalBarSum = emps.reduce((s,e) => s + (e.barGehalt||0), 0);
-  const paidUebSum = emps.filter(e => rows.find(r=>r.emp_id===e.id&&r.ueb_status==='bezahlt')).reduce((s,e)=>s+Math.max(0,e.bruttoGehalt-(e.barGehalt||0)),0);
-  const paidBarSum = emps.filter(e => rows.find(r=>r.emp_id===e.id&&r.bar_status==='bezahlt')).reduce((s,e)=>s+(e.barGehalt||0),0);
+  const paidUebSum = emps.filter(e => rowMap.get(e.id)?.ueb_status==='bezahlt').reduce((s,e)=>s+Math.max(0,e.bruttoGehalt-(e.barGehalt||0)),0);
+  const paidBarSum = emps.filter(e => rowMap.get(e.id)?.bar_status==='bezahlt').reduce((s,e)=>s+(e.barGehalt||0),0);
 
   const pct = (a,b) => b > 0 ? Math.round(a/b*100) : 0;
 
@@ -2190,12 +2194,12 @@ async function renderDashPayOverview(monthStr) {
     const bankEmps = bankGroups[bank];
     const bankTotal = bankEmps.reduce((s,e) => s + Math.max(0, e.bruttoGehalt-(e.barGehalt||0)), 0);
     const bankPaidTotal = bankEmps
-      .filter(e => rows.find(r => r.emp_id===e.id && r.ueb_status==='bezahlt'))
+      .filter(e => rowMap.get(e.id)?.ueb_status==='bezahlt')
       .reduce((s,e) => s + Math.max(0, e.bruttoGehalt-(e.barGehalt||0)), 0);
     const allPaid = bankPaidTotal >= bankTotal && bankTotal > 0;
 
     const bankRows = bankEmps.map(e => {
-      const ps = rows.find(r => r.emp_id === e.id);
+      const ps = rowMap.get(e.id);
       const uebAmt = Math.max(0, e.bruttoGehalt - (e.barGehalt||0));
       const uebSt = ps?.ueb_status || 'ausstehend';
       return `<tr style="border-bottom:1px solid var(--border-light)">
@@ -2230,7 +2234,7 @@ async function renderDashPayOverview(monthStr) {
   // ── BAR employees table ───────────────────────────────────
   const barEmps = emps.filter(e => (e.barGehalt||0) > 0);
   const barRowsHtml = barEmps.map(e => {
-    const ps = rows.find(r => r.emp_id === e.id);
+    const ps = rowMap.get(e.id);
     const barAmt = e.barGehalt || 0;
     const barSt = ps?.bar_status || 'ausstehend';
     return `<tr style="border-bottom:1px solid var(--border-light)">
