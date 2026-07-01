@@ -5722,8 +5722,19 @@ function openCreateUserModal() {
   const locOptions = `<option value="all">🌍 Alle Standorte</option>` +
     LOCS.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
   const deptOptions = [...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob','Aushilfe', ...DEPTS.map(d => d.name)].filter(Boolean))].map(d => `<option value="${d}">${d}</option>`).join('');
-  const empOptions = EMPS.slice().sort((a,b)=>a.name.localeCompare(b.name))
-    .map(e => `<option value="${e.id}">${e.name} · ${getLocationName(e.location)}</option>`).join('');
+  // Mitarbeiter: nach aktuellem Standort filtern; wer schon einen Zugang hat, markieren.
+  // Ohne Zugang zuerst (leichter neue anzulegen).
+  const empHasZugang = e => USERS.some(u => u.empId === e.id && u.regEmail);
+  const empPool = EMPS
+    .filter(e => (e.status==='active'||e.status==='aktiv'))
+    .filter(e => currentLocation==='all' ? true : empHasLoc(e, currentLocation))
+    .sort((a,b) => {
+      const za = empHasZugang(a), zb = empHasZugang(b);
+      if (za !== zb) return za ? 1 : -1;       // ohne Zugang zuerst
+      return a.name.localeCompare(b.name);
+    });
+  const empOptions = empPool
+    .map(e => `<option value="${e.id}">${empHasZugang(e)?'✓ ':''}${e.name} · ${getLocationName(e.location)}${empHasZugang(e)?' (hat Zugang)':''}</option>`).join('');
 
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
