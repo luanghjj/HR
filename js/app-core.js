@@ -5591,6 +5591,31 @@ function renderAccess(){
     </tr>`;
   }).join('');
 
+  // Mitarbeiter OHNE Zugang (am aktuellen Standort) – zum schnellen Freischalten
+  const linkedEmpIds = new Set(USERS.map(u => u.empId).filter(Boolean));
+  let noZugangEmps = EMPS.filter(e => (e.status==='active'||e.status==='aktiv') && !linkedEmpIds.has(e.id));
+  if (currentLocation !== 'all') noZugangEmps = noZugangEmps.filter(e => empHasLoc(e, currentLocation));
+  noZugangEmps.sort((a,b)=>a.name.localeCompare(b.name));
+  const noZugangRows = noZugangEmps.map(e => {
+    const locTags = (e.location||'').split(',').map(l=>l.trim()).filter(Boolean)
+      .map(lid=>`<span style="display:inline-block;font-size:.7rem;font-weight:600;background:rgba(99,102,241,.08);color:var(--accent);padding:2px 8px;border-radius:10px;margin:1px 2px">${getLocationName(lid)}</span>`).join('') || '<span style="color:var(--text-muted);font-size:.75rem">—</span>';
+    const initials = (e.name||'').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    return `<tr style="background:rgba(234,179,8,.05)">
+      <td><div style="display:flex;align-items:center;gap:10px">
+        <div class="emp-avatar" style="background:#eab308">${initials}</div>
+        <div>
+          <div style="font-weight:600;font-size:.88rem">${e.name}</div>
+          <span style="font-size:.74rem;color:#a16207">⚠️ noch kein Zugang</span>
+        </div>
+      </div></td>
+      <td><span style="font-size:.82rem;color:var(--text-secondary)">${e.position||'—'}</span></td>
+      <td><span style="font-size:.82rem;color:var(--text-muted)">—</span></td>
+      <td>${locTags}</td>
+      <td>${statusBadge(e.status)}</td>
+      <td><button class="btn btn-sm btn-success" onclick="openCreateUserModal(${e.id})" style="font-weight:600"><span class="ms" style="font-size:16px">person_add</span> Zugang erstellen</button></td>
+    </tr>`;
+  }).join('');
+  rows += noZugangRows;
   const sortBtnLoc = accessSort === 'location' ? 'btn-primary' : '';
   const sortBtnName = accessSort === 'name' ? 'btn-primary' : '';
 
@@ -5718,7 +5743,7 @@ function genPassword(len = 10) {
 }
 
 // ═══ CREATE NEW USER MODAL ═══
-function openCreateUserModal() {
+function openCreateUserModal(preEmpId) {
   const locOptions = `<option value="all">🌍 Alle Standorte</option>` +
     LOCS.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
   const deptOptions = [...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob','Aushilfe', ...DEPTS.map(d => d.name)].filter(Boolean))].map(d => `<option value="${d}">${d}</option>`).join('');
@@ -5819,6 +5844,11 @@ function openCreateUserModal() {
   </div>`;
   document.body.appendChild(modal);
   requestAnimationFrame(() => modal.classList.add('show'));
+  // Wenn ein Mitarbeiter vorgegeben ist (Button "Zugang erstellen"): vorauswählen
+  if (preEmpId != null) {
+    const sel = document.getElementById('newUserEmpSel');
+    if (sel) sel.value = String(preEmpId);
+  }
 }
 
 function cuToggleEmpMode() {
