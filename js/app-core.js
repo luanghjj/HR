@@ -4095,7 +4095,9 @@ function renderSchedule(){
       const scopeEmps=getVisibleEmps().filter(e=>(e.status==='active'||e.status==='aktiv'));
       scopeEmps.forEach(e=>{
         if(emps.includes(e.name)) return; // already added (has shift)
-        // Show if: has a Zugang (user account) OR has an upcoming shift in next 4 weeks
+        // Bei konkretem Standort: alle aktiven MA zeigen (auch neue ohne Zugang/Schicht).
+        // Bei "Alle Standorte": nur mit Zugang oder baldiger Schicht (sonst zu lange Liste).
+        if(currentLocation!=='all'){ emps.push(e.name); return; }
         const hasZugang = USERS.some(u => u.empId === e.id);
         const hasFutureShift = SHIFTS.some(s => s.empId === e.id && s.date >= todayStr && s.date <= futureStr && !s.isSick && !s.isVacation);
         if(hasZugang || hasFutureShift) emps.push(e.name);
