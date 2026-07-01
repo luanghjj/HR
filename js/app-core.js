@@ -1450,7 +1450,7 @@ function renderEmpRows(emps){
   const _ys1=isoDate(new Date(new Date().getFullYear(),0,1));
   const DEPT_COLORS={'Küche':'#10b981','Service':'#3b4fd2','Bar':'#f97316','Sushi':'#8b5cf6','Ausbildung':'#a29bfe','Verwaltung':'#e11d48'};
   const canEditDept = can('editEmployees');
-  const BEREICH_OPTS = [...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob', ...DEPTS.map(d=>d.name)].filter(Boolean))];
+  const BEREICH_OPTS = [...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob','Aushilfe', ...DEPTS.map(d=>d.name)].filter(Boolean))];
 
   // Badge-Farben pro Standort
   const LOC_BADGE_COLORS = {origami:'#6366f1',enso:'#d97706',okyu:'#dc2626',omoistuttgart:'#059669'};
@@ -1851,7 +1851,7 @@ function viewEmp(id){
   const vr=e.vacTotal-e.vacUsed,pl=ev.filter(v=>(v.status==='approved'||v.status==='pending')&&v.from>='2026-03-20').reduce((s,v)=>s+v.days,0);
   const planH=calcPlanHours(e.id);
   const hourly=calcHourly(e);
-  const deptOpts=[...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob', ...DEPTS.map(d=>d.name), e.dept].filter(Boolean))];
+  const deptOpts=[...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob','Aushilfe', ...DEPTS.map(d=>d.name), e.dept].filter(Boolean))];
 
   let adminSection='';
   if(isAdmin){
@@ -3533,7 +3533,7 @@ async function saveLate(empId){if(!can('markLate')&&!can('editSchedules'))return
 // ═══ DEPARTMENTS ═══
 // Standard-Bereiche, falls für einen Standort (noch) keine departments-Zeilen
 // in der DB existieren (aktuell nur Origami gepflegt → Enso/Okyu/OMoi leer).
-const STANDARD_BEREICHE = ['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob','Minijob'];
+const STANDARD_BEREICHE = ['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob','Aushilfe','Aushilfe'];
 
 /** Save Leitung (head) for a department to Supabase.
  *  If the dept is synthetic (no DB row yet), auto-creates it first. */
@@ -3602,7 +3602,7 @@ async function saveDeptHead(deptId, newHead) {
     toast('Fehler beim Speichern: ' + err.message, 'err');
   }
 }
-const _BEREICH_COLORS = {'Küche':'#fdcb6e','Service':'#74b9ff','Bar':'#00b894','Sushi':'#fd79a8','Ausbildung':'#e17055','Verwaltung':'#a29bfe','Minijob':'#14b8a6'};
+const _BEREICH_COLORS = {'Küche':'#fdcb6e','Service':'#74b9ff','Bar':'#00b894','Sushi':'#fd79a8','Ausbildung':'#e17055','Verwaltung':'#a29bfe','Minijob':'#14b8a6','Aushilfe':'#eab308'};
 
 /** Bereiche eines Standorts.
  *  Gibt DB-Rows zurück; fehlende Standard-Bereiche werden als Synthetic ergänzt. */
@@ -5719,7 +5719,7 @@ function genPassword(len = 10) {
 function openCreateUserModal() {
   const locOptions = `<option value="all">🌍 Alle Standorte</option>` +
     LOCS.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-  const deptOptions = [...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob', ...DEPTS.map(d => d.name)].filter(Boolean))].map(d => `<option value="${d}">${d}</option>`).join('');
+  const deptOptions = [...new Set(['Küche','Sushi','Service','Bar','Ausbildung','Verwaltung','Minijob','Aushilfe', ...DEPTS.map(d => d.name)].filter(Boolean))].map(d => `<option value="${d}">${d}</option>`).join('');
   const empOptions = EMPS.slice().sort((a,b)=>a.name.localeCompare(b.name))
     .map(e => `<option value="${e.id}">${e.name} · ${getLocationName(e.location)}</option>`).join('');
 
