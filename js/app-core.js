@@ -3585,10 +3585,41 @@ function updateEmpField(empId, field, value){
   toast(field==='schuleTage'?'Schule/Fortbildung aktualisiert':'Aktualisiert');
   syncEmployeeField(empId, field, e[field]);
 }
+// Namen überall synchron halten (name + emp_name in allen abhängigen Tabellen)
+async function syncEmployeeNameEverywhere(empId, newName){
+  const e=EMPS.find(x=>x.id===empId); if(e) e.name=newName;
+  SHIFTS.forEach(s=>{ if(s.empId===empId) s.empName=newName; });
+  if(typeof VACS!=='undefined') VACS.forEach(v=>{ if(v.empId===empId) v.empName=newName; });
+  if(typeof SICKS!=='undefined') SICKS.forEach(s=>{ if(s.empId===empId) s.empName=newName; });
+  if(typeof DOCS!=='undefined') DOCS.forEach(d=>{ if(d.empId===empId) d.empName=newName; });
+  if(typeof AVAILABILITY!=='undefined') AVAILABILITY.forEach(a=>{ if(a.empId===empId) a.empName=newName; });
+  const u=USERS.find(x=>x.empId===empId); if(u) u.name=newName;
+  // DB (jeweils eigenständig – fehlende Tabelle bricht nichts)
+  try{ await sb.from('employees').update({name:newName}).eq('id',empId); }catch(_){}
+  try{ await sb.from('shifts').update({emp_name:newName}).eq('emp_id',empId); }catch(_){}
+  try{ await sb.from('vacations').update({emp_name:newName}).eq('emp_id',empId); }catch(_){}
+  try{ await sb.from('sick_leaves').update({emp_name:newName}).eq('emp_id',empId); }catch(_){}
+  try{ await sb.from('documents').update({emp_name:newName}).eq('emp_id',empId); }catch(_){}
+  try{ await sb.from('availability').update({emp_name:newName}).eq('emp_id',empId); }catch(_){}
+  try{ await sb.from('user_profiles').update({name:newName}).eq('emp_id',empId); }catch(_){}
+}
+
 async function updateEmpText(empId, field, value){
   const e=EMPS.find(x=>x.id===empId);if(!e)return;
   e[field]=value;
   syncEmployeeField(empId, field, value);
+  // Vor-/Nachname geändert → vollständigen Namen neu bilden und überall syncen
+  if(field==='firstName' || field==='lastName'){
+    const newName=`${e.firstName||''} ${e.lastName||''}`.trim();
+    if(newName){
+      await syncEmployeeNameEverywhere(empId, newName);
+      const mt=document.getElementById('modalTitle');
+      if(mt && mt.textContent.startsWith('Mitarbeiter:')) mt.textContent='Mitarbeiter: '+newName;
+      if(getCurrentPage()==='schedule') renderSchedule();
+    }
+    toast('Name aktualisiert: '+(newName||'—'));
+    return;
+  }
   // Standort/Bereich-Wechsel: zukünftige Schichten (ab heute) mitziehen
   if(field==='dept'||field==='location'){
     const moved=await syncFutureShiftsForEmp(empId, field, value);
