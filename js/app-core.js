@@ -4046,8 +4046,44 @@ function renderDepts(){
 }
 
 // ═══ SCHEDULE ═══
-function setView(v,btn){scheduleView=v;renderSchedule();}
-function schedNav(dir){if(scheduleView==='day')scheduleDate.setDate(scheduleDate.getDate()+dir);else if(scheduleView==='week')scheduleDate.setDate(scheduleDate.getDate()+7*dir);else scheduleDate.setMonth(scheduleDate.getMonth()+dir);renderSchedule();}
+// Lädt Schichten für den sichtbaren Zeitraum NACH und merged sie in SHIFTS
+// (nur fehlende, per id). So sind auch alte/zukünftige Wochen bearbeitbar,
+// ohne den vorhandenen Datenbestand zu ersetzen.
+const _loadedShiftRanges = [];
+async function ensureShiftsLoaded(){
+  // Sichtbaren Bereich je nach Ansicht bestimmen
+  let start, end;
+  if(scheduleView==='month'){
+    start=new Date(scheduleDate.getFullYear(),scheduleDate.getMonth(),1);
+    end=new Date(scheduleDate.getFullYear(),scheduleDate.getMonth()+1,0);
+  } else if(scheduleView==='day'){
+    start=new Date(scheduleDate); end=new Date(scheduleDate);
+  } else {
+    start=getWeekStart(scheduleDate); end=new Date(start); end.setDate(end.getDate()+6);
+  }
+  const sISO=isoDate(start), eISO=isoDate(end);
+  // Schon geladen? (grobe Deckung reicht)
+  if(_loadedShiftRanges.some(r=>r.s<=sISO && r.e>=eISO)) return;
+  try{
+    const { data, error } = await sb.from('shifts').select('*')
+      .gte('shift_date', sISO).lte('shift_date', eISO);
+    if(error) return;
+    const existing = new Set(SHIFTS.map(s=>s.id));
+    (data||[]).forEach(s=>{
+      if(existing.has(s.id)) return;
+      SHIFTS.push({
+        id:s.id, empId:s.emp_id, empName:s.emp_name, dept:s.dept, location:s.location,
+        date:s.shift_date, from:s.shift_from?.substring(0,5)||'09:00', to:s.shift_to?.substring(0,5)||'17:00',
+        label:s.label||'', colorClass:s.label==='Schule'?'schule':(s.color_class||getDeptColorClass(s.dept)),
+        isSick:s.is_sick||false, isVacation:s.is_vacation||false, isLate:s.is_late||false,
+        lateMin:s.late_min||0, vacHalf:s.vac_half||false, pauseMinutes:(s.pause_minutes??null)
+      });
+    });
+    _loadedShiftRanges.push({s:sISO,e:eISO});
+  }catch(_){ /* offline/keine Rechte – still */ }
+}
+async function setView(v,btn){scheduleView=v;await ensureShiftsLoaded();renderSchedule();}
+async function schedNav(dir){if(scheduleView==='day')scheduleDate.setDate(scheduleDate.getDate()+dir);else if(scheduleView==='week')scheduleDate.setDate(scheduleDate.getDate()+7*dir);else scheduleDate.setMonth(scheduleDate.getMonth()+dir);await ensureShiftsLoaded();renderSchedule();}
 
 function renderSchedule(){
   const pg=document.getElementById('page-schedule');
