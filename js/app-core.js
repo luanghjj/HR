@@ -1803,6 +1803,88 @@ async function fetchMonthlyHours(empId){
     return { label:b.label, brutto, netto, count:b.count, lateMin:b.lateMin };
   });
 }
+// Detaillierte Schichten EINES Monats (jede Schicht mit Zeit, Pause, Verspätung)
+async function fetchMonthDetail(empId, year, month){
+  const emp = EMPS.find(e=>e.id===empId);
+  const pauseMin = emp?.pauseMinutes ?? 30;
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month+1, 0);
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  let rows = [];
+  try {
+    const { data, error } = await sb.from('shifts')
+      .select('shift_date,shift_from,shift_to,label,is_sick,is_vacation,is_late,late_min')
+      .eq('emp_id', empId)
+      .gte('shift_date', iso(start))
+      .lte('shift_date', iso(end))
+      .order('shift_date');
+    if (!error && data) rows = data;
+  } catch(_) { /* ignore */ }
+  const days = rows.map(s=>{
+    const [fh,fm]=(s.shift_from||'0:0').split(':').map(Number);
+    const [th,tm]=(s.shift_to||'0:0').split(':').map(Number);
+    const bruttoH = Math.max(0,(th+tm/60)-(fh+fm/60));
+    const lateMin = s.is_late ? (s.late_min||0) : 0;
+    const isOff = s.is_sick || s.is_vacation;
+    const pauseUse = isOff ? 0 : pauseMin;
+    const nettoH = isOff ? 0 : Math.max(0, bruttoH - pauseUse/60 - lateMin/60);
+    return {
+      date: s.shift_date, from: s.shift_from, to: s.shift_to, label: s.label||'',
+      isSick: s.is_sick, isVacation: s.is_vacation, lateMin,
+      pauseMin: pauseUse,
+      bruttoH: Math.round(bruttoH*10)/10,
+      nettoH: Math.round(nettoH*10)/10
+    };
+  });
+  return { emp, pauseMin, days };
+}
+
+// PDF: Monatsbericht eines Mitarbeiters (Tage, Zeiten, Pause, Verspätung)
+async function exportMonthReportPDF(empId, year, month){
+  if(!can('canExport'))return;
+  const { emp, days } = await fetchMonthDetail(empId, year, month);
+  if(!emp){ toast('Mitarbeiter nicht gefunden','err'); return; }
+  const monLbl = `${MONTHS_DE[month]} ${year}`;
+  const fmtDay = ds => { const d=new Date(ds); return `${['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]} ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`; };
+  let sumBrutto=0, sumNetto=0, sumLate=0, workDays=0, sumPause=0;
+  const rowsHtml = days.map(d=>{
+    let typ='', zeit='', pause='', spaet='', netto='';
+    if(d.isVacation){ typ='<span style="color:#0984e3">Urlaub</span>'; }
+    else if(d.isSick){ typ='<span style="color:#d63031">Krank</span>'; }
+    else {
+      typ = d.label || 'Schicht';
+      zeit = `${d.from}–${d.to}`;
+      pause = `${d.pauseMin} min`;
+      spaet = d.lateMin>0 ? `<span style="color:#e84393">${d.lateMin} min</span>` : '–';
+      netto = `${d.nettoH} h`;
+      sumBrutto+=d.bruttoH; sumNetto+=d.nettoH; sumLate+=d.lateMin; sumPause+=d.pauseMin; workDays++;
+    }
+    return `<tr><td>${fmtDay(d.date)}</td><td>${typ}</td><td>${zeit}</td><td style="text-align:right">${d.isSick||d.isVacation?'':d.bruttoH+' h'}</td><td style="text-align:center">${pause}</td><td style="text-align:center">${spaet}</td><td style="text-align:right;font-weight:700">${netto}</td></tr>`;
+  }).join('');
+  const sumNettoR = Math.round(sumNetto*10)/10;
+  const sumBruttoR = Math.round(sumBrutto*10)/10;
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Monatsbericht ${emp.name} ${monLbl}</title>
+    <style>body{font-family:'Segoe UI',Arial,sans-serif;padding:28px;color:#222}
+    h1{font-size:20px;margin:0 0 2px}h2{font-size:13px;color:#666;font-weight:normal;margin:0 0 18px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{padding:7px 10px;border:1px solid #ddd;text-align:left}
+    th{background:#f5f5f5;font-weight:700;text-transform:uppercase;font-size:10px}
+    tfoot td{font-weight:700;background:#fafafa}
+    .meta{font-size:11px;color:#888;margin-bottom:14px}
+    @media print{body{padding:0}}</style></head><body>
+    <h1>Monatsbericht – ${emp.name}</h1>
+    <h2>${monLbl} · ${getLocationName((emp.location||'').split(',')[0])} · ${emp.dept||''}${emp.employmentType?(' · '+emp.employmentType):''}</h2>
+    <div class="meta">Pause: ${emp.pauseMinutes??30} Min./Schicht · Netto = Brutto − Pause − Verspätung</div>
+    <table>
+      <thead><tr><th>Tag</th><th>Art</th><th>Zeit</th><th style="text-align:right">Brutto</th><th style="text-align:center">Pause</th><th style="text-align:center">Verspätung</th><th style="text-align:right">Netto</th></tr></thead>
+      <tbody>${rowsHtml||'<tr><td colspan="7" style="text-align:center;color:#999">Keine Schichten in diesem Monat</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="3">Summe (${workDays} Arbeitstage)</td><td style="text-align:right">${sumBruttoR} h</td><td style="text-align:center">${Math.round(sumPause)} min</td><td style="text-align:center">${sumLate} min</td><td style="text-align:right">${sumNettoR} h</td></tr></tfoot>
+    </table>
+    <script>window.print();<\/script></body></html>`);
+  w.document.close();
+}
+
 async function openMonthlyHoursModal(empId){
   if (empId==null) { toast('Kein Mitarbeiter verknüpft','warn'); return; }
   const emp = EMPS.find(e=>e.id===empId);
@@ -4732,20 +4814,38 @@ function openExportModal(){
   if(!can('canExport'))return;
   const empOpts=getVisibleEmps().slice().sort((a,b)=>a.name.localeCompare(b.name)).map(e=>`<option value="${e.name.replace(/"/g,'&quot;')}">${e.name}</option>`).join('');
   const deptOpts=[...new Set(getVisibleEmps().map(e=>e.dept).filter(Boolean))].sort().map(d=>`<option value="${d}">${d}</option>`).join('');
+  // Mitarbeiter mit ID (für Monatsbericht) + Monatsliste (letzte 12 Monate)
+  const empIdOpts=getVisibleEmps().slice().sort((a,b)=>a.name.localeCompare(b.name)).map(e=>`<option value="${e.id}">${e.name}</option>`).join('');
+  const _now=new Date();
+  const monOpts=Array.from({length:12},(_,i)=>{const d=new Date(_now.getFullYear(),_now.getMonth()-i,1);return `<option value="${d.getFullYear()}-${d.getMonth()}">${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}</option>`;}).join('');
+  const hide="document.getElementById('expEmpWrap').style.display='none';document.getElementById('expDeptWrap').style.display='none';document.getElementById('expMonWrap').style.display='none';";
   openModal('PDF Export', `
     <div style="display:flex;flex-direction:column;gap:14px">
       <div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0"><input type="radio" name="expScope" value="all" checked onchange="document.getElementById('expEmpWrap').style.display='none';document.getElementById('expDeptWrap').style.display='none'"> <span style="font-weight:600">Alle anzeigen</span></label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0"><input type="radio" name="expScope" value="emp" onchange="document.getElementById('expEmpWrap').style.display='';document.getElementById('expDeptWrap').style.display='none'"> <span style="font-weight:600">Ein Mitarbeiter</span></label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0"><input type="radio" name="expScope" value="all" checked onchange="${hide}"> <span style="font-weight:600">Alle anzeigen (aktuelle Woche)</span></label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0"><input type="radio" name="expScope" value="emp" onchange="${hide}document.getElementById('expEmpWrap').style.display=''"> <span style="font-weight:600">Ein Mitarbeiter (aktuelle Woche)</span></label>
         <div id="expEmpWrap" style="display:none;padding:4px 0 4px 26px"><select class="form-select" id="expEmpSel" style="width:100%">${empOpts}</select></div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0"><input type="radio" name="expScope" value="dept" onchange="document.getElementById('expDeptWrap').style.display='';document.getElementById('expEmpWrap').style.display='none'"> <span style="font-weight:600">Ein Bereich</span></label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0"><input type="radio" name="expScope" value="dept" onchange="${hide}document.getElementById('expDeptWrap').style.display=''"> <span style="font-weight:600">Ein Bereich (aktuelle Woche)</span></label>
         <div id="expDeptWrap" style="display:none;padding:4px 0 4px 26px"><select class="form-select" id="expDeptSel" style="width:100%">${deptOpts}</select></div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 0;border-top:1px solid var(--border);margin-top:4px;padding-top:12px"><input type="radio" name="expScope" value="month" onchange="${hide}document.getElementById('expMonWrap').style.display=''"> <span style="font-weight:600">📅 Monatsbericht (ein Mitarbeiter)</span></label>
+        <div id="expMonWrap" style="display:none;padding:4px 0 4px 26px">
+          <select class="form-select" id="expMonEmp" style="width:100%;margin-bottom:8px">${empIdOpts}</select>
+          <select class="form-select" id="expMonMonth" style="width:100%">${monOpts}</select>
+          <div style="font-size:.72rem;color:var(--text-muted);margin-top:6px">Zeigt jeden Arbeitstag: Zeit, Pause, Verspätung, Netto-Stunden.</div>
+        </div>
       </div>
     </div>`,
     `<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="doExportPDF()"><span class="ms" style="font-size:16px;vertical-align:middle">picture_as_pdf</span> Exportieren</button>`);
 }
 function doExportPDF(){
   const scope=document.querySelector('input[name="expScope"]:checked')?.value||'all';
+  if(scope==='month'){
+    const empId=parseInt(document.getElementById('expMonEmp')?.value,10);
+    const [y,m]=(document.getElementById('expMonMonth')?.value||'').split('-').map(Number);
+    closeModal();
+    exportMonthReportPDF(empId, y, m);
+    return;
+  }
   let val=null;
   if(scope==='emp')val=document.getElementById('expEmpSel')?.value;
   else if(scope==='dept')val=document.getElementById('expDeptSel')?.value;
