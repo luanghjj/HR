@@ -4581,26 +4581,22 @@ async function saveQuickShift() {
   const shiftLoc = await pickShiftLocation(emp);
   if (!shiftLoc) return; // abgebrochen
   const newShift = {
+    id: Date.now()+Math.random()*1e6|0,
     empId: emp.id, empName: emp.name, dept: emp.dept, location: shiftLoc,
     date, from, to, label, colorClass: getDeptColorClass(emp.dept),
-    isSick: false, isVacation: false, isLate: false, vacHalf: false
+    isSick: false, isVacation: false, isLate: false, lateMin: 0, vacHalf: false
   };
-
-  try {
-    const { data, error } = await sb.from('shifts').insert({
-      emp_id: emp.id, emp_name: emp.name, dept: emp.dept, location: shiftLoc,
-      shift_date: date, shift_from: from, shift_to: to, label, color_class: newShift.colorClass,
-      is_sick: false, is_vacation: false, is_late: false, vac_half: false
-    }).select().single();
-    if (error) { toast('Fehler: ' + error.message, 'err'); return; }
-    newShift.id = data.id;
-    SHIFTS.push(newShift);
-    closeModal();
-    toast(`✓ Schicht für ${emp.name} am ${formatDateDE(date)} erstellt`);
+  // Optimistisch: sofort anzeigen, dann im Hintergrund speichern
+  SHIFTS.push(newShift);
+  closeModal();
+  toast(`✓ Schicht für ${emp.name} am ${formatDateDE(date)} erstellt`);
+  renderSchedule();
+  const res = await syncAddShift(newShift); // setzt echte id
+  if (res && res.ok === false) {
+    const i = SHIFTS.findIndex(s => s === newShift);
+    if (i >= 0) SHIFTS.splice(i, 1);
+    toast('Fehler beim Speichern: ' + (res.error||'unbekannt') + ' – Schicht entfernt', 'err');
     renderSchedule();
-  } catch (e) {
-    console.error('[QuickAdd]', e);
-    toast('Fehler beim Speichern', 'err');
   }
 }
 
@@ -7451,27 +7447,37 @@ async function saveShift(){
 
   if(!dayDefs.length){toast('Keine Tage ausgewählt','err');return;}
 
-  // 2. Schichten je Mitarbeiter erzeugen (Ruhetag pro Standort filtern)
-  let created=0;
+  // 2. Standort je MA bestimmen (ggf. nachfragen bei Mehrfach-Standort + "Alle")
   const blockedSet=new Set();
+  const newShifts=[];
   for(const emp of selEmps){
-    // Standort der Schicht bestimmen (ggf. nachfragen bei Mehrfach-Standort + "Alle").
     const shiftLoc=await pickShiftLocation(emp);
     if(!shiftLoc)continue; // für diesen MA abgebrochen
     for(const s of dayDefs){
       const vt=getVacTypeForDate(s.date, shiftLoc);
       if(!vt){blockedSet.add(formatDateDE(s.date));continue;}
       const cc=s.label==='Schule'?'schule':getDeptColorClass(emp.dept);
-      const ns={id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:shiftLoc,date:s.date,from:s.from,to:s.to,label:s.label,colorClass:cc,isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false};
-      SHIFTS.push(ns);await syncAddShift(ns);created++;
+      newShifts.push({id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:shiftLoc,date:s.date,from:s.from,to:s.to,label:s.label,colorClass:cc,isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false});
     }
   }
 
   if(blockedSet.size)toast(`Ruhetag übersprungen: ${[...blockedSet].join(', ')}`,'warn');
-  if(created===0){toast('Alle gewählten Tage sind Ruhetage','err');return;}
+  if(!newShifts.length){toast('Alle gewählten Tage sind Ruhetage','err');return;}
+
+  // 3. Optimistisch: sofort anzeigen, dann im Hintergrund als Batch speichern
+  newShifts.forEach(ns=>SHIFTS.push(ns));
+  const created=newShifts.length;
   closeModal();
   toast(`${created} Schicht${created>1?'en':''} für ${selEmps.length} Mitarbeiter gespeichert`);
   renderSchedule();
+  const res=await syncBulkShifts(newShifts);
+  if(res&&res.ok===false){
+    // Rollback: eingefügte Schichten wieder entfernen
+    const ids=new Set(newShifts.map(s=>s.id));
+    for(let i=SHIFTS.length-1;i>=0;i--){ if(ids.has(SHIFTS[i].id)) SHIFTS.splice(i,1); }
+    toast('Fehler beim Speichern: '+(res.error||'unbekannt'),'err');
+    renderSchedule();
+  }
 }
 function saveVac(){const eid=parseInt(document.getElementById('mVE').value);const emp=EMPS.find(e=>e.id===eid);if(!emp){toast('Bitte Mitarbeiter wählen','err');return;}const fr=document.getElementById('mVF').value,to=document.getElementById('mVTo').value;if(!fr||!to){toast('Bitte Von- und Bis-Datum eingeben','err');return;}if(to<fr){toast('Bis-Datum darf nicht vor Von-Datum liegen','err');return;}const days=Math.ceil((new Date(to)-new Date(fr))/864e5)+1;const nv={id:Date.now(),empId:eid,empName:emp.name,location:emp.location,from:fr,to,days,status:'pending',note:document.getElementById('mVN').value};VACS.push(nv);syncAddVacation(nv);addNotif('vacation','Urlaubsantrag',`${emp.name}: ${formatDateDE(fr)}–${formatDateDE(to)} (${days}T)`);closeModal();toast('Antrag gestellt');renderVacation();}
 async function saveSickL(){

@@ -423,9 +423,10 @@ async function syncAddShift(shift) {
     // falls die Spalte noch nicht existiert – MA-Default gilt).
     if (shift.pauseMinutes != null) payload.pause_minutes = shift.pauseMinutes;
     const { data, error } = await sb.from('shifts').insert(payload).select().single();
-    if (error) console.warn('[Sync] Shift error:', error.message);
-    else { shift.id = data.id; console.log('[Sync] ✓ Shift added:', shift.empName, shift.date); }
-  } catch (e) { console.warn('[Sync]', e.message); }
+    if (error) { console.warn('[Sync] Shift error:', error.message); return { ok:false, error: error.message }; }
+    shift.id = data.id; console.log('[Sync] ✓ Shift added:', shift.empName, shift.date);
+    return { ok:true };
+  } catch (e) { console.warn('[Sync]', e.message); return { ok:false, error: e.message }; }
 }
 
 /**
@@ -556,13 +557,14 @@ async function syncBulkShifts(shiftsArray) {
       late_min: s.lateMin || 0
     }));
     const { data, error } = await sb.from('shifts').insert(rows).select();
-    if (error) { console.warn('[Sync] Bulk shifts error:', error.message); return; }
+    if (error) { console.warn('[Sync] Bulk shifts error:', error.message); return { ok:false, error: error.message }; }
     // Update local IDs
     if (data) {
       data.forEach((row, i) => { if (shiftsArray[i]) shiftsArray[i].id = row.id; });
     }
     console.log('[Sync] ✓', rows.length, 'shifts saved to Supabase');
-  } catch (e) { console.warn('[Sync]', e.message); }
+    return { ok:true };
+  } catch (e) { console.warn('[Sync]', e.message); return { ok:false, error: e.message }; }
 }
 
 // ═══ TIME RECORDS (GPS Check-in/out) ═══
