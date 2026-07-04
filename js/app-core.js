@@ -7241,50 +7241,65 @@ function openModal(type, bodyHtml, footerHtml){
     const allLocs=[...new Set(emps.map(e=>e.location))];
     const allDepts=[...new Set(emps.map(e=>e.dept))].sort();
     t.textContent='Schicht hinzufügen';
+    window._shiftMode='day'; // beim Öffnen immer auf Standard (1 Tag) zurück
     b.innerHTML=`<div class="form-grid">
-      <div class="form-group"><label class="form-label">Standort</label><select class="form-select" id="mSLoc" onchange="filterShiftEmps()"><option value="all">Alle Standorte</option>${allLocs.map(l=>`<option value="${l}">${getLocationName(l)}</option>`).join('')}</select></div>
-      <div class="form-group"><label class="form-label">Bereich</label><select class="form-select" id="mSDept" onchange="filterShiftEmps()"><option value="all">Alle Bereiche</option>${allDepts.map(d=>`<option value="${d}">${d}</option>`).join('')}</select></div>
-      <div class="form-group full"><label class="form-label">Mitarbeiter <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">(mehrere wählbar)</span></label>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
-          <button type="button" class="btn btn-sm" onclick="toggleAllShiftEmps(true)" style="font-size:.72rem;padding:3px 12px">Alle</button>
-          <button type="button" class="btn btn-sm" onclick="toggleAllShiftEmps(false)" style="font-size:.72rem;padding:3px 12px">Keine</button>
-          <span id="mSECount" style="font-size:.74rem;color:var(--text-muted);margin-left:auto">0 ausgewählt</span>
-        </div>
-        <div id="mSEList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:2px;background:var(--bg-input)">
-          ${emps.map(e=>`<label class="shift-emp-row" data-loc="${e.location}" data-dept="${e.dept}" style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:.84rem" onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background=''">
-            <input type="checkbox" class="shift-emp-cb" value="${e.id}" onchange="updateShiftEmpCount()" style="width:15px;height:15px;accent-color:var(--accent)">
-            <span style="font-weight:600">${e.name}</span>
-            <span style="color:var(--text-muted);font-size:.76rem;margin-left:auto">${e.dept}</span>
-          </label>`).join('')}
-        </div>
+      <!-- EINFACH: 1 Mitarbeiter schnell wählen -->
+      <div class="form-group full"><label class="form-label">Mitarbeiter</label>
+        <select class="form-select" id="mSEQuick" onchange="quickPickShiftEmp(this.value)">
+          <option value="">— wählen —</option>
+          ${emps.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(e=>`<option value="${e.id}">${e.name} · ${e.dept}</option>`).join('')}
+        </select>
       </div>
-      <div class="form-group full"><label class="form-label">Modus</label>
-        <div style="display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
-          <button class="btn shift-mode-btn active" data-mode="day" onclick="toggleShiftMode('day')" style="flex:1;border:none;border-radius:0;font-size:.78rem">📅 Ein Tag</button>
-          <button class="btn shift-mode-btn" data-mode="week" onclick="toggleShiftMode('week')" style="flex:1;border:none;border-radius:0;font-size:.78rem">📋 Gleiche Zeit</button>
-          <button class="btn shift-mode-btn" data-mode="plan" onclick="toggleShiftMode('plan')" style="flex:1;border:none;border-radius:0;font-size:.78rem">📊 Wochenplan</button>
-        </div>
-      </div>
-      <div id="shiftModeDay"><div class="form-group full"><label class="form-label">Datum</label><input class="form-input" type="date" id="mSD" value="${isoDate(scheduleDate)}"></div></div>
-      <div id="shiftModeWeek" style="display:none"><div class="form-group full"><label class="form-label">Woche ab ${formatDateDE(wDates[0])}</label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${dayNames.map((d,i)=>`<label style="display:flex;align-items:center;gap:4px;font-size:.82rem;cursor:pointer;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input)"><input type="checkbox" class="weekday-cb" data-date="${wDates[i]}" ${i<5?'checked':''}> ${d} ${new Date(wDates[i]).getDate()}.${new Date(wDates[i]).getMonth()+1}</label>`).join('')}</div>
-      </div></div>
-      <div id="shiftModePlan" style="display:none"><div class="form-group full"><label class="form-label">Wochenplan – individuelle Zeiten</label>
-        <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">${dayNames.map((d,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input)">
-          <label style="display:flex;align-items:center;gap:4px;width:60px;font-size:.82rem;font-weight:600;cursor:pointer"><input type="checkbox" class="plan-day-cb" data-idx="${i}" data-date="${wDates[i]}" ${i<5?'checked':''}  onchange="this.closest('div').querySelector('.plan-times').style.opacity=this.checked?1:.3"> ${d}</label>
-          <span style="font-size:.72rem;color:var(--text-muted);width:40px">${new Date(wDates[i]).getDate()}.${new Date(wDates[i]).getMonth()+1}</span>
-          <div class="plan-times" style="display:flex;gap:6px;align-items:center;flex:1;${i>=5?'opacity:.3':''}">
-            <input class="form-input plan-von" data-idx="${i}" type="time" value="${i<5?'09:00':''}" style="font-size:.8rem;padding:4px 6px;flex:1">
-            <span style="font-size:.75rem;color:var(--text-muted)">–</span>
-            <input class="form-input plan-bis" data-idx="${i}" type="time" value="${i<5?'17:00':''}" style="font-size:.8rem;padding:4px 6px;flex:1">
-            <select class="form-select plan-tmpl" data-idx="${i}" onchange="applyPlanTmpl(${i})" style="font-size:.72rem;padding:3px 4px;width:70px"><option value="">—</option>${SHIFT_TEMPLATES.map((t,j)=>`<option value="${j}">${t.label}</option>`).join('')}</select>
-          </div>
-        </div>`).join('')}</div>
-      </div></div>
+      <div id="shiftModeDay" class="form-group full"><label class="form-label">Datum</label><input class="form-input" type="date" id="mSD" value="${isoDate(scheduleDate)}"></div>
       <div id="shiftTimesGlobal">
         <div class="form-group"><label class="form-label">Vorlage</label><select class="form-select" id="mST" onchange="applyTmpl()"><option value="">Manuell</option>${SHIFT_TEMPLATES.map((t,i)=>`<option value="${i}">${t.label}</option>`).join('')}</select></div>
         <div class="form-group"><label class="form-label">Von</label><input class="form-input" type="time" id="mSF" value="09:00"></div>
         <div class="form-group"><label class="form-label">Bis</label><input class="form-input" type="time" id="mSTo" value="17:00"></div>
+      </div>
+
+      <div class="form-group full" style="margin-top:4px"><button type="button" class="btn btn-sm" onclick="toggleShiftAdvanced(this)" style="width:100%;font-size:.78rem"><span class="ms" style="font-size:15px;vertical-align:middle">tune</span> Erweitert: mehrere Mitarbeiter / ganze Woche</button></div>
+
+      <div id="shiftAdvanced" class="form-group full" style="display:none;flex-direction:column;gap:12px;border-top:1px dashed var(--border);padding-top:12px">
+        <div style="display:flex;gap:10px">
+          <div class="form-group" style="flex:1;margin:0"><label class="form-label">Standort</label><select class="form-select" id="mSLoc" onchange="filterShiftEmps()"><option value="all">Alle Standorte</option>${allLocs.map(l=>`<option value="${l}">${getLocationName(l)}</option>`).join('')}</select></div>
+          <div class="form-group" style="flex:1;margin:0"><label class="form-label">Bereich</label><select class="form-select" id="mSDept" onchange="filterShiftEmps()"><option value="all">Alle Bereiche</option>${allDepts.map(d=>`<option value="${d}">${d}</option>`).join('')}</select></div>
+        </div>
+        <div><label class="form-label">Mitarbeiter <span style="font-weight:400;color:var(--text-muted);font-size:.78rem">(mehrere wählbar)</span></label>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+            <button type="button" class="btn btn-sm" onclick="toggleAllShiftEmps(true)" style="font-size:.72rem;padding:3px 12px">Alle</button>
+            <button type="button" class="btn btn-sm" onclick="toggleAllShiftEmps(false)" style="font-size:.72rem;padding:3px 12px">Keine</button>
+            <span id="mSECount" style="font-size:.74rem;color:var(--text-muted);margin-left:auto">0 ausgewählt</span>
+          </div>
+          <div id="mSEList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:2px;background:var(--bg-input)">
+            ${emps.map(e=>`<label class="shift-emp-row" data-loc="${e.location}" data-dept="${e.dept}" style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:.84rem" onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background=''">
+              <input type="checkbox" class="shift-emp-cb" value="${e.id}" onchange="updateShiftEmpCount()" style="width:15px;height:15px;accent-color:var(--accent)">
+              <span style="font-weight:600">${e.name}</span>
+              <span style="color:var(--text-muted);font-size:.76rem;margin-left:auto">${e.dept}</span>
+            </label>`).join('')}
+          </div>
+        </div>
+        <div><label class="form-label">Modus</label>
+          <div style="display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
+            <button class="btn shift-mode-btn active" data-mode="day" onclick="toggleShiftMode('day')" style="flex:1;border:none;border-radius:0;font-size:.78rem">📅 Ein Tag</button>
+            <button class="btn shift-mode-btn" data-mode="week" onclick="toggleShiftMode('week')" style="flex:1;border:none;border-radius:0;font-size:.78rem">📋 Gleiche Zeit</button>
+            <button class="btn shift-mode-btn" data-mode="plan" onclick="toggleShiftMode('plan')" style="flex:1;border:none;border-radius:0;font-size:.78rem">📊 Wochenplan</button>
+          </div>
+        </div>
+        <div id="shiftModeWeek" style="display:none"><label class="form-label">Woche ab ${formatDateDE(wDates[0])}</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${dayNames.map((d,i)=>`<label style="display:flex;align-items:center;gap:4px;font-size:.82rem;cursor:pointer;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input)"><input type="checkbox" class="weekday-cb" data-date="${wDates[i]}" ${i<5?'checked':''}> ${d} ${new Date(wDates[i]).getDate()}.${new Date(wDates[i]).getMonth()+1}</label>`).join('')}</div>
+        </div>
+        <div id="shiftModePlan" style="display:none"><label class="form-label">Wochenplan – individuelle Zeiten</label>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">${dayNames.map((d,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-input)">
+            <label style="display:flex;align-items:center;gap:4px;width:60px;font-size:.82rem;font-weight:600;cursor:pointer"><input type="checkbox" class="plan-day-cb" data-idx="${i}" data-date="${wDates[i]}" ${i<5?'checked':''}  onchange="this.closest('div').querySelector('.plan-times').style.opacity=this.checked?1:.3"> ${d}</label>
+            <span style="font-size:.72rem;color:var(--text-muted);width:40px">${new Date(wDates[i]).getDate()}.${new Date(wDates[i]).getMonth()+1}</span>
+            <div class="plan-times" style="display:flex;gap:6px;align-items:center;flex:1;${i>=5?'opacity:.3':''}">
+              <input class="form-input plan-von" data-idx="${i}" type="time" value="${i<5?'09:00':''}" style="font-size:.8rem;padding:4px 6px;flex:1">
+              <span style="font-size:.75rem;color:var(--text-muted)">–</span>
+              <input class="form-input plan-bis" data-idx="${i}" type="time" value="${i<5?'17:00':''}" style="font-size:.8rem;padding:4px 6px;flex:1">
+              <select class="form-select plan-tmpl" data-idx="${i}" onchange="applyPlanTmpl(${i})" style="font-size:.72rem;padding:3px 4px;width:70px"><option value="">—</option>${SHIFT_TEMPLATES.map((t,j)=>`<option value="${j}">${t.label}</option>`).join('')}</select>
+            </div>
+          </div>`).join('')}</div>
+        </div>
       </div>
     </div>`;
     f.innerHTML='<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="saveShift()">Speichern</button>';
@@ -7388,6 +7403,19 @@ function updateShiftEmpCount(){
   const n=document.querySelectorAll('.shift-emp-cb:checked').length;
   const el=document.getElementById('mSECount');
   if(el)el.textContent=n+' ausgewählt';
+}
+// Einfache Auswahl: 1 Mitarbeiter im Dropdown → passende Checkbox setzen
+function quickPickShiftEmp(empId){
+  document.querySelectorAll('.shift-emp-cb').forEach(cb=>{cb.checked=(empId!==''&&cb.value===String(empId));});
+  updateShiftEmpCount();
+}
+// "Erweitert" ein-/ausblenden
+function toggleShiftAdvanced(btn){
+  const adv=document.getElementById('shiftAdvanced');
+  if(!adv)return;
+  const open=adv.style.display==='none'||!adv.style.display;
+  adv.style.display=open?'flex':'none';
+  if(btn)btn.style.background=open?'var(--bg-input)':'';
 }
 function applyTmpl(){const i=document.getElementById('mST').value;if(i!==''){document.getElementById('mSF').value=SHIFT_TEMPLATES[i].from;document.getElementById('mSTo').value=SHIFT_TEMPLATES[i].to;}}
 function saveEmp(){const f=document.getElementById('mF').value.trim(),l=document.getElementById('mL').value.trim();if(!f||!l)return;
