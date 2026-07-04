@@ -4277,6 +4277,15 @@ function renderSchedule(){
       });
     }
     const showH=can('seeFinancials');
+    // ─── Precompute (Performance): einmal statt pro Zelle filtern/finden ───
+    // Schichten nach empName|date gruppieren
+    const _shiftsByKey=new Map();
+    shifts.forEach(s=>{const k=s.empName+'|'+s.date;let a=_shiftsByKey.get(k);if(!a){a=[];_shiftsByKey.set(k,a);}a.push(s);});
+    // getVacTypeForDate cachen (hängt nur von Datum + Standort ab)
+    const _vacTypeCache=new Map();
+    const vacType=(ds,loc)=>{const k=ds+'|'+(loc||'');if(_vacTypeCache.has(k))return _vacTypeCache.get(k);const v=getVacTypeForDate(ds,loc);_vacTypeCache.set(k,v);return v;};
+    // Verspätungs-Sync aus dem Render-Loop heraushalten → nach dem Rendern
+    const _lateToSync=[];
     let h='<div class="sc2-grid-wrap"><table style="width:max-content;min-width:100%"><thead><tr><th style="min-width:200px">Mitarbeiter</th>';
     dayD.forEach((ds,i)=>{const d=new Date(ds);const isToday=ds===isoDate(new Date());h+=`<th${isToday?' class="is-today"':''}><div class="th-day">${DAYS_DE[i]}</div><div class="th-date">${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}</div></th>`;});
     if(showH)h+='<th style="text-align:right">Σ Std.</th>';
@@ -4286,14 +4295,14 @@ function renderSchedule(){
       h+=`<tr data-emp="${(emp||'').replace(/"/g,'&quot;')}" data-dept="${(_empObj2?.dept||'').replace(/"/g,'&quot;')}"><td><div style="display:flex;align-items:center;gap:12px"><div class="sc2-emp-avatar">${_empInitials}</div><div><div class="sc2-emp-name"${_empObj2?.id!=null?` onclick="openMonthlyHoursModal(${_empObj2.id})" style="cursor:pointer" title="Monatsstunden ansehen"`:''}>${emp}</div><div class="sc2-emp-pos">${_empPos}</div></div></div></td>`;
       let weekH=0;
       dayD.forEach(ds=>{
-        const dayS=shifts.filter(s=>s.date===ds&&s.empName===emp);
+        const dayS=_shiftsByKey.get(emp+'|'+ds)||[];
         dayS.forEach(s=>{if(!s.isSick&&!s.isVacation){const[fh,fm]=s.from.split(':').map(Number);const[th,tm]=s.to.split(':').map(Number);weekH+=(th+tm/60)-(fh+fm/60);}});
         h+=`<td class="shift-cell" data-date="${ds}" data-emp="${emp}" ${canEdit?'ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragleave="onDragLeave(event)"':''}>`;
         let cellHas = dayS.length > 0;
         dayS.forEach(s=>{
           // Cross-reference with GPS check-in
           const tr = TIME_RECORDS.find(r => r.shiftId === s.id || (r.empId === s.empId && r.checkIn && r.checkIn.startsWith(ds)));
-          if (tr && tr.isLate && !s.isLate) { s.isLate = true; s.lateMin = tr.lateMin || 0; syncUpdateShift(s); }
+          if (tr && tr.isLate && !s.isLate) { s.isLate = true; s.lateMin = tr.lateMin || 0; _lateToSync.push(s); }
           // Compact mode for special days
           if (s.isSick) {
             h+=`<div class="shift-block compact-block is-sick" ${canEdit?`onclick="shiftBlockTap(${s.id})"`:''}
@@ -4323,11 +4332,11 @@ function renderSchedule(){
         });
 
         // Show approved vacations for this emp+date (if no shift already marked)
-        const empObj = EMPS.find(e=>e.name===emp);
+        const empObj = _empObj2;
         if (empObj && !dayS.some(s=>s.isVacation)) {
           const vac = VACS.find(v=>v.empId===empObj.id && v.status==='approved' && ds>=v.from && ds<=v.to);
           if (vac) {
-            const vType = getVacTypeForDate(ds, empObj.location);
+            const vType = vacType(ds, empObj.location);
             if (vType) {
               const vClass = vType === 'A' ? 'is-vacation vac-half' : 'is-vacation';
               h+=`<div class="shift-block compact-block ${vClass}"><span class="compact-letter">${vType}</span></div>`;
@@ -4339,7 +4348,7 @@ function renderSchedule(){
         if (empObj && !dayS.some(s=>s.isSick)) {
           const sick = SICKS.find(s=>s.empId===empObj.id && s.status==='active' && ds>=s.from && ds<=s.to);
           if (sick) {
-            const sType = getVacTypeForDate(ds, empObj.location);
+            const sType = vacType(ds, empObj.location);
             if (sType) {
               h+=`<div class="shift-block compact-block is-sick"><span class="compact-letter">K</span></div>`;
               cellHas = true;
@@ -4370,9 +4379,8 @@ function renderSchedule(){
 
         if(!cellHas){
           // Check if this is a Ruhetag for employee's location
-          const ruheEmp = empObj || EMPS.find(e=>e.name===emp);
-          const ruheLoc = ruheEmp?.location || '';
-          const ruheType = getVacTypeForDate(ds, ruheLoc);
+          const ruheLoc = empObj?.location || '';
+          const ruheType = vacType(ds, ruheLoc);
           const isOwnRow = empObj && empObj.id === currentUser.empId;
           if(!ruheType){
             h+='<div class="ruhetag-cell"><span class="ruhetag-label">Ruhetag</span></div>';
@@ -4413,6 +4421,8 @@ function renderSchedule(){
       <div class="sc2-bento-card is-stat" ${Math.max(0,_openShifts)>0&&canEdit?`onclick="openModal('addShift')" style="cursor:pointer"`:''}><div class="sc2-bento-icon" style="background:rgba(99,102,241,.08);color:var(--accent)"><span class="ms">event_available</span></div><div class="sc2-bento-stat-text"><div class="sc2-bento-big">${Math.max(0,_openShifts)}</div><div class="sc2-bento-micro">Freie Slots</div><div class="sc2-bento-hint">${Math.max(0,_openShifts)===0?'Woche voll geplant':canEdit?'Klicken zum Planen →':'noch zu besetzen'}</div></div></div>
     </div>`;
     c.innerHTML=h;
+    // Verspätungen aus GPS nach dem Rendern EINMAL synchronisieren (nicht im Render-Loop)
+    if(_lateToSync.length) _lateToSync.forEach(s=>syncUpdateShift(s));
   } else if(scheduleView==='day'){
     document.getElementById('schedLabel').textContent=scheduleDate.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
     const ds=isoDate(scheduleDate);const dayS=shifts.filter(s=>s.date===ds);const seen=new Set();
