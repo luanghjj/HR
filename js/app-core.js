@@ -1774,7 +1774,7 @@ async function fetchMonthlyHours(empId){
   let rows = [];
   try {
     const { data, error } = await sb.from('shifts')
-      .select('shift_date,shift_from,shift_to,is_sick,is_vacation,is_late,late_min')
+      .select('*')
       .eq('emp_id', empId)
       .gte('shift_date', iso(start))
       .lte('shift_date', iso(end));
@@ -1784,7 +1784,7 @@ async function fetchMonthlyHours(empId){
   const buckets = [];
   for (let i=0;i<6;i++){
     const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-    buckets.push({ y:d.getFullYear(), m:d.getMonth(), label:`${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}`, brutto:0, count:0, lateMin:0 });
+    buckets.push({ y:d.getFullYear(), m:d.getMonth(), label:`${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}`, brutto:0, count:0, lateMin:0, pauseSum:0 });
   }
   rows.forEach(s=>{
     if (s.is_sick || s.is_vacation) return;
@@ -1795,11 +1795,12 @@ async function fetchMonthlyHours(empId){
     const [th,tm] = (s.shift_to||'0:0').split(':').map(Number);
     b.brutto += (th+tm/60)-(fh+fm/60);
     b.count++;
+    b.pauseSum += (s.pause_minutes != null ? s.pause_minutes : pauseMin);
     if (s.is_late) b.lateMin += (s.late_min || 0);
   });
   return buckets.map(b=>{
     const brutto = Math.round(b.brutto*10)/10;
-    const netto = Math.max(0, Math.round((b.brutto - b.count*pauseMin/60 - b.lateMin/60)*10)/10);
+    const netto = Math.max(0, Math.round((b.brutto - b.pauseSum/60 - b.lateMin/60)*10)/10);
     return { label:b.label, brutto, netto, count:b.count, lateMin:b.lateMin };
   });
 }
@@ -1813,7 +1814,7 @@ async function fetchMonthDetail(empId, year, month){
   let rows = [];
   try {
     const { data, error } = await sb.from('shifts')
-      .select('shift_date,shift_from,shift_to,label,is_sick,is_vacation,is_late,late_min')
+      .select('*')
       .eq('emp_id', empId)
       .gte('shift_date', iso(start))
       .lte('shift_date', iso(end))
@@ -1826,7 +1827,8 @@ async function fetchMonthDetail(empId, year, month){
     const bruttoH = Math.max(0,(th+tm/60)-(fh+fm/60));
     const lateMin = s.is_late ? (s.late_min||0) : 0;
     const isOff = s.is_sick || s.is_vacation;
-    const pauseUse = isOff ? 0 : pauseMin;
+    const shiftPause = s.pause_minutes != null ? s.pause_minutes : pauseMin;
+    const pauseUse = isOff ? 0 : shiftPause;
     const nettoH = isOff ? 0 : Math.max(0, bruttoH - pauseUse/60 - lateMin/60);
     return {
       date: s.shift_date, from: s.shift_from, to: s.shift_to, label: s.label||'',
@@ -2078,14 +2080,14 @@ function viewEmp(id){
       <div class="form-group"><label class="form-label">Pause / Schicht (Min.)</label>
         <input class="form-input" type="number" min="0" step="5" value="${e.pauseMinutes??30}" ${ro} ${canEdit?`onchange="updateEmpField(${e.id},'pauseMinutes',this.value)"`:''}></div>
       ${(()=>{
-        const gross=calcPlanHours(e.id), net=calcNetHours(e), cnt=calcMonthShiftCount(e.id), pm=e.pauseMinutes??30, late=calcMonthLateMinutes(e.id);
+        const gross=calcPlanHours(e.id), net=calcNetHours(e), cnt=calcMonthShiftCount(e.id), pauseSum=calcMonthPauseMinutes(e), late=calcMonthLateMinutes(e.id);
         const warn=(e.employmentType==='Minijob') && net>43.5; // ~538€ bei Mindestlohn – nur Warnung
         const col=warn?'var(--danger)':'var(--success)';
         return `<div class="form-group full"><label class="form-label">Stunden diesen Monat (netto)</label>
           <div style="font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:${col};padding:6px 0">
             ${net} h ${warn?'<span class="badge badge-danger" style="font-size:.6rem;vertical-align:middle">⚠ Minijob-Grenze</span>':''}
           </div>
-          <div style="font-size:.72rem;color:var(--text-muted)">Plan ${gross}h − ${cnt} Schicht${cnt!==1?'en':''} × ${pm}min Pause${late>0?` − ${late}min Verspätung`:''}</div>
+          <div style="font-size:.72rem;color:var(--text-muted)">Plan ${gross}h − ${Math.round(pauseSum)}min Pause (${cnt} Schicht${cnt!==1?'en':''})${late>0?` − ${late}min Verspätung`:''}</div>
           <button class="btn btn-sm" style="margin-top:8px" onclick="openMonthlyHoursModal(${e.id})"><span class="ms" style="font-size:15px;vertical-align:middle">bar_chart</span> Monatsverlauf (6 Monate)</button>
         </div>`;
       })()}
@@ -4644,6 +4646,11 @@ function editShift(id){
       <div class="form-group"><label class="form-label">Von</label><input class="form-input" type="time" id="edShiftFrom" value="${s.from}"></div>
       <div class="form-group"><label class="form-label">Bis</label><input class="form-input" type="time" id="edShiftTo" value="${s.to}"></div>
     </div>
+    <div class="form-group full">
+      <label class="form-label">Pause (Min.) – nur diese Schicht</label>
+      <input class="form-input" type="number" min="0" step="5" id="edShiftPause" value="${s.pauseMinutes ?? ''}" placeholder="Standard: ${emp?.pauseMinutes ?? 30} Min.">
+      <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">Leer = Standard-Pause des Mitarbeiters (${emp?.pauseMinutes ?? 30} Min.). Für durchgehende Schichten z.B. 60 oder 90.</div>
+    </div>
   </div>`;
   document.getElementById('modalFooter').innerHTML=`<button class="btn btn-danger" onclick="deleteShift(${id});closeModal()">Löschen</button><button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="updateShiftFromModal(${id})">Speichern</button>`;
   document.getElementById('modalOverlay').classList.remove('hidden');
@@ -4657,7 +4664,13 @@ function updateShiftFromModal(id){
   if(!nd||!nf||!nt){toast('Bitte alle Felder ausfüllen','err');return;}
   s.date=nd;s.from=nf;s.to=nt;
   if(tmplIdx!==''){s.label=SHIFT_TEMPLATES[tmplIdx].label;}
+  // Eigene Pause: leer → null (Standard des MA); Zahl → nur diese Schicht
+  const pRaw=(document.getElementById('edShiftPause')?.value||'').trim();
+  const prevPause=s.pauseMinutes;
+  s.pauseMinutes = pRaw==='' ? null : Math.max(0,parseInt(pRaw,10)||0);
   syncUpdateShift(s);
+  // Falls auf Standard zurückgesetzt (null): explizit null in DB schreiben
+  if(s.pauseMinutes==null && prevPause!=null) syncShiftPause(s.id, null);
   closeModal();toast('Schicht aktualisiert ✓');renderSchedule();
 }
 async function markSick(id){if(!can('editSchedules'))return;const s=SHIFTS.find(x=>x.id===id);if(!s)return;s.isSick=!s.isSick;s.isVacation=false;const e=EMPS.find(x=>x.id===s.empId);renderSchedule();const ok=await syncUpdateShift(s);if(ok===false){s.isSick=!s.isSick;toast('Fehler beim Speichern','err');renderSchedule();return;}if(e){const delta=s.isSick?1:-1;const nv=Math.max(0,e.sickDays+delta);const okF=await syncEmployeeField(e.id,'sickDays',nv);if(okF!==false)e.sickDays=nv;}if(s.isSick)addNotif('sick','Krank',`${s.empName}: ${formatDateDE(s.date)}`);renderSchedule();}

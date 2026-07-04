@@ -404,7 +404,7 @@ async function syncDeleteSchule(id) {
  */
 async function syncAddShift(shift) {
   try {
-    const { data, error } = await sb.from('shifts').insert({
+    const payload = {
       emp_id: shift.empId,
       emp_name: shift.empName,
       dept: shift.dept,
@@ -418,7 +418,11 @@ async function syncAddShift(shift) {
       is_vacation: shift.isVacation || false,
       is_late: shift.isLate || false,
       late_min: shift.lateMin || 0
-    }).select().single();
+    };
+    // Nur mitschicken, wenn eine eigene Pause gesetzt ist (sonst kein Bruch,
+    // falls die Spalte noch nicht existiert – MA-Default gilt).
+    if (shift.pauseMinutes != null) payload.pause_minutes = shift.pauseMinutes;
+    const { data, error } = await sb.from('shifts').insert(payload).select().single();
     if (error) console.warn('[Sync] Shift error:', error.message);
     else { shift.id = data.id; console.log('[Sync] ✓ Shift added:', shift.empName, shift.date); }
   } catch (e) { console.warn('[Sync]', e.message); }
@@ -430,7 +434,7 @@ async function syncAddShift(shift) {
 async function syncUpdateShift(shift) {
   try {
     if (!shift.id || typeof shift.id !== 'number') return;
-    const { error } = await sb.from('shifts').update({
+    const payload = {
       is_sick: shift.isSick || false,
       is_vacation: shift.isVacation || false,
       is_late: shift.isLate || false,
@@ -444,9 +448,23 @@ async function syncUpdateShift(shift) {
       shift_from: shift.from,
       shift_to: shift.to,
       label: shift.label || ''
-    }).eq('id', shift.id);
+    };
+    // Eigene Pause nur mitschicken, wenn gesetzt (Spalte evtl. noch nicht da → kein Bruch)
+    if (shift.pauseMinutes != null) payload.pause_minutes = shift.pauseMinutes;
+    const { error } = await sb.from('shifts').update(payload).eq('id', shift.id);
     if (error) { console.warn('[Sync] Shift update error:', error.message); return false; }
     console.log('[Sync] ✓ Shift updated:', shift.id);
+    return true;
+  } catch (e) { console.warn('[Sync]', e.message); return false; }
+}
+
+// Eigene Schicht-Pause setzen ODER auf Standard zurücksetzen (null). Separat,
+// da null nur nach Migration (Spalte vorhanden) sinnvoll geschrieben werden kann.
+async function syncShiftPause(shiftId, pauseMinutes) {
+  try {
+    if (!shiftId || typeof shiftId !== 'number') return false;
+    const { error } = await sb.from('shifts').update({ pause_minutes: pauseMinutes }).eq('id', shiftId);
+    if (error) { console.warn('[Sync] Shift pause error:', error.message); return false; }
     return true;
   } catch (e) { console.warn('[Sync]', e.message); return false; }
 }

@@ -222,7 +222,8 @@ async function loadDataFromSupabase() {
         isVacation: s.is_vacation || false,
         isLate: s.is_late || false,
         lateMin: s.late_min || 0,
-        vacHalf: s.vac_half || false
+        vacHalf: s.vac_half || false,
+        pauseMinutes: (s.pause_minutes ?? null)   // null = MA-Default verwenden
       }));
       window._shiftsFromDB = true;
       console.log('[Data] ✓ ' + shifts.length + ' shifts loaded from Supabase');
