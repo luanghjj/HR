@@ -133,19 +133,22 @@ function formatEuro(value) {
   }) + ' €';
 }
 
-/** Calculate planned hours for an employee (current month) */
+/** Calculate planned hours for an employee (current month)
+ *  Halber Urlaub (isVacation && vacHalf) zählt mit halben Stunden. */
 function calcPlanHours(employeeId) {
   const now = new Date(); // BUG FIX: was hardcoded
   const year = now.getFullYear();
   const month = now.getMonth();
-  const monthShifts = SHIFTS.filter(s => s.empId === employeeId && !s.isSick && !s.isVacation);
+  // Krank + ganzer Urlaub raus; halber Urlaub bleibt (halbe Stunden)
+  const monthShifts = SHIFTS.filter(s => s.empId === employeeId && !s.isSick && !(s.isVacation && !s.vacHalf));
   let total = 0;
   monthShifts.forEach(shift => {
     const shiftDate = new Date(shift.date);
     if (shiftDate.getFullYear() === year && shiftDate.getMonth() === month) {
       const [fromHour, fromMin] = shift.from.split(':').map(Number);
       const [toHour, toMin] = shift.to.split(':').map(Number);
-      total += (toHour + toMin / 60) - (fromHour + fromMin / 60);
+      const h = (toHour + toMin / 60) - (fromHour + fromMin / 60);
+      total += (shift.isVacation && shift.vacHalf) ? h / 2 : h;
     }
   });
   return Math.round(total * 10) / 10;

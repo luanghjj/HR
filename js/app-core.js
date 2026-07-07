@@ -1787,16 +1787,23 @@ async function fetchMonthlyHours(empId){
     buckets.push({ y:d.getFullYear(), m:d.getMonth(), label:`${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}`, brutto:0, count:0, lateMin:0, pauseSum:0 });
   }
   rows.forEach(s=>{
-    if (s.is_sick || s.is_vacation) return;
+    if (s.is_sick || (s.is_vacation && !s.vac_half)) return; // Krank / ganzer Urlaub → 0 h
     const d = new Date(s.shift_date);
     const b = buckets.find(x=>x.y===d.getFullYear() && x.m===d.getMonth());
     if (!b) return;
     const [fh,fm] = (s.shift_from||'0:0').split(':').map(Number);
     const [th,tm] = (s.shift_to||'0:0').split(':').map(Number);
-    b.brutto += (th+tm/60)-(fh+fm/60);
-    b.count++;
-    b.pauseSum += (s.pause_minutes != null ? s.pause_minutes : pauseMin);
-    if (s.is_late) b.lateMin += (s.late_min || 0);
+    const bruttoH = Math.max(0,(th+tm/60)-(fh+fm/60));
+    if (s.is_vacation && s.vac_half) {
+      // Halber Urlaub (A): halber Tag gearbeitet, keine Pause/Verspätung
+      b.brutto += bruttoH/2;
+      b.count++;
+    } else {
+      b.brutto += bruttoH;
+      b.count++;
+      b.pauseSum += (s.pause_minutes != null ? s.pause_minutes : pauseMin);
+      if (s.is_late) b.lateMin += (s.late_min || 0);
+    }
   });
   return buckets.map(b=>{
     const brutto = Math.round(b.brutto*10)/10;
@@ -1826,13 +1833,16 @@ async function fetchMonthDetail(empId, year, month){
     const [th,tm]=(s.shift_to||'0:0').split(':').map(Number);
     const bruttoH = Math.max(0,(th+tm/60)-(fh+fm/60));
     const lateMin = s.is_late ? (s.late_min||0) : 0;
-    const isOff = s.is_sick || s.is_vacation;
+    const isHalfVac = s.is_vacation && s.vac_half;        // A: halber Tag → Stunden ÷ 2
+    const isFullOff = s.is_sick || (s.is_vacation && !s.vac_half); // Krank / B: ganzer Tag → 0 h
     const shiftPause = s.pause_minutes != null ? s.pause_minutes : pauseMin;
-    const pauseUse = isOff ? 0 : shiftPause;
-    const nettoH = isOff ? 0 : Math.max(0, bruttoH - pauseUse/60 - lateMin/60);
+    let pauseUse, nettoH;
+    if (isFullOff) { pauseUse = 0; nettoH = 0; }
+    else if (isHalfVac) { pauseUse = 0; nettoH = Math.max(0, bruttoH/2); }
+    else { pauseUse = shiftPause; nettoH = Math.max(0, bruttoH - pauseUse/60 - lateMin/60); }
     return {
       date: s.shift_date, from: s.shift_from, to: s.shift_to, label: s.label||'',
-      isSick: s.is_sick, isVacation: s.is_vacation, lateMin,
+      isSick: s.is_sick, isVacation: s.is_vacation, vacHalf: !!s.vac_half, lateMin,
       pauseMin: pauseUse,
       bruttoH: Math.round(bruttoH*10)/10,
       nettoH: Math.round(nettoH*10)/10
@@ -1848,21 +1858,33 @@ async function exportMonthReportPDF(empId, year, month){
   if(!emp){ toast('Mitarbeiter nicht gefunden','err'); return; }
   const monLbl = `${MONTHS_DE[month]} ${year}`;
   const fmtDay = ds => { const d=new Date(ds); return `${['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]} ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`; };
-  let sumBrutto=0, sumNetto=0, sumLate=0, workDays=0, sumPause=0;
+  let sumBrutto=0, sumNetto=0, sumLate=0, workDays=0, sumPause=0, vacDays=0;
   const rowsHtml = days.map(d=>{
-    let typ='', zeit='', pause='', spaet='', netto='';
-    if(d.isVacation){ typ='<span style="color:#0984e3">Urlaub</span>'; }
+    let typ='', zeit='', brutto='', pause='', spaet='', netto='';
+    if(d.isVacation && d.vacHalf){
+      // Halber Urlaub (A): halber Tag gearbeitet → Stunden ÷ 2
+      typ='<span style="color:#0984e3">½ Urlaub (A)</span>';
+      zeit = `${d.from}–${d.to}`;
+      brutto = `${d.bruttoH} h`;
+      pause = '–'; spaet = '–';
+      netto = `${d.nettoH} h`;
+      vacDays += 0.5; workDays++;
+      sumBrutto+=d.bruttoH; sumNetto+=d.nettoH;
+    }
+    else if(d.isVacation){ typ='<span style="color:#0984e3">Urlaub (B)</span>'; vacDays += 1; }
     else if(d.isSick){ typ='<span style="color:#d63031">Krank</span>'; }
     else {
       typ = d.label || 'Schicht';
       zeit = `${d.from}–${d.to}`;
+      brutto = `${d.bruttoH} h`;
       pause = `${d.pauseMin} min`;
       spaet = d.lateMin>0 ? `<span style="color:#e84393">${d.lateMin} min</span>` : '–';
       netto = `${d.nettoH} h`;
       sumBrutto+=d.bruttoH; sumNetto+=d.nettoH; sumLate+=d.lateMin; sumPause+=d.pauseMin; workDays++;
     }
-    return `<tr><td>${fmtDay(d.date)}</td><td>${typ}</td><td>${zeit}</td><td style="text-align:right">${d.isSick||d.isVacation?'':d.bruttoH+' h'}</td><td style="text-align:center">${pause}</td><td style="text-align:center">${spaet}</td><td style="text-align:right;font-weight:700">${netto}</td></tr>`;
+    return `<tr><td>${fmtDay(d.date)}</td><td>${typ}</td><td>${zeit}</td><td style="text-align:right">${brutto}</td><td style="text-align:center">${pause}</td><td style="text-align:center">${spaet}</td><td style="text-align:right;font-weight:700">${netto}</td></tr>`;
   }).join('');
+  const vacDaysLbl = vacDays>0 ? (Number.isInteger(vacDays)?vacDays:vacDays.toFixed(1)) : 0;
   const sumNettoR = Math.round(sumNetto*10)/10;
   const sumBruttoR = Math.round(sumBrutto*10)/10;
   const w = window.open('','_blank');
@@ -1877,7 +1899,7 @@ async function exportMonthReportPDF(empId, year, month){
     @media print{body{padding:0}}</style></head><body>
     <h1>Monatsbericht – ${emp.name}</h1>
     <h2>${monLbl} · ${getLocationName((emp.location||'').split(',')[0])} · ${emp.dept||''}${emp.employmentType?(' · '+emp.employmentType):''}</h2>
-    <div class="meta">Pause: ${emp.pauseMinutes??30} Min./Schicht · Netto = Brutto − Pause − Verspätung</div>
+    <div class="meta">Pause: ${emp.pauseMinutes??30} Min./Schicht · Netto = Brutto − Pause − Verspätung · Urlaub: ${vacDaysLbl} Tag(e) (A = ½, B = 1)</div>
     <table>
       <thead><tr><th>Tag</th><th>Art</th><th>Zeit</th><th style="text-align:right">Brutto</th><th style="text-align:center">Pause</th><th style="text-align:center">Verspätung</th><th style="text-align:right">Netto</th></tr></thead>
       <tbody>${rowsHtml||'<tr><td colspan="7" style="text-align:center;color:#999">Keine Schichten in diesem Monat</td></tr>'}</tbody>
@@ -4750,25 +4772,41 @@ async function markSick(id){if(!can('editSchedules'))return;const s=SHIFTS.find(
 function markVac(id){
   if(!can('editSchedules'))return;
   const s=SHIFTS.find(x=>x.id===id);if(!s)return;
-  if(s.isVacation){
-    // Toggle off
+  // Bereits Urlaub → direkt aufheben
+  if(s.isVacation){ setVac(id,null); return; }
+  // Sonst: A (halber Tag) oder B (ganzer Tag) wählen lassen
+  document.getElementById('modalTitle').textContent='Urlaub – '+s.empName;
+  document.getElementById('modalBody').innerHTML=`
+    <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px">${formatDateDE(s.date)} · ${s.from}–${s.to}</div>
+    <div style="display:flex;gap:12px">
+      <button class="btn" style="flex:1;flex-direction:column;gap:6px;padding:18px 12px;height:auto" onclick="setVac(${id},true)">
+        <span style="font-size:1.6rem;font-weight:800;color:#0984e3">A</span>
+        <span style="font-weight:600">Halber Tag</span>
+        <span style="font-size:.72rem;color:var(--text-muted)">½ Urlaubstag · Stunden ÷ 2</span>
+      </button>
+      <button class="btn" style="flex:1;flex-direction:column;gap:6px;padding:18px 12px;height:auto" onclick="setVac(${id},false)">
+        <span style="font-size:1.6rem;font-weight:800;color:#0984e3">B</span>
+        <span style="font-weight:600">Ganzer Tag</span>
+        <span style="font-size:.72rem;color:var(--text-muted)">1 Urlaubstag · 0 Stunden</span>
+      </button>
+    </div>`;
+  document.getElementById('modalFooter').innerHTML=`<button class="btn" onclick="closeModal()">Abbrechen</button>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+// half: true = A (halber Tag), false = B (ganzer Tag), null = Urlaub aufheben
+function setVac(id, half){
+  const s=SHIFTS.find(x=>x.id===id);if(!s)return;
+  if(half===null){
     s.isVacation=false;s.vacHalf=false;
   } else {
-    // Auto-detect based on location + day of week
-    const emp=EMPS.find(e=>e.id===s.empId);
-    const loc=emp?.location||s.location||'okyu';
-    const vType=getVacTypeForDate(s.date, loc);
-    if(!vType){
-      toast('Dieser Tag ist ein Ruhetag – kein Urlaub möglich','warn');
-      return;
-    }
-    s.isVacation=true;s.isSick=false;
-    s.vacHalf=(vType==='A');
-    const label=vType==='A'?'Halber Urlaub':'Urlaub';
+    s.isVacation=true;s.isSick=false;s.vacHalf=!!half;
+    const label=half?'Halber Urlaub (A)':'Urlaub (B)';
     toast(`${label} für ${s.empName}`);
     addNotif('vacation',label,`${s.empName}: ${formatDateDE(s.date)}`);
   }
-  syncUpdateShift(s);renderSchedule();
+  closeModal();
+  renderSchedule();
+  syncUpdateShift(s).then(ok=>{ if(ok===false){ toast('Fehler beim Speichern','err'); } });
 }
 function markLateShift(id){if(!can('markLate')&&!can('editSchedules'))return;const s=SHIFTS.find(x=>x.id===id);if(!s)return;
   document.getElementById('modalTitle').textContent='Verspätung – '+s.empName;

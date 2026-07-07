@@ -417,7 +417,8 @@ async function syncAddShift(shift) {
       is_sick: shift.isSick || false,
       is_vacation: shift.isVacation || false,
       is_late: shift.isLate || false,
-      late_min: shift.lateMin || 0
+      late_min: shift.lateMin || 0,
+      vac_half: shift.vacHalf || false
     };
     // Nur mitschicken, wenn eine eigene Pause gesetzt ist (sonst kein Bruch,
     // falls die Spalte noch nicht existiert – MA-Default gilt).
