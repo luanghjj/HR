@@ -5938,6 +5938,27 @@ async function saveUserEmail(userId, email){
   } catch(e) { toast('Fehler: ' + e.message, 'err'); }
 }
 
+// ═══ LOGIN-E-MAIL ÄNDERN (routet je nach Konto-Typ) ═══
+// Bestehendes Auth-Konto (authUserId gesetzt) → Edge Function ändert Auth + reg_email.
+// Nur Einladung (kein Auth-Konto) → reg_email direkt (saveUserEmail).
+async function changeUserEmail(userId, email){
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+  email = (email || '').trim().toLowerCase();
+  if (email === (u.regEmail || '').toLowerCase()) return; // keine Änderung
+  // E-Mail eines aktiven Logins darf nicht geleert werden
+  if (!email && u.authUserId) { toast('Login-E-Mail kann nicht entfernt werden', 'err'); return; }
+  if (email && !email.includes('@')) { toast('Ungültige E-Mail', 'err'); return; }
+  // Kein echtes Auth-Konto → nur Vorautorisierung (reg_email)
+  if (!u.authUserId) { await saveUserEmail(userId, email); return; }
+  // Echtes Login → Auth + reg_email über Edge Function
+  try {
+    await callAdminUsers('updateEmail', { userId, email });
+    u.regEmail = email;
+    toast(`✓ Login-E-Mail geändert: ${email}`, 'success');
+  } catch(e) { toast('Fehler: ' + e.message, 'err'); }
+}
+
 // ═══ ADMIN-USERS EDGE FUNCTION HELPER ═══
 // Ruft die Edge Function 'admin-users' auf (Konto anlegen, Passwort
 // setzen/ansehen). Nur Inhaber – die Funktion prüft das serverseitig.
@@ -6931,7 +6952,8 @@ async function openAccountDetailModal(userId) {
             <button class="btn btn-sm" onclick="closeModal();openLocPicker('${userId}')" title="Standorte ändern"><span class="ms" style="font-size:15px">edit_location</span></button></div>
           </div>
           <div style="grid-column:span 2"><label class="form-label">E-Mail (Login)</label>
-            <input class="form-input" id="adEmail" type="email" value="${(u.regEmail||'').replace(/"/g,'&quot;')}" placeholder="email@example.com" ${hasLogin?'readonly style="background:var(--bg-secondary)"':''}></div>
+            <input class="form-input" id="adEmail" type="email" value="${(u.regEmail||'').replace(/"/g,'&quot;')}" placeholder="email@example.com">
+            ${hasLogin?`<div style="font-size:.68rem;color:var(--text-muted);margin-top:3px">Änderung aktualisiert auch die Anmeldung – MA meldet sich danach mit der neuen E-Mail an.</div>`:''}</div>
           <div style="grid-column:span 2"><label class="form-label">Passwort</label>${pwBlock}</div>
         </div>
       </div>
@@ -7017,6 +7039,7 @@ async function adCreateLogin(userId) {
     });
     // Lokalen State aktualisieren
     u.regEmail = email;
+    if (r.authUserId) u.authUserId = r.authUserId;
     if (r.userId && r.userId !== u.id) u.id = r.userId;
     toast(`✓ Login erstellt für ${email}`, 'success');
     closeModal();
@@ -7036,12 +7059,12 @@ async function saveAccountDetail(userId) {
   if (name && name !== u.name) await changeUserName(userId, name);
   if (role && role !== u.role) await changeUserRole(userId, role);
   if (pos != null) await changeUserPosition(userId, pos);
-  // Login-E-Mail speichern (nur wenn Feld editierbar = noch kein Login angelegt).
-  // Ohne Passwort = Einladung: MA meldet sich später per Google/Registrierung an.
+  // Login-E-Mail speichern. Bestehendes Login → Auth + reg_email (Edge Function);
+  // nur Einladung (kein Auth-Konto) → reg_email. changeUserEmail entscheidet.
   const emailEl = document.getElementById('adEmail');
-  if (emailEl && !emailEl.readOnly) {
+  if (emailEl) {
     const email = (emailEl.value || '').trim().toLowerCase();
-    if (email !== (u.regEmail || '')) await saveUserEmail(userId, email);
+    if (email !== (u.regEmail || '').toLowerCase()) await changeUserEmail(userId, email);
   }
   // 2. Berechtigungen (gleiche Logik wie savePermissions)
   await savePermissions(userId);

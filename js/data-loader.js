@@ -37,6 +37,7 @@ async function loadDataFromSupabase() {
         location: p.location,
         avatar: p.avatar,
         empId: p.emp_id,
+        authUserId: p.auth_user_id || null,
         lastLogin: new Date().toLocaleDateString('de-DE'),
         status: p.status || 'active',
         regBirthday: p.reg_birthday || null,
