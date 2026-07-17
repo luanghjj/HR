@@ -388,9 +388,10 @@ async function loadDataFromSupabase() {
     } // end Finanz-/Admin-Tabellen
 
 
-    // Load Aushilfe slots (current + future, 3 months ahead)
+    // Load Aushilfe slots (3 months history + 3 months future)
     const aushilfeStart = new Date();
-    aushilfeStart.setDate(1); // Start of this month
+    aushilfeStart.setMonth(aushilfeStart.getMonth() - 3); // 3 Monate zurück (Verlauf)
+    aushilfeStart.setDate(1);
     const aushilfeEnd = new Date();
     aushilfeEnd.setMonth(aushilfeEnd.getMonth() + 3);
     try {
