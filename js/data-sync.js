@@ -580,10 +580,27 @@ async function syncCheckIn(record) {
       .select('*').eq('emp_id', record.empId).is('check_out', null)
       .order('check_in', { ascending: false }).limit(1).maybeSingle();
     if (open) {
-      console.log('[Sync] Check-in bereits offen → bestehenden Datensatz nutzen:', open.id);
-      record.id = open.id;
-      record.checkIn = open.check_in;
-      return open;
+      // Offener Check-in eines VORTAGS (vergessen auszustempeln) nicht weiterführen
+      // → würde Stunden über zwei Tage ziehen. Alten Datensatz automatisch schließen
+      // und neuen Check-in für heute anlegen (Issue #5).
+      const todayBerlin = isoDateBerlin(new Date());
+      const openDay = isoDateBerlin(open.check_in);
+      if (openDay !== todayBerlin) {
+        const staleOut = new Date(new Date(open.check_in).getTime() + STALE_CHECKIN_MAX_H * 3600000);
+        const pauseMin = pauseForRecord(open.emp_id, open.shift_id);
+        const staleH = workedHours15(open.check_in, staleOut, pauseMin);
+        await sb.from('time_records').update({
+          check_out: staleOut.toISOString(), total_hours: parseFloat(staleH),
+          note: (open.note ? open.note + ' · ' : '') + 'auto-geschlossen (neuer Check-in am ' + todayBerlin + ')'
+        }).eq('id', open.id);
+        console.log('[Sync] verwaister Check-in vom', openDay, 'geschlossen → neuer Check-in');
+      } else {
+        // Tatsächlich derselbe Tag → bestehenden Datensatz weiter nutzen
+        console.log('[Sync] Check-in bereits offen → bestehenden Datensatz nutzen:', open.id);
+        record.id = open.id;
+        record.checkIn = open.check_in;
+        return open;
+      }
     }
     const { data, error } = await sb.from('time_records').insert({
       emp_id: record.empId,

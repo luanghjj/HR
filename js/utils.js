@@ -8,9 +8,104 @@ function escapeHtml(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-/** Format Date to ISO string YYYY-MM-DD */
+/** Format Date to ISO string YYYY-MM-DD (browser-local time) */
 function isoDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** Format any date/timestamp to YYYY-MM-DD in Europe/Berlin (TZ-safe).
+ *  Supabase gibt TIMESTAMPTZ als UTC-String zurück (z.B. '2026-07-17T22:30:00Z');
+ *  ein Check-in 18.07. 00:30 CEST liegt in Berlin am 18.07., als UTC aber am 17.07.
+ *  startsWith('2026-07-18') würde falsch sein → deshalb Berlin-Datum benutzen.
+ *  @param {Date|string|number} date - Date object, ISO string or epoch ms
+ *  @returns {string} YYYY-MM-DD in Europe/Berlin */
+function isoDateBerlin(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d)) return '';
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(d);
+  const y = p.find(x => x.type === 'year').value;
+  const m = p.find(x => x.type === 'month').value;
+  const day = p.find(x => x.type === 'day').value;
+  return `${y}-${m}-${day}`;
+}
+
+/** Schicht-Stunden aus 'HH:MM'-Strings. Behandelt Schichten über Mitternacht
+ *  (to <= from → +24h) und liefert nie negative Werte (Math.max(0,…)).
+ *  @param {string} fromStr - 'HH:MM'
+ *  @param {string} toStr   - 'HH:MM'
+ *  @returns {number} Stunden (brutto) */
+function calcShiftSpanH(fromStr, toStr) {
+  if (!fromStr || !toStr) return 0;
+  const [fh, fm] = fromStr.split(':').map(Number);
+  const [th, tm] = toStr.split(':').map(Number);
+  let h = (th + tm / 60) - (fh + fm / 60);
+  if (h < 0) h += 24; // über Mitternacht
+  return Math.max(0, h);
+}
+
+/** Berlin-Offset gegenüber UTC in Millisekunden (DST-sicher) für einen Zeitpunkt.
+ *  Positiv = Berlin voraus. Dient dazu, ein Berliner Wanduhr-Datum ('YYYY-MM-DD' +
+ *  'HH:MM') in einen absoluten Epoch-Wert umzuwandeln, unabhängig von der
+ *  Browser-Zeitzone (z.B. Auto-Checkout auf nicht-Berlin-Geräten).
+ *  @param {Date} [d] - Zeitpunkt (Default: jetzt)
+ *  @returns {number} ms */
+function berlinOffsetMs(d) {
+  const dt = d instanceof Date ? d : new Date();
+  const utcMs = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(),
+    dt.getUTCHours(), dt.getUTCMinutes());
+  // Berliner Wanduhr als "lokale" Zeit interpretieren:
+  const blnStr = dt.toLocaleString('en-US', { timeZone: 'Europe/Berlin', hour12: false });
+  const bln = new Date(blnStr);
+  const blnUtcMs = Date.UTC(bln.getFullYear(), bln.getMonth(), bln.getDate(),
+    bln.getHours(), bln.getMinutes());
+  return blnUtcMs - utcMs;
+}
+
+/** Absoluten Epoch-Wert (ms) aus Berliner Datum + 'HH:MM' Wanduhr berechnen.
+ *  TZ-sicher: funktioniert auf jedem Browser, nicht nur Europe/Berlin.
+ *  @param {string} dateStr - 'YYYY-MM-DD' (Berliner Kalendertag)
+ *  @param {string} hhmm    - 'HH:MM'
+ *  @returns {number} epoch ms */
+function berlinWallMs(dateStr, hhmm) {
+  if (!dateStr || !hhmm) return NaN;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const [hh, mm] = hhmm.split(':').map(Number);
+  return Date.UTC(y, m - 1, d, hh, mm, 0, 0) - berlinOffsetMs(new Date());
+}
+
+/** Pause-Minuten für einen Check-in-Record: Schicht-Pause hat Vorrang,
+ *  sonst MA-Default (pauseMinutes ?? 30).
+ *  @param {number} empId
+ *  @param {number|null} shiftId
+ *  @returns {number} Pause in Minuten */
+function pauseForRecord(empId, shiftId) {
+  if (shiftId != null && typeof SHIFTS !== 'undefined') {
+    const sh = SHIFTS.find(s => s.id === shiftId);
+    if (sh && sh.pauseMinutes != null) return sh.pauseMinutes;
+  }
+  const emp = (typeof EMPS !== 'undefined') ? EMPS.find(e => e.id === empId) : null;
+  return emp?.pauseMinutes ?? 30;
+}
+
+/** Netto-Stunden EINER Schicht (gemapptes Shift-Objekt mit s.from/s.to/…).
+ *  Krank / ganzer Urlaub → 0 h. Halber Urlaub → halbe Stunden (ohne Pause/Verspätung).
+ *  Sonst: brutto − Pause (Schicht > MA-Default > 30) − Verspätung.
+ *  @param {object} shift - gemapptes Shift-Objekt {from,to,isSick,isVacation,vacHalf,isLate,lateMin,pauseMinutes}
+ *  @param {object} [emp]  - gemapptes MA-Objekt (für pauseMinutes-Default)
+ *  @returns {number} Netto-Stunden (1 Dezimalstelle) */
+function calcShiftNetH(shift, emp) {
+  if (!shift) return 0;
+  if (shift.isSick || (shift.isVacation && !shift.vacHalf)) return 0;
+  const brutto = calcShiftSpanH(shift.from, shift.to);
+  if (shift.isVacation && shift.vacHalf) {
+    return Math.max(0, Math.round(brutto / 2 * 10) / 10);
+  }
+  const pauseMin = shift.pauseMinutes != null ? shift.pauseMinutes : (emp?.pauseMinutes ?? 30);
+  const lateMin = shift.isLate ? (shift.lateMin || 0) : 0;
+  const net = brutto - pauseMin / 60 - lateMin / 60;
+  return Math.max(0, Math.round(net * 10) / 10);
 }
 
 /** Format date string to German locale (DD.MM.YYYY) */
@@ -134,7 +229,8 @@ function formatEuro(value) {
 }
 
 /** Calculate planned hours for an employee (current month)
- *  Halber Urlaub (isVacation && vacHalf) zählt mit halben Stunden. */
+ *  Halber Urlaub (isVacation && vacHalf) zählt mit halben Stunden.
+ *  TZ-sicher + mitternachtübergreifend (calcShiftSpanH). */
 function calcPlanHours(employeeId) {
   const now = new Date(); // BUG FIX: was hardcoded
   const year = now.getFullYear();
@@ -145,9 +241,7 @@ function calcPlanHours(employeeId) {
   monthShifts.forEach(shift => {
     const shiftDate = new Date(shift.date);
     if (shiftDate.getFullYear() === year && shiftDate.getMonth() === month) {
-      const [fromHour, fromMin] = shift.from.split(':').map(Number);
-      const [toHour, toMin] = shift.to.split(':').map(Number);
-      const h = (toHour + toMin / 60) - (fromHour + fromMin / 60);
+      const h = calcShiftSpanH(shift.from, shift.to);
       total += (shift.isVacation && shift.vacHalf) ? h / 2 : h;
     }
   });
@@ -403,9 +497,29 @@ function findNearestLocation(lat, lng) {
   return nearest ? { location: nearest, distance: Math.round(minDist) } : null;
 }
 
+// ═══ MINIJOB-GRENZE ═══
+// 538 € ist die gesetzliche Geringfügigkeitsgrenze (Minijob, seit 2024).
+// 43,5 h ist der historische Default (538 € / ~12,32 € Mindestlohn 2024).
+// Wenn ein MA einen echten EUR/Std-Satz hat, ist die Stundengrenze
+// GERINGER: 538 / hourlyRate. Fallback ohne Satz: 43,5 h.
+const MINIJOB_LIMIT_EUR = 538;
+const MINIJOB_MAX_H = 43.5; // Fallback, wenn kein EUR/Std-Satz vorhanden
+
+/** Stundengrenze für Minijob-Warnung pro Mitarbeiter (EUR-basiert, falls Satz vorhanden).
+ *  @param {object} emp - gemapptes MA-Objekt (hourlyRate optional)
+ *  @returns {number} max. Netto-Stunden im Monat */
+function minijobMaxHours(emp) {
+  if (emp?.hourlyRate && emp.hourlyRate > 0) {
+    return Math.floor((MINIJOB_LIMIT_EUR / emp.hourlyRate) * 10) / 10;
+  }
+  return MINIJOB_MAX_H;
+}
+
 // ═══ ZEITERFASSUNG – 15-Minuten-Raster ═══
 // Regel: Check-in wird AUFgerundet (↑), Check-out wird ABgerundet (↓).
 // Dadurch zählt nur die volle 15-Min-Arbeitszeit (zugunsten des Betriebs).
+// Pause: Standardmäßig wird die MA-/Schicht-Pause abgezogen (Netto, wie Plan-Stunden),
+//        damit Ist- und Plan-Stunden dieselbe Definition haben (Issue #3).
 
 /** Date auf 15-Min-Raster runden. dir: 'ceil' (Check-in) | 'floor' (Check-out) */
 function round15(date, dir) {
@@ -414,9 +528,15 @@ function round15(date, dir) {
   return new Date(dir === 'ceil' ? Math.ceil(t / ms) * ms : Math.floor(t / ms) * ms);
 }
 
-/** Gearbeitete Stunden mit 15-Min-Raster (Check-in↑, Check-out↓). */
-function workedHours15(checkIn, checkOut) {
+/** Gearbeitete Stunden mit 15-Min-Raster (Check-in↑, Check-out↓).
+ *  Optionaler pauseMin wird abgezogen (Netto wie Plan-Stunden).
+ *  @param {Date|string|number} checkIn
+ *  @param {Date|string|number} checkOut
+ *  @param {number} [pauseMin] - Pause in Minuten (wird abgezogen, nie <0) */
+function workedHours15(checkIn, checkOut, pauseMin) {
   const inR  = round15(checkIn, 'ceil');
   const outR = round15(checkOut, 'floor');
-  return Math.max(0, Math.round(((outR - inR) / 3600000) * 100) / 100);
+  let h = (outR - inR) / 3600000;
+  if (pauseMin && pauseMin > 0) h -= pauseMin / 60;
+  return Math.max(0, Math.round(h * 100) / 100);
 }

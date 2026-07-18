@@ -195,15 +195,17 @@ async function loadDataFromSupabase() {
       }));
     }
 
-    // Load shifts (2 weeks around current date)
-    const shiftStart = new Date();
-    shiftStart.setDate(shiftStart.getDate() - 7);
+    // Load shifts: gesamter aktueller Monat + 14 Tage Vorschau (vorher nur ±7/+14,
+    // dadurch fehlten Schichten am Monatsanfang in "Stunden diesen Monat", Reports etc.).
+    const now = new Date();
+    const shiftStart = new Date(now.getFullYear(), now.getMonth(), 1); // 1. des aktuellen Monats
+    shiftStart.setDate(shiftStart.getDate() - 7);                      // kleine Rückkehr-Puffer
     const shiftEnd = new Date();
     shiftEnd.setDate(shiftEnd.getDate() + 14);
     const { data: shifts, error: shiftsErr } = await sb.from('shifts')
       .select('*')
-      .gte('shift_date', shiftStart.toISOString().split('T')[0])
-      .lte('shift_date', shiftEnd.toISOString().split('T')[0])
+      .gte('shift_date', isoDate(shiftStart))
+      .lte('shift_date', isoDate(shiftEnd))
       .order('shift_date');
     if (shiftsErr) console.warn('[Data] shifts:', shiftsErr.message);
     if (shifts && shifts.length > 0) {
@@ -308,12 +310,12 @@ async function loadDataFromSupabase() {
       }));
     }
 
-    // Set activeCheckIn if user has open check-in today
+    // Set activeCheckIn if user has open check-in today (TZ-safe via Europe/Berlin)
     if (currentUser?.empId) {
-      const today = isoDate(new Date());
+      const today = isoDateBerlin(new Date());
       activeCheckIn = TIME_RECORDS.find(r =>
         r.empId === currentUser.empId &&
-        r.checkIn?.startsWith(today) &&
+        isoDateBerlin(r.checkIn) === today &&
         !r.checkOut
       ) || null;
     }
@@ -529,13 +531,29 @@ async function loadDataFromSupabase() {
 
 // ═══ AUTO-CHECKOUT (30 min after shift end) ═══
 const AUTO_CHECKOUT_BUFFER = 30; // minutes
+const STALE_CHECKIN_MAX_H = 24;  // offener Check-in älter als 24h → automatisch schließen
 
 async function runAutoCheckout() {
-  const today = isoDate(new Date());
+  const today = isoDateBerlin(new Date());
   const now = new Date();
 
-  // Find open time_records (check_in today, no check_out)
-  const openRecords = TIME_RECORDS.filter(r => r.checkIn?.startsWith(today) && !r.checkOut);
+  // 1) Verwaiste offene Check-ins schließen (gestern vergessen auszustempeln o.ä.).
+  //    Ein offener Check-in älter als 24h würde sonst die Stunden über zwei Tage ziehen.
+  const stale = TIME_RECORDS.filter(r => !r.checkOut && r.checkIn &&
+    (now - new Date(r.checkIn)) / 3600000 > STALE_CHECKIN_MAX_H);
+  for (const rec of stale) {
+    const staleOut = new Date(new Date(rec.checkIn).getTime() + STALE_CHECKIN_MAX_H * 3600000);
+    const pauseMin = pauseForRecord(rec.empId, rec.shiftId);
+    const th = workedHours15(rec.checkIn, staleOut, pauseMin);
+    const outIso = staleOut.toISOString();
+    const { error } = await sb.from('time_records').update({
+      check_out: outIso, total_hours: parseFloat(th)
+    }).eq('id', rec.id);
+    if (!error) { rec.checkOut = outIso; rec.totalHours = parseFloat(th); console.log('[Auto-Checkout] verwaister Check-in geschlossen:', rec.id); }
+  }
+
+  // 2) Find open time_records (check_in today in Berlin, no check_out)
+  const openRecords = TIME_RECORDS.filter(r => !r.checkOut && isoDateBerlin(r.checkIn) === today);
   if (openRecords.length === 0) return;
 
   // Find matching shifts
@@ -544,20 +562,34 @@ async function runAutoCheckout() {
 
   let autoCount = 0;
   for (const rec of openRecords) {
-    const shift = todayShifts.find(s => s.empId === rec.empId);
+    // Vorzug: exakte Schicht über rec.shiftId; sonst Schicht des MAs, die am
+    // nächsten am Check-in-Zeitpunkt beginnt (bei mehreren Schichten/Tag, Issue #4).
+    let shift = rec.shiftId != null ? todayShifts.find(s => s.id === rec.shiftId) : null;
+    if (!shift) {
+      const ciMs = new Date(rec.checkIn).getTime();
+      shift = todayShifts
+        .filter(s => s.empId === rec.empId)
+        .sort((a, b) => Math.abs(_shiftStartMs(a, today) - ciMs) - Math.abs(_shiftStartMs(b, today) - ciMs))[0];
+    }
     if (!shift || !shift.to) continue;
 
-    // Parse shift end
+    // Parse shift end als absoluten Epoch-Wert im Berliner Wanduhr-System (TZ-sicher,
+    // funktioniert auch auf Nicht-Berlin-Browsern). Ca-Ende kann am Folgetag liegen.
     const [endH, endM] = shift.to.split(':').map(Number);
-    const shiftEnd = new Date(today + 'T00:00:00');
-    shiftEnd.setHours(endH, endM, 0, 0);
+    const [stH, stM] = (shift.from || '00:00').split(':').map(Number);
+    const overnight = endH < stH || (endH === stH && endM < stM);
+    let shiftEndMs = berlinWallMs(today, shift.to);
+    if (overnight) shiftEndMs += 24 * 3600000; // über Mitternacht → Folgetag
+    const shiftEnd = new Date(shiftEndMs);
 
     // 30 min buffer
     const deadline = new Date(shiftEnd.getTime() + AUTO_CHECKOUT_BUFFER * 60000);
 
     if (now >= deadline) {
       const checkOutTime = shiftEnd.toISOString();
-      const totalHours = workedHours15(rec.checkIn, shiftEnd);
+      const pauseMin = shift.pauseMinutes != null ? shift.pauseMinutes
+        : (EMPS.find(e => e.id === rec.empId)?.pauseMinutes ?? 30);
+      const totalHours = workedHours15(rec.checkIn, shiftEnd, pauseMin);
 
       const { error } = await sb.from('time_records').update({
         check_out: checkOutTime,
@@ -575,5 +607,10 @@ async function runAutoCheckout() {
   if (autoCount > 0) {
     console.log(`[Auto-Checkout] ✓ ${autoCount} Mitarbeiter automatisch ausgecheckt`);
   }
+}
+
+/** Millisekunden des Schicht-Beginns (Berliner Wanduhr, TZ-sicher) für Auto-Checkout-Sortierung. */
+function _shiftStartMs(shift, dateStr) {
+  return berlinWallMs(dateStr, shift.from || '00:00');
 }
 
