@@ -288,12 +288,12 @@ async function detectQrCheckin() {
  * If not → check-in with GPS verify
  */
 async function handleQrCheckin(locationId) {
-  const today = isoDate(new Date());
+  const today = isoDateBerlin(new Date());
 
-  // Check if already checked in today (open record)
+  // Check if already checked in today (open record) — TZ-safe via Europe/Berlin
   const openRecord = TIME_RECORDS.find(r =>
     r.empId === currentUser.empId &&
-    r.checkIn?.startsWith(today) &&
+    isoDateBerlin(r.checkIn) === today &&
     !r.checkOut
   );
 
@@ -534,8 +534,9 @@ async function doCheckOut() {
     let pos = null;
     try { pos = await getCurrentGPS(); } catch(_) { /* GPS optional beim Check-out */ }
     const cin = new Date(activeCheckIn.checkIn);
-    // 15-Min-Raster: Check-in↑, Check-out↓
-    const totalHours = workedHours15(activeCheckIn.checkIn, Date.now());
+    // 15-Min-Raster: Check-in↑, Check-out↓ + Pause abziehen (Netto wie Plan-Stunden, Issue #3)
+    const pauseMin = pauseForRecord(activeCheckIn.empId, activeCheckIn.shiftId);
+    const totalHours = workedHours15(activeCheckIn.checkIn, Date.now(), pauseMin);
 
     const data = await syncCheckOut(activeCheckIn.id, {
       lat: pos?.lat ?? null,
@@ -777,7 +778,7 @@ function renderDashboard(){
         <div class="stat-card"><div class="stat-icon">📄</div><div class="stat-label">Dokumente</div><div class="stat-value">${getVisibleDocs().length}</div></div>
       </div>`;
   } else {
-    const today=isoDate(new Date());
+    const today=isoDateBerlin(new Date());
     const now=new Date();
     const h=now.getHours();
     const greeting=h<12?'Guten Morgen':h<17?'Guten Tag':'Guten Abend';
@@ -796,7 +797,7 @@ function renderDashboard(){
     const totalLate=emps.reduce((s,e)=>s+e.lateCount,0);
     const activeSick=allSicks.filter(s=>s.status==='active').length;
     const todayShifts=getVisibleShifts().filter(s=>s.date===today&&!s.isSick&&!s.isVacation);
-    const todayCheckins=TIME_RECORDS.filter(r=>r.checkIn&&r.checkIn.startsWith(today));
+    const todayCheckins=TIME_RECORDS.filter(r=>r.checkIn&&isoDateBerlin(r.checkIn)===today);
     const scheduledCount=new Set(todayShifts.map(s=>s.empId)).size;
     const checkedInCount=todayCheckins.length;
     const attPct=scheduledCount>0?Math.round(checkedInCount/scheduledCount*100):0;
@@ -1762,7 +1763,6 @@ function applyMitColVisibility() {
 const _origRenderEmpRows = typeof renderEmpRows === 'function' ? renderEmpRows : null;
 
 // ═══ MONATSSTUNDEN (letzte 6 Monate, aus Supabase) ═══
-const MINIJOB_MAX_H = 43.5; // ~538€ bei Mindestlohn – nur Warnung
 async function fetchMonthlyHours(empId){
   const emp = EMPS.find(e=>e.id===empId);
   const pauseMin = emp?.pauseMinutes ?? 30;
@@ -1793,7 +1793,7 @@ async function fetchMonthlyHours(empId){
     if (!b) return;
     const [fh,fm] = (s.shift_from||'0:0').split(':').map(Number);
     const [th,tm] = (s.shift_to||'0:0').split(':').map(Number);
-    const bruttoH = Math.max(0,(th+tm/60)-(fh+fm/60));
+    const bruttoH = calcShiftSpanH(s.shift_from, s.shift_to);
     if (s.is_vacation && s.vac_half) {
       // Halber Urlaub (A): halber Tag gearbeitet, keine Pause/Verspätung
       b.brutto += bruttoH/2;
@@ -1831,7 +1831,7 @@ async function fetchMonthDetail(empId, year, month){
   const days = rows.map(s=>{
     const [fh,fm]=(s.shift_from||'0:0').split(':').map(Number);
     const [th,tm]=(s.shift_to||'0:0').split(':').map(Number);
-    const bruttoH = Math.max(0,(th+tm/60)-(fh+fm/60));
+    const bruttoH = calcShiftSpanH(s.shift_from, s.shift_to);
     const lateMin = s.is_late ? (s.late_min||0) : 0;
     const isHalfVac = s.is_vacation && s.vac_half;        // A: halber Tag → Stunden ÷ 2
     const isFullOff = s.is_sick || (s.is_vacation && !s.vac_half); // Krank / B: ganzer Tag → 0 h
@@ -1844,8 +1844,8 @@ async function fetchMonthDetail(empId, year, month){
       date: s.shift_date, from: s.shift_from, to: s.shift_to, label: s.label||'',
       isSick: s.is_sick, isVacation: s.is_vacation, vacHalf: !!s.vac_half, lateMin,
       pauseMin: pauseUse,
-      bruttoH: Math.round(bruttoH*10)/10,
-      nettoH: Math.round(nettoH*10)/10
+      bruttoH: bruttoH,   // raw (ungekürzt) – PDF rundet nur für Anzeige & Gesamtsumme
+      nettoH: nettoH      // raw (ungekürzt) – stimmt so mit fetchMonthlyHours/calcNetHours überein
     };
   });
   return { emp, pauseMin, days };
@@ -1859,15 +1859,16 @@ async function exportMonthReportPDF(empId, year, month){
   const monLbl = `${MONTHS_DE[month]} ${year}`;
   const fmtDay = ds => { const d=new Date(ds); return `${['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()]} ${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}`; };
   let sumBrutto=0, sumNetto=0, sumLate=0, workDays=0, sumPause=0, vacDays=0;
+  const r1 = v => Math.round(v*10)/10; // nur für Anzeige; Summen bleiben raw
   const rowsHtml = days.map(d=>{
     let typ='', zeit='', brutto='', pause='', spaet='', netto='';
     if(d.isVacation && d.vacHalf){
       // Halber Urlaub (A): halber Tag gearbeitet → Stunden ÷ 2
       typ='<span style="color:#0984e3">½ Urlaub (A)</span>';
       zeit = `${d.from}–${d.to}`;
-      brutto = `${d.bruttoH} h`;
+      brutto = `${r1(d.bruttoH)} h`;
       pause = '–'; spaet = '–';
-      netto = `${d.nettoH} h`;
+      netto = `${r1(d.nettoH)} h`;
       vacDays += 0.5; workDays++;
       sumBrutto+=d.bruttoH; sumNetto+=d.nettoH;
     }
@@ -1876,10 +1877,10 @@ async function exportMonthReportPDF(empId, year, month){
     else {
       typ = d.label || 'Schicht';
       zeit = `${d.from}–${d.to}`;
-      brutto = `${d.bruttoH} h`;
+      brutto = `${r1(d.bruttoH)} h`;
       pause = `${d.pauseMin} min`;
       spaet = d.lateMin>0 ? `<span style="color:#e84393">${d.lateMin} min</span>` : '–';
-      netto = `${d.nettoH} h`;
+      netto = `${r1(d.nettoH)} h`;
       sumBrutto+=d.bruttoH; sumNetto+=d.nettoH; sumLate+=d.lateMin; sumPause+=d.pauseMin; workDays++;
     }
     return `<tr><td>${fmtDay(d.date)}</td><td>${typ}</td><td>${zeit}</td><td style="text-align:right">${brutto}</td><td style="text-align:center">${pause}</td><td style="text-align:center">${spaet}</td><td style="text-align:right;font-weight:700">${netto}</td></tr>`;
@@ -1922,8 +1923,9 @@ async function openMonthlyHoursModal(empId){
   const body = document.getElementById('monthlyHoursBody');
   if (!body) return;
   if (!data.some(d=>d.count>0)) { body.innerHTML='<p style="color:var(--text-muted)">Keine Daten in den letzten 6 Monaten.</p>'; return; }
+  const maxH = minijobMaxHours(emp);
   const rows = data.map(d=>{
-    const warn = isMini && d.netto>MINIJOB_MAX_H;
+    const warn = isMini && d.netto>maxH;
     return `<tr>
       <td style="font-weight:600">${d.label}</td>
       <td style="text-align:right;font-family:'Space Mono',monospace">${d.brutto} h</td>
@@ -1931,7 +1933,7 @@ async function openMonthlyHoursModal(empId){
       <td style="text-align:center;color:var(--text-muted)">${d.count}</td>
     </tr>`;
   }).join('');
-  body.innerHTML = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:8px">Pause: ${pauseMin} Min./Schicht${isMini?' · Minijob-Grenze '+MINIJOB_MAX_H+'h':''}</div>
+  body.innerHTML = `<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:8px">Pause: ${pauseMin} Min./Schicht${isMini?' · Minijob-Grenze '+maxH+'h ('+MINIJOB_LIMIT_EUR+'€'+(emp.hourlyRate?' / '+emp.hourlyRate+'€ h':'')+')}':''}</div>
     <table style="width:100%;border-collapse:collapse;font-size:.85rem">
       <thead><tr style="border-bottom:1px solid var(--border);text-align:left">
         <th style="padding:6px 4px">Monat</th><th style="padding:6px 4px;text-align:right">Brutto</th><th style="padding:6px 4px;text-align:right">Netto</th><th style="padding:6px 4px;text-align:center">Schichten</th>
@@ -2103,7 +2105,8 @@ function viewEmp(id){
         <input class="form-input" type="number" min="0" step="5" value="${e.pauseMinutes??30}" ${ro} ${canEdit?`onchange="updateEmpField(${e.id},'pauseMinutes',this.value)"`:''}></div>
       ${(()=>{
         const gross=calcPlanHours(e.id), net=calcNetHours(e), cnt=calcMonthShiftCount(e.id), pauseSum=calcMonthPauseMinutes(e), late=calcMonthLateMinutes(e.id);
-        const warn=(e.employmentType==='Minijob') && net>43.5; // ~538€ bei Mindestlohn – nur Warnung
+        const maxH=minijobMaxHours(e);
+        const warn=(e.employmentType==='Minijob') && net>maxH; // Grenze EUR-basiert falls EUR/Std vorhanden
         const col=warn?'var(--danger)':'var(--success)';
         return `<div class="form-group full"><label class="form-label">Stunden diesen Monat (netto)</label>
           <div style="font-family:'Space Mono',monospace;font-size:1.3rem;font-weight:700;color:${col};padding:6px 0">
@@ -2835,7 +2838,7 @@ async function zeDownloadTagPDF(empId) {
   const monat = parseInt(document.getElementById('zeMonatSel')?.value || (new Date().getMonth()+1));
   const jahr = new Date().getFullYear();
   const now = new Date();
-  const todayISO = isoDate(now);
+  const todayISO = isoDateBerlin(now);
   const todayMonth = now.getMonth() + 1;
   const todayYear = now.getFullYear();
   const isCurrentMonth = (monat === todayMonth && jahr === todayYear);
@@ -2860,14 +2863,19 @@ async function zeDownloadTagPDF(empId) {
   if(error) { console.error('[ZE PDF Tag] fetch fake:', error); }
 
   // --- Step 2: Fetch real data for today from time_records (only if current month) ---
+  // TZ-sicher: Berlin-Tag kann in UTC am Vortag beginnen (00:30 CEST = 22:30 UTC Vortag).
+  // Daher 1 Tag früher beginnen und in JS via isoDateBerlin auf den echten Berlin-Tag filtern.
   let todayEntry = null;
   if (isCurrentMonth) {
-    const {data: todayRecords, error: trErr} = await sb.from('time_records')
+    const dayBefore = new Date(now); dayBefore.setDate(dayBefore.getDate() - 1);
+    const dayAfter = new Date(now); dayAfter.setDate(dayAfter.getDate() + 1);
+    const {data: rawRecords, error: trErr} = await sb.from('time_records')
       .select('check_in, check_out')
       .eq('emp_id', empId)
-      .gte('check_in', todayISO + 'T00:00:00')
-      .lt('check_in', todayISO + 'T23:59:59')
+      .gte('check_in', isoDate(dayBefore) + 'T00:00:00')
+      .lte('check_in', isoDate(dayAfter) + 'T23:59:59')
       .order('check_in');
+    const todayRecords = (rawRecords || []).filter(r => isoDateBerlin(r.check_in) === todayISO);
     if(trErr) console.warn('[ZE PDF Tag] fetch time_records:', trErr);
     todayEntry = buildTodayEntry(todayRecords, todayISO);
   }
@@ -3597,7 +3605,11 @@ async function renderEmpLohnabrechnung(empId, empName) {
 // Update arbitrary employee field
 function updateEmpField(empId, field, value){
   const e=EMPS.find(x=>x.id===empId);if(!e)return;
-  e[field]=parseInt(value)||0;
+  // Dezimalfelder mit parseFloat (hourlyRate/weeklyHours/monthlyHours/pauseMinutes),
+  // Ganzzahlfelder mit parseInt (vacTotal/vacUsed/schuleTage). Sonst würde z.B. hourlyRate
+  // 12,50 € auf 12 € abgeschnitten → falsche Minijob-Grenze (538/hourlyRate).
+  const isDecimal = field==='hourlyRate'||field==='weeklyHours'||field==='monthlyHours'||field==='pauseMinutes';
+  e[field] = isDecimal ? (parseFloat(String(value).replace(',', '.')) || 0) : (parseInt(value) || 0);
   if(field==='vacTotal'||field==='vacUsed'){
     const pl=VACS.filter(v=>v.empId===empId&&(v.status==='approved'||v.status==='pending')&&v.from>='2026-03-20').reduce((s,v)=>s+v.days,0);
     const remain=e.vacTotal-e.vacUsed-pl;
@@ -4293,8 +4305,8 @@ function renderSchedule(){
       });
     } else if(sortBy==='hours'){
       emps.sort((a,b)=>{
-        const ha=shifts.filter(s=>s.empName===a&&!s.isSick&&!s.isVacation&&dayD.includes(s.date)).reduce((sum,s)=>{const[fh,fm]=s.from.split(':').map(Number);const[th,tm]=s.to.split(':').map(Number);return sum+(th+tm/60)-(fh+fm/60);},0);
-        const hb=shifts.filter(s=>s.empName===b&&!s.isSick&&!s.isVacation&&dayD.includes(s.date)).reduce((sum,s)=>{const[fh,fm]=s.from.split(':').map(Number);const[th,tm]=s.to.split(':').map(Number);return sum+(th+tm/60)-(fh+fm/60);},0);
+        const ha=shifts.filter(s=>s.empName===a&&!s.isSick&&!s.isVacation&&dayD.includes(s.date)).reduce((sum,s)=>sum+calcShiftSpanH(s.from,s.to),0);
+        const hb=shifts.filter(s=>s.empName===b&&!s.isSick&&!s.isVacation&&dayD.includes(s.date)).reduce((sum,s)=>sum+calcShiftSpanH(s.from,s.to),0);
         return hb-ha;
       });
     }
@@ -4310,20 +4322,21 @@ function renderSchedule(){
     const _lateToSync=[];
     let h='<div class="sc2-grid-wrap"><table style="width:max-content;min-width:100%"><thead><tr><th style="min-width:200px">Mitarbeiter</th>';
     dayD.forEach((ds,i)=>{const d=new Date(ds);const isToday=ds===isoDate(new Date());h+=`<th${isToday?' class="is-today"':''}><div class="th-day">${DAYS_DE[i]}</div><div class="th-date">${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}</div></th>`;});
-    if(showH)h+='<th style="text-align:right">Σ Std.</th>';
+    if(showH)h+='<th style="text-align:right">Σ Std.<div style="font-size:.55rem;font-weight:400;opacity:.7">netto</div></th>';
     h+='</tr></thead><tbody>';
     emps.forEach(emp=>{
       const _empObj2=EMPS.find(e=>e.name===emp);const _empPos=_empObj2?.position||'';const _empInitials=emp.split(' ').map(n=>n[0]).join('').substring(0,2);
       h+=`<tr data-emp="${(emp||'').replace(/"/g,'&quot;')}" data-dept="${(_empObj2?.dept||'').replace(/"/g,'&quot;')}"><td><div style="display:flex;align-items:center;gap:12px"><div class="sc2-emp-avatar">${_empInitials}</div><div><div class="sc2-emp-name"${_empObj2?.id!=null?` onclick="openMonthlyHoursModal(${_empObj2.id})" style="cursor:pointer" title="Monatsstunden ansehen"`:''}>${emp}</div><div class="sc2-emp-pos">${_empPos}</div></div></div></td>`;
       let weekH=0;
+      const _empObjForWeek=_empObj2;
       dayD.forEach(ds=>{
         const dayS=_shiftsByKey.get(emp+'|'+ds)||[];
-        dayS.forEach(s=>{if(!s.isSick&&!s.isVacation){const[fh,fm]=s.from.split(':').map(Number);const[th,tm]=s.to.split(':').map(Number);weekH+=(th+tm/60)-(fh+fm/60);}});
+        dayS.forEach(s=>{if(!s.isSick&&!s.isVacation){weekH+=calcShiftNetH(s,_empObjForWeek);}});
         h+=`<td class="shift-cell" data-date="${ds}" data-emp="${emp}" ${canEdit?'ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragleave="onDragLeave(event)"':''}>`;
         let cellHas = dayS.length > 0;
         dayS.forEach(s=>{
           // Cross-reference with GPS check-in
-          const tr = TIME_RECORDS.find(r => r.shiftId === s.id || (r.empId === s.empId && r.checkIn && r.checkIn.startsWith(ds)));
+          const tr = TIME_RECORDS.find(r => r.shiftId === s.id || (r.empId === s.empId && r.checkIn && isoDateBerlin(r.checkIn) === ds));
           if (tr && tr.isLate && !s.isLate) { s.isLate = true; s.lateMin = tr.lateMin || 0; _lateToSync.push(s); }
           // Compact mode for special days
           if (s.isSick) {
@@ -4428,13 +4441,13 @@ function renderSchedule(){
     h+='</tbody></table></div>';
     // Add footer and stats bento
     const _deptColors={};DEPTS.forEach(dept=>{_deptColors[dept.name]=dept.color||'var(--accent)';});
-    const _deptHours={};shifts.filter(s=>_wkDays.includes(s.date)&&!s.isSick&&!s.isVacation).forEach(s=>{const[fh,fm]=s.from.split(':').map(Number);const[th,tm]=s.to.split(':').map(Number);const h2=(th+tm/60)-(fh+fm/60);_deptHours[s.dept]=(_deptHours[s.dept]||0)+h2;});
+    const _deptHours={};shifts.filter(s=>_wkDays.includes(s.date)&&!s.isSick&&!s.isVacation).forEach(s=>{const h2=calcShiftNetH(s,EMPS.find(e=>e.id===s.empId));_deptHours[s.dept]=(_deptHours[s.dept]||0)+h2;});
     const _totalH=Object.values(_deptHours).reduce((a,b)=>a+b,0);
     const _openShifts=_wkDays.length*emps.length-_totalWkShifts;
 
     h+=`<div class="sc2-grid-footer">
       <div class="sc2-footer-depts">${Object.entries(_deptHours).map(([d,hh])=>`<div class="sc2-footer-dept"><div class="sc2-footer-dot" style="background:${_deptColors[d]||'var(--accent)'}"></div>${d}: ${Math.round(hh)} Std.</div>`).join('')}</div>
-      <div class="sc2-footer-total">Gesamtstunden Woche: <strong>${Math.round(_totalH*10)/10} Std.</strong></div>
+      <div class="sc2-footer-total">Gesamtstunden Woche (netto): <strong>${Math.round(_totalH*10)/10} Std.</strong></div>
     </div>`;
 
     h+=`<div class="sc2-bento">
