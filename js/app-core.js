@@ -4578,6 +4578,7 @@ function openSelfServiceCell(empId, date) {
   popup.innerHTML = `<div style="background:var(--bg-card);border-radius:18px;padding:22px;width:320px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <h3 style="font-size:.95rem;font-weight:700;margin:0 0 4px">${formatDateDE(date)}</h3>
     <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 16px">Was möchtest du melden?</p>
+    <div style="font-size:.7rem;color:var(--danger);background:rgba(220,38,38,.08);border:1px dashed var(--danger);border-radius:8px;padding:6px 8px;margin:0 0 12px;font-family:monospace;word-break:break-all">DEBUG: empId=${empId} | employmentType=${JSON.stringify(_dbgEmp?.employmentType)} | dept=${JSON.stringify(_dbgEmp?.dept)} | isMinijob=${minijob}</div>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${btns}
     </div>
