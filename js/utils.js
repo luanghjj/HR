@@ -430,7 +430,12 @@ function getVisibleDocs() {
 
 /** Get notifications visible to current user */
 function getVisibleNotifs() {
-  return NOTIFS.filter(n => !n.forRole || n.forRole.includes(currentUser.role));
+  return NOTIFS.filter(n => {
+    // Gezielt an einen MA: nur dieser sieht die Notiz (z. B. Minijob-Bestätigung)
+    if (n.forEmpId) return currentUser?.empId === n.forEmpId;
+    // sonst rollenbasiert (Inhaber/Manager)
+    return !n.forRole || n.forRole.includes(currentUser?.role);
+  });
 }
 
 // ═══ GPS Utilities ═══

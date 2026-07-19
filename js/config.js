@@ -41,6 +41,7 @@ const PAGE_TITLES = {
   departments: 'Bereiche',
   schedule: 'Arbeitsplan',
   aushilfe_planung: 'Aushilfe Planung',
+  proposals: 'Schichtvorschläge',
   vacation: 'Urlaubsplan',
   sick: 'Krankmeldungen',
   documents: 'Unterlagen',
