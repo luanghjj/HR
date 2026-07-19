@@ -25,8 +25,10 @@ const PERMS = {
   },
   mitarbeiter: {
     // ── OKYU HRM ──
+    // seeOwnSchedule: true → registrierte MA sehen im Arbeitsplan NUR ihre
+    // eigenen Schichten/Vorschläge. Alles-sehen ist Admin/Manager vorbehalten.
     seeAllLocations: false, seeAllEmployees: false, editEmployees: false,
-    seeDepartments: true, editDepartments: false, seeAllSchedules: false, editSchedules: false, seeOwnSchedule: false,
+    seeDepartments: true, editDepartments: false, seeAllSchedules: false, editSchedules: false, seeOwnSchedule: true,
     seeAllVacations: false, approveVacations: false, seeAllSick: false,
     seeAllDocs: false, canExport: false, manageAccess: false, markLate: false, manageAnnouncements: false,
     seeFinancials: false, editVacDays: false, editTraining: false,
@@ -34,8 +36,9 @@ const PERMS = {
   },
   azubi: {
     // ── OKYU HRM ──
+    // Wie mitarbeiter: nur eigene Schichten im Arbeitsplan.
     seeAllLocations: false, seeAllEmployees: false, editEmployees: false,
-    seeDepartments: true, editDepartments: false, seeAllSchedules: false, editSchedules: false, seeOwnSchedule: false,
+    seeDepartments: true, editDepartments: false, seeAllSchedules: false, editSchedules: false, seeOwnSchedule: true,
     seeAllVacations: false, approveVacations: false, seeAllSick: false,
     seeAllDocs: false, canExport: false, manageAccess: false, markLate: false, manageAnnouncements: false,
     seeFinancials: false, editVacDays: false, editTraining: false,
