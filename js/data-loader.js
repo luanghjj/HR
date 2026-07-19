@@ -462,15 +462,19 @@ async function loadDataFromSupabase() {
         .order('prop_date');
       if (!spErr && props) {
         SHIFT_PROPOSALS.length = 0;
-        props.forEach(p => SHIFT_PROPOSALS.push({
-          id: p.id, empId: p.emp_id, empName: escapeHtml(p.emp_name || ''),
-          location: p.location || '', dept: p.dept || '',
-          date: p.prop_date, shiftLabel: p.shift_label || '',
-          from: p.shift_from, to: p.shift_to,
-          status: p.status, note: escapeHtml(p.note || ''),
-          decidedBy: p.decided_by || '', decidedAt: p.decided_at || null,
-          createdAt: p.created_at
-        }));
+        props
+          // Abgelehnte Vorschläge werden wie gelöscht behandelt → nicht laden.
+          // (Alt-Datensätze aus DB verschwinden dadurch aus Plan & Admin-Liste.)
+          .filter(p => p.status !== 'rejected')
+          .forEach(p => SHIFT_PROPOSALS.push({
+            id: p.id, empId: p.emp_id, empName: escapeHtml(p.emp_name || ''),
+            location: p.location || '', dept: p.dept || '',
+            date: p.prop_date, shiftLabel: p.shift_label || '',
+            from: p.shift_from, to: p.shift_to,
+            status: p.status, note: escapeHtml(p.note || ''),
+            decidedBy: p.decided_by || '', decidedAt: p.decided_at || null,
+            createdAt: p.created_at
+          }));
         console.log('[Data] ✓ ' + SHIFT_PROPOSALS.length + ' Schichtvorschläge geladen');
       }
     } catch (_) { /* table may not exist yet */ }

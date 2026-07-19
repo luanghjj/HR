@@ -4409,21 +4409,18 @@ function renderSchedule(){
         }
 
         // Schichtvorschlag (Minijob-Angebot) anzeigen, wenn kein Dienst gesetzt.
-        // WICHTIG: genehmigte Vorschläge werden NICHT hier gezeigt – daraus wurde
-        // beim Genehmigen eine echte Schicht angelegt (die oben in dayS erscheint).
-        // Hier nur noch offene (⏳) und abgelehnte (✕) Vorschläge darstellen.
+        // Nur OFFENE Vorschläge (⏳) werden gezeigt:
+        //  – genehmigte → daraus wurde eine echte Schicht (erscheint oben in dayS)
+        //  – abgelehnte → werden gelöscht, tauchen also gar nicht mehr auf
         if (empObj && !dayS.length) {
-          const prop = SHIFT_PROPOSALS.find(p => p.empId === empObj.id && p.date === ds);
-          if (prop && prop.status !== 'approved') {
+          const prop = SHIFT_PROPOSALS.find(p => p.empId === empObj.id && p.date === ds && p.status === 'pending');
+          if (prop) {
             const isOwn = empObj.id === currentUser.empId;
             const canEditProp = can('editSchedules');
-            // Farbe nach Status
-            const cls = prop.status === 'rejected' ? 'is-sick' : '';
-            const badge = prop.status === 'rejected' ? '✕' : '⏳';
             const click = isOwn ? `onclick="openProposalModal('${ds}')" style="cursor:pointer" title="Vorschlag ansehen"` :
                           canEditProp ? `onclick="navigate('proposals')" style="cursor:pointer" title="Zur Genehmigung"` : '';
-            h += `<div class="shift-block compact-block ${cls}" ${click} data-sid="prop-${prop.id}">
-              <span class="compact-letter">${badge}</span>
+            h += `<div class="shift-block compact-block" ${click} data-sid="prop-${prop.id}">
+              <span class="compact-letter">⏳</span>
               <div class="shift-time">${prop.from}–${prop.to}</div>
             </div>`;
             cellHas = true;
@@ -5824,8 +5821,9 @@ function renderProposals(){
       </tbody></table>`:`<p style="padding:20px;color:var(--text-muted)">Du hast noch keine Schichtvorschläge. Gehe zum Arbeitsplan und klicke auf einen deiner leeren Tage.</p>`}</div>`;
     return;
   }
-  // Admin-Ansicht
-  const tabDefs=[['pending','Offen'],['approved','Bestätigt'],['rejected','Abgelehnt'],['all','Alle']];
+  // Admin-Ansicht (abgelehnte Vorschläge werden gelöscht → kein "Abgelehnt"-Tab)
+  if(proposalTab==='rejected') proposalTab='pending'; // alter Tab entfällt
+  const tabDefs=[['pending','Offen'],['approved','Bestätigt'],['all','Alle']];
   const tabHtml=tabDefs.map(([k,l])=>`<button class="vac-tab${proposalTab===k?' active':''}" onclick="proposalTab='${k}';renderProposals()">${l}</button>`).join('');
   let list=SHIFT_PROPOSALS.slice().sort((a,b)=>a.date<b.date?-1:1);
   if(proposalTab!=='all') list=list.filter(p=>p.status===proposalTab);
@@ -5883,16 +5881,17 @@ async function approveProposal(id){
   renderProposals();updateBadges();renderSchedule();
 }
 
-/** Vorschlag ablehnen → Status rejected + Minijob benachrichtigen. */
+/** Vorschlag ablehnen → Vorschlag löschen (verschwindet aus Plan & Liste) + Minijob benachrichtigen. */
 async function rejectProposal(id){
   if(!can('editSchedules'))return;
-  const p=SHIFT_PROPOSALS.find(x=>x.id===id);if(!p)return;
-  const prev=p.status;p.status='rejected';renderProposals();updateBadges();
-  const ok=await syncProposalStatus(p.id,'rejected',currentUser.id);
-  if(!ok){p.status=prev;toast('Fehler beim Speichern','err');renderProposals();updateBadges();return;}
+  const idx=SHIFT_PROPOSALS.findIndex(x=>x.id===id);if(idx<0)return;
+  const p=SHIFT_PROPOSALS[idx];
+  // Optimistic: aus dem Speicher entfernen (kein Rest-Eintrag im Arbeitsplan).
+  SHIFT_PROPOSALS.splice(idx,1);renderProposals();updateBadges();renderSchedule();
+  const ok=await syncDeleteProposal(id);
+  if(!ok){SHIFT_PROPOSALS.splice(idx,0,p);toast('Fehler beim Ablehnen','err');renderProposals();updateBadges();renderSchedule();return;}
   addNotif('warn','Schichtvorschlag abgelehnt',`${formatDateDE(p.date)} · ${p.shiftLabel} wurde leider abgelehnt.`,p.empId);
   toast('Abgelehnt','err');
-  renderProposals();updateBadges();renderSchedule();
 }
 
 
