@@ -4568,6 +4568,9 @@ function openSelfServiceCell(empId, date) {
   // Für Minijob: "Verfügbar melden" als Hauptaktion → danach Schicht wählen.
   // Für alle anderen: "Nicht verfügbar melden" als Hauptaktion (wie bisher).
   const minijob = isMinijobEmp(empId);
+  // TEMP DEBUG – hilft herauszufinden, warum ein Minijob nicht erkannt wird.
+  const _dbgEmp = EMPS.find(x => x.id === empId);
+  console.log('[DEBUG openSelfServiceCell] empId=', empId, 'emp=', _dbgEmp, 'employmentType=', _dbgEmp?.employmentType, 'isMinijob=', minijob);
   const btnVerfuegbar = `<button class="btn ${minijob?'btn-primary':''}" style="width:100%;justify-content:flex-start" onclick="document.getElementById('selfServicePopup').remove();openProposalModal('${date}')"><span class="ms" style="font-size:18px">event_available</span> Verfügbar melden</button>`;
   const btnNichtVerf = `<button class="btn ${minijob?'':'btn-primary'}" style="width:100%;justify-content:flex-start" onclick="toggleUnavailable(${empId},'${date}');document.getElementById('selfServicePopup').remove()"><span class="ms" style="font-size:18px">event_busy</span> Nicht verfügbar melden</button>`;
   const btnUrlaub = `<button class="btn" style="width:100%;justify-content:flex-start" onclick="document.getElementById('selfServicePopup').remove();openVacationForDate('${date}')"><span class="ms" style="font-size:18px">beach_access</span> Urlaub beantragen</button>`;
