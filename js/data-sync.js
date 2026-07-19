@@ -93,6 +93,53 @@ async function syncVacationStatus(vacId, status) {
 }
 
 /**
+ * Neuen Schichtvorschlag (Minijob-Angebot) in Supabase anlegen
+ */
+async function syncAddProposal(prop) {
+  try {
+    const { data, error } = await sb.from('shift_proposals').insert({
+      emp_id: prop.empId,
+      emp_name: prop.empName,
+      location: prop.location || null,
+      dept: prop.dept || null,
+      prop_date: prop.date,
+      shift_label: prop.shiftLabel,
+      shift_from: prop.from,
+      shift_to: prop.to,
+      status: prop.status || 'pending',
+      note: prop.note || ''
+    }).select().single();
+    if (error) console.warn('[Sync] Proposal error:', error.message);
+    else { prop.id = data.id; console.log('[Sync] ✓ Proposal added:', prop.empName, prop.date); }
+  } catch (e) { console.warn('[Sync]', e.message); }
+}
+
+/**
+ * Status eines Schichtvorschlags aktualisieren (approved/rejected)
+ */
+async function syncProposalStatus(propId, status, decidedBy) {
+  try {
+    const update = { status };
+    if (decidedBy) { update.decided_by = decidedBy; update.decided_at = new Date().toISOString(); }
+    const { error } = await sb.from('shift_proposals').update(update).eq('id', propId);
+    if (error) { console.warn('[Sync] Proposal status error:', error.message); return false; }
+    console.log('[Sync] ✓ Proposal', propId, '→', status);
+    return true;
+  } catch (e) { console.warn('[Sync]', e.message); return false; }
+}
+
+/**
+ * Schichtvorschlag löschen (z. B. eigener offener Vorschlag zurücknehmen)
+ */
+async function syncDeleteProposal(propId) {
+  try {
+    const { error } = await sb.from('shift_proposals').delete().eq('id', propId);
+    if (error) { console.warn('[Sync] Proposal delete error:', error.message); return false; }
+    return true;
+  } catch (e) { console.warn('[Sync]', e.message); return false; }
+}
+
+/**
  * Add new sick leave to Supabase
  */
 async function syncAddSick(sick) {

@@ -37,6 +37,10 @@ let checkInTimer = null;  // Interval for live timer
 // Verfügbarkeit (Nicht verfügbar – Self-Service)
 let AVAILABILITY = [];
 
+// Schichtvorschläge (Minijob schlägt Tage/Schichten vor → Admin genehmigt)
+let SHIFT_PROPOSALS = [];
+let proposalTab = 'pending'; // 'pending' | 'approved' | 'rejected' | 'mine'
+
 // Mitteilungen / Announcements (Admin → alle)
 let ANNOUNCEMENTS = [];
 let ANNOUNCEMENT_READS = [];   // wer hat welche Pflicht-Mitteilung gelesen

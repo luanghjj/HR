@@ -451,6 +451,30 @@ async function loadDataFromSupabase() {
       }
     } catch (_) { /* table may not exist yet */ }
 
+    // Load Schichtvorschläge (Minijob-Angebote) – aktueller + nächste 3 Monate
+    try {
+      const spStart = new Date(); spStart.setDate(1);
+      const spEnd = new Date(); spEnd.setMonth(spEnd.getMonth() + 3);
+      const { data: props, error: spErr } = await sb.from('shift_proposals')
+        .select('*')
+        .gte('prop_date', spStart.toISOString().split('T')[0])
+        .lte('prop_date', spEnd.toISOString().split('T')[0])
+        .order('prop_date');
+      if (!spErr && props) {
+        SHIFT_PROPOSALS.length = 0;
+        props.forEach(p => SHIFT_PROPOSALS.push({
+          id: p.id, empId: p.emp_id, empName: escapeHtml(p.emp_name || ''),
+          location: p.location || '', dept: p.dept || '',
+          date: p.prop_date, shiftLabel: p.shift_label || '',
+          from: p.shift_from, to: p.shift_to,
+          status: p.status, note: escapeHtml(p.note || ''),
+          decidedBy: p.decided_by || '', decidedAt: p.decided_at || null,
+          createdAt: p.created_at
+        }));
+        console.log('[Data] ✓ ' + SHIFT_PROPOSALS.length + ' Schichtvorschläge geladen');
+      }
+    } catch (_) { /* table may not exist yet */ }
+
     // Load Mitteilungen / Announcements (aktive)
     try {
       const { data: anns, error: annErr } = await sb.from('announcements')

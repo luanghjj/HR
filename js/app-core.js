@@ -42,6 +42,7 @@ function buildSidebar(){
     sectionStart('planung', 'Planung');
     if(showSchedule) html+=`<div class="nav-item" onclick="navigate('schedule',this)">${mi('calendar_month')} Arbeitsplan</div>`;
     if(can('editSchedules')) html+=`<div class="nav-item" onclick="navigate('aushilfe_planung',this)">${mi('groups')} Aushilfe Planung</div>`;
+    if(can('editSchedules')) html+=`<div class="nav-item" onclick="navigate('proposals',this)">${mi('event_available')} Schichtvorschläge<span class="nav-badge" id="propBadge" style="display:none">0</span></div>`;
     if(showVacation) html+=`<div class="nav-item" onclick="navigate('vacation',this)">${mi('beach_access')} ${can('seeAllVacations')?'Urlaubsplan':'Mein Urlaub'}<span class="nav-badge" id="vacBadge" style="display:none">0</span></div>`;
     if(showSick) html+=`<div class="nav-item" onclick="navigate('sick',this)">${mi('medical_services')} ${can('seeAllSick')?'Krankmeldungen':'Meine Krankmeldungen'}<span class="nav-badge" id="sickBadge" style="display:none">0</span></div>`;
     sectionEnd();
@@ -207,7 +208,7 @@ function renderPage(p){
   const c=document.getElementById('contentArea');
 
   c.innerHTML='<div class="page active" id="page-'+p+'"></div>';
-  ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,aushilfe_planung:renderAushilfePlanung,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung,qr_generator:renderQrGenerator,locations:renderLocations})[p]?.();
+  ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,aushilfe_planung:renderAushilfePlanung,proposals:renderProposals,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung,qr_generator:renderQrGenerator,locations:renderLocations})[p]?.();
 }
 
 // ═══ SHIFTS (loaded from Supabase via data-loader.js) ═══
@@ -768,6 +769,7 @@ function renderDashboard(){
 
     pg.innerHTML=`
       ${announcementBannerHtml()}
+      ${minijobSundayReminderHtml(me)}
       ${todayHtml}
       ${zeitHtml}
       ${upcomingHtml}
@@ -1151,6 +1153,10 @@ function updateBadges(){
   const vb=document.getElementById('vacBadge'),sb=document.getElementById('sickBadge');
   if(vb){vb.style.display=pv?'':'none';vb.textContent=pv;}
   if(sb){sb.style.display=as?'':'none';sb.textContent=as;}
+  // Schichtvorschläge: offene Vorschläge für Admins (editSchedules)
+  const pp=can('editSchedules')?SHIFT_PROPOSALS.filter(p=>p.status==='pending').length:0;
+  const pb=document.getElementById('propBadge');
+  if(pb){pb.style.display=pp?'':'none';pb.textContent=pp;}
   const annUnread = visibleAnnouncements().some(a=>!localStorage.getItem('ann_read_'+a.id));
   document.getElementById('notifDot').style.display=(getVisibleNotifs().some(n=>n.unread)||annUnread)?'':'none';
 }
@@ -4402,6 +4408,27 @@ function renderSchedule(){
           }
         }
 
+        // Schichtvorschlag (Minijob-Angebot) anzeigen, wenn kein Dienst gesetzt
+        if (empObj && !dayS.length) {
+          const prop = SHIFT_PROPOSALS.find(p => p.empId === empObj.id && p.date === ds);
+          if (prop) {
+            const isOwn = empObj.id === currentUser.empId;
+            const canEditProp = can('editSchedules');
+            // Farbe nach Status
+            const cls = prop.status === 'approved' ? 'is-vacation' :
+                        prop.status === 'rejected' ? 'is-sick' : '';
+            const badge = prop.status === 'approved' ? '✓' :
+                          prop.status === 'rejected' ? '✕' : '⏳';
+            const click = isOwn ? `onclick="openProposalModal('${ds}')" style="cursor:pointer" title="Vorschlag ansehen"` :
+                          canEditProp ? `onclick="navigate('proposals')" style="cursor:pointer" title="Zur Genehmigung"` : '';
+            h += `<div class="shift-block compact-block ${cls}" ${click} data-sid="prop-${prop.id}">
+              <span class="compact-letter">${badge}</span>
+              <div class="shift-time">${prop.from}–${prop.to}</div>
+            </div>`;
+            cellHas = true;
+          }
+        }
+
         // Nicht verfügbar (Self-Service) anzeigen, wenn kein Dienst gesetzt
         if (!cellHas && empObj) {
           const av = AVAILABILITY.find(a => a.empId===empObj.id && a.date===ds);
@@ -4426,8 +4453,9 @@ function renderSchedule(){
               h+=`<div class="empty-cell-add" onclick="quickAddShift('${emp}','${ds}',${_empObj2?.id??'null'})" title="Schicht hinzufügen"><span class="ms">add</span></div>`;
             }
           } else if(isOwnRow){
-            // Mitarbeiter: eigene Zelle → Self-Service (nicht verfügbar / Urlaub)
-            h+=`<div class="empty-cell-self" onclick="openSelfServiceCell(${empObj.id},'${ds}')" title="Nicht verfügbar / Urlaub beantragen"><span class="ms">more_horiz</span></div>`;
+            // Mitarbeiter: eigene Zelle → Self-Service (verfügbar / nicht verfügbar / Urlaub)
+            const selfTitle = isMinijobEmp(empObj.id) ? 'Verfügbar / nicht verfügbar / Urlaub' : 'Nicht verfügbar / Urlaub beantragen';
+            h+=`<div class="empty-cell-self" onclick="openSelfServiceCell(${empObj.id},'${ds}')" title="${selfTitle}"><span class="ms">more_horiz</span></div>`;
           } else {
             h+='<span style="color:var(--text-muted);font-size:.7rem">—</span>';
           }
@@ -4537,12 +4565,18 @@ function openSelfServiceCell(empId, date) {
   popup.id = 'selfServicePopup';
   popup.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:10001;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
   popup.onclick = (e) => { if (e.target === popup) popup.remove(); };
+  // Für Minijob: "Verfügbar melden" als Hauptaktion → danach Schicht wählen.
+  // Für alle anderen: "Nicht verfügbar melden" als Hauptaktion (wie bisher).
+  const minijob = isMinijobEmp(empId);
+  const btnVerfuegbar = `<button class="btn ${minijob?'btn-primary':''}" style="width:100%;justify-content:flex-start" onclick="document.getElementById('selfServicePopup').remove();openProposalModal('${date}')"><span class="ms" style="font-size:18px">event_available</span> Verfügbar melden</button>`;
+  const btnNichtVerf = `<button class="btn ${minijob?'':'btn-primary'}" style="width:100%;justify-content:flex-start" onclick="toggleUnavailable(${empId},'${date}');document.getElementById('selfServicePopup').remove()"><span class="ms" style="font-size:18px">event_busy</span> Nicht verfügbar melden</button>`;
+  const btnUrlaub = `<button class="btn" style="width:100%;justify-content:flex-start" onclick="document.getElementById('selfServicePopup').remove();openVacationForDate('${date}')"><span class="ms" style="font-size:18px">beach_access</span> Urlaub beantragen</button>`;
+  const btns = minijob ? `${btnVerfuegbar}${btnNichtVerf}${btnUrlaub}` : `${btnNichtVerf}${btnUrlaub}`;
   popup.innerHTML = `<div style="background:var(--bg-card);border-radius:18px;padding:22px;width:320px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <h3 style="font-size:.95rem;font-weight:700;margin:0 0 4px">${formatDateDE(date)}</h3>
     <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 16px">Was möchtest du melden?</p>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn btn-primary" style="width:100%;justify-content:flex-start" onclick="toggleUnavailable(${empId},'${date}');document.getElementById('selfServicePopup').remove()"><span class="ms" style="font-size:18px">event_busy</span> Nicht verfügbar melden</button>
-      <button class="btn" style="width:100%;justify-content:flex-start" onclick="document.getElementById('selfServicePopup').remove();openVacationForDate('${date}')"><span class="ms" style="font-size:18px">beach_access</span> Urlaub beantragen</button>
+      ${btns}
     </div>
     <div style="margin-top:14px;text-align:right"><button class="btn btn-sm" onclick="document.getElementById('selfServicePopup').remove()">Abbrechen</button></div>
   </div>`;
@@ -4573,6 +4607,129 @@ function openVacationForDate(date) {
     if (f) f.value = date;
     if (t) t.value = date;
   }, 50);
+}
+
+// ═══ SCHICHTVORSCHLÄGE (Minijob: "Ich kann arbeiten") ═══
+/** Ist der MA (per ID) ein Minijob? */
+function isMinijobEmp(empId){
+  const e = EMPS.find(x => x.id === empId);
+  return !!e && e.employmentType === 'Minijob';
+}
+
+/** Eigene offenen Vorschläge für die kommende Woche (Mo–So der Folgewoche). */
+function myProposalsNextWeek(){
+  const me = currentUser?.empId;
+  if (me == null) return [];
+  const ws = getWeekStart(scheduleDate);
+  // Folgewoche = aktuelle Plan-Woche + 7 Tage; falls heute Sonntag und Plan-Woche
+  // schon auf nächste Woche gesprungen ist, bleibt es dort. Einfach: alle eigenen
+  // Vorschläge ab heute.
+  return SHIFT_PROPOSALS.filter(p => p.empId === me);
+}
+
+/** Sonntags-Erinnerung für Minijobs: "Trag ein, wann du nächste Woche arbeiten kannst." */
+function minijobSundayReminderHtml(me){
+  if (!me || me.employmentType !== 'Minijob') return '';
+  // Nur sonntags zeigen (getDay()===0). Hinweis: app läuft in Browser-Zeit, ausreichend.
+  if (new Date().getDay() !== 0) return '';
+  // Nur zeigen, wenn für die nächste Woche noch kein Vorschlag vorliegt (nicht nerven).
+  const nextMon = new Date(); nextMon.setDate(nextMon.getDate() + 1); // Montag nach Sonntag
+  while (nextMon.getDay() !== 1) nextMon.setDate(nextMon.getDate() + 1);
+  const nextSun = new Date(nextMon); nextSun.setDate(nextSun.getDate() + 6);
+  const has = SHIFT_PROPOSALS.some(p => p.empId === me.id &&
+    p.date >= isoDate(nextMon) && p.date <= isoDate(nextSun));
+  if (has) return '';
+  return `<div class="ann-banner" style="background:linear-gradient(90deg,rgba(20,184,166,.12),rgba(20,184,166,.04));border:1px solid rgba(20,184,166,.3);border-radius:14px;padding:14px 16px;margin:0 0 16px;display:flex;gap:12px;align-items:center">
+    <span class="ms" style="font-size:24px;color:#14b8a6">event_available</span>
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:.9rem">Wann kannst du nächste Woche arbeiten?</div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-top:2px">Trag ein, an welchen Tagen du verfügbar bist. Dein Chef bestätigt dann die Schichten.</div>
+    </div>
+    <button class="btn btn-sm" style="background:#14b8a6;color:#fff" onclick="goProposalNextWeek()"><span class="ms" style="font-size:16px;vertical-align:middle">calendar_month</span> Zum Arbeitsplan</button>
+  </div>`;
+}
+
+/** Sprung zum Arbeitsplan der kommenden Woche (für die Sonntags-Erinnerung). */
+function goProposalNextWeek(){
+  // Nächsten Montag als Plan-Datum setzen
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
+  scheduleDate = d;
+  scheduleView = 'week';
+  navigate('schedule');
+}
+
+/** Modal: Minijob wählt Wunschsicht für einen Tag. */
+function openProposalModal(date){
+  const me = EMPS.find(e => e.id === currentUser.empId);
+  if (!me) { toast('Kein Mitarbeiterprofil','err'); return; }
+  // Existierenden eigenen Vorschlag für diesen Tag laden (zum Bearbeiten/Löschen)
+  const existing = SHIFT_PROPOSALS.find(p => p.empId === me.id && p.date === date);
+  const tmplOpts = SHIFT_TEMPLATES.map((t,i) => `<option value="${i}" ${existing&&existing.shiftLabel===t.label?'selected':''}>${t.label} (${t.from}–${t.to})</option>`).join('');
+  openModal('Verfügbar melden – ' + formatDateDE(date), `
+    <p style="font-size:.82rem;color:var(--text-muted);margin:0 0 14px">Trag ein, an welchem Tag und mit welcher Schicht du arbeiten kannst. Dein Chef bestätigt dann die Schicht.</p>
+    <div class="form-group"><label class="form-label">Schicht</label>
+      <select class="form-select" id="prTmpl" onchange="const t=SHIFT_TEMPLATES[this.value];if(t){document.getElementById('prFrom').value=t.from;document.getElementById('prTo').value=t.to;document.getElementById('prLabel').value=t.label;}">
+        ${tmplOpts}
+      </select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label class="form-label">Von</label><input class="form-input" type="time" id="prFrom" value="${existing?existing.from:SHIFT_TEMPLATES[0].from}"></div>
+      <div class="form-group"><label class="form-label">Bis</label><input class="form-input" type="time" id="prTo" value="${existing?existing.to:SHIFT_TEMPLATES[0].to}"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Bemerkung (optional)</label><input class="form-input" type="text" id="prNote" value="${existing?escapeHtml(existing.note||''):''}" placeholder="z. B. nur ab 16 Uhr"></div>
+    <input type="hidden" id="prDate" value="${date}">
+    <input type="hidden" id="prLabel" value="${existing?existing.shiftLabel:SHIFT_TEMPLATES[0].label}">
+  `, `<button class="btn" onclick="closeModal()">Abbrechen</button>
+     <button class="btn btn-primary" onclick="saveProposal()">${existing?'Aktualisieren':'Verfügbar melden'}</button>
+     ${existing?`<button class="btn" style="color:var(--danger);margin-left:auto" onclick="removeProposal(${existing.id})">Zurücknehmen</button>`:''}`);
+}
+
+/** Vorschlag speichern (neu oder aktualisieren). */
+async function saveProposal(){
+  const me = EMPS.find(e => e.id === currentUser.empId);
+  if (!me) return;
+  const date = document.getElementById('prDate').value;
+  const from = document.getElementById('prFrom').value;
+  const to = document.getElementById('prTo').value;
+  const label = document.getElementById('prLabel').value || 'Schicht';
+  const note = document.getElementById('prNote').value;
+  if (!from || !to) { toast('Bitte Zeiten ausfüllen','err'); return; }
+  const existing = SHIFT_PROPOSALS.find(p => p.empId === me.id && p.date === date);
+  if (existing) {
+    existing.from = from; existing.to = to; existing.shiftLabel = label; existing.note = note;
+    // Status bleibt wie er ist; nur Felder updaten (einfach: neu anlegen wäre duplikat)
+    await syncProposalStatus(existing.id, existing.status, null);
+    // Felder persistieren: wir updaten via direct supabase-Update der Nicht-Status-Spalten
+    try { await sb.from('shift_proposals').update({
+      shift_label: label, shift_from: from, shift_to: to, note: note || ''
+    }).eq('id', existing.id); } catch(e){ console.warn('[Proposal] update', e.message); }
+    toast('Vorschlag aktualisiert – wartet auf Bestätigung');
+  } else {
+    const prop = {
+      id: Date.now(), empId: me.id, empName: me.name,
+      location: me.location || '', dept: me.dept || '',
+      date, shiftLabel: label, from, to, status: 'pending', note
+    };
+    SHIFT_PROPOSALS.push(prop);
+    syncAddProposal(prop);
+    toast('Verfügbarkeit gemeldet – wartet auf Bestätigung');
+  }
+  closeModal();
+  renderSchedule();
+}
+
+/** Eigenen Vorschlag zurücknehmen (nur solange 'pending'). */
+async function removeProposal(propId){
+  const p = SHIFT_PROPOSALS.find(x => x.id === propId);
+  if (!p) return;
+  if (p.empId !== currentUser.empId) return; // nur eigene
+  if (p.status !== 'pending') { toast('Bereits entschiedene Vorschläge können nicht gelöscht werden','warn'); return; }
+  SHIFT_PROPOSALS = SHIFT_PROPOSALS.filter(x => x.id !== propId);
+  await syncDeleteProposal(propId);
+  closeModal();
+  toast('Verfügbarkeit zurückgenommen');
+  renderSchedule();
 }
 
 function quickAddShift(empName, date, empId) {
@@ -5641,6 +5798,94 @@ function renderVacation(){
 
 async function appVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(!v)return;const prev=v.status;v.status='approved';renderVacation();updateBadges();const ok=await syncVacationStatus(v.id,'approved');if(!ok){v.status=prev;toast('Fehler beim Speichern – nicht genehmigt','err');renderVacation();updateBadges();return;}const e=EMPS.find(x=>x.id===v.empId);if(e){e.vacUsed+=v.days;const okF=await syncEmployeeField(e.id,'vacUsed',e.vacUsed);if(!okF){e.vacUsed-=v.days;}}addNotif('vacation','Urlaub genehmigt',v.empName);toast('Genehmigt');renderVacation();updateBadges();}
 async function rejVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(!v)return;const prev=v.status;v.status='rejected';renderVacation();updateBadges();const ok=await syncVacationStatus(v.id,'rejected');if(!ok){v.status=prev;toast('Fehler beim Speichern','err');renderVacation();updateBadges();return;}addNotif('vacation','Urlaub abgelehnt',v.empName);toast('Abgelehnt','err');renderVacation();updateBadges();}
+
+// ═══ SCHICHTVORSCHLÄGE – Admin-Ansicht (Genehmigen / Ablehnen) ═══
+function renderProposals(){
+  const pg=document.getElementById('page-proposals');
+  if(!pg)return;
+  if(!can('editSchedules')){
+    // Minijob / Mitarbeiter: nur eigene Vorschläge sehen
+    const mine=SHIFT_PROPOSALS.filter(p=>p.empId===currentUser.empId).sort((a,b)=>a.date<b.date?-1:1);
+    pg.innerHTML=`<div class="vac-table-card"><div class="vac-table-header"><h3 class="vac-table-title">Meine Schichtvorschläge</h3></div>
+      ${mine.length?`<table class="vac-table"><thead><tr><th>Tag</th><th>Schicht</th><th>Zeit</th><th>Status</th><th>Aktion</th></tr></thead><tbody>
+      ${mine.map(p=>`<tr><td>${formatDateDE(p.date)}</td><td>${escapeHtml(p.shiftLabel)}</td><td>${p.from}–${p.to}</td>
+        <td>${p.status==='approved'?'<span class="badge badge-success">Bestätigt</span>':p.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abgelehnt</span>'}</td>
+        <td>${p.status==='pending'?`<button class="btn btn-sm" onclick="openProposalModal('${p.date}')">Bearbeiten</button>`:'—'}</td></tr>`).join('')}
+      </tbody></table>`:`<p style="padding:20px;color:var(--text-muted)">Du hast noch keine Schichtvorschläge. Gehe zum Arbeitsplan und klicke auf einen deiner leeren Tage.</p>`}</div>`;
+    return;
+  }
+  // Admin-Ansicht
+  const tabDefs=[['pending','Offen'],['approved','Bestätigt'],['rejected','Abgelehnt'],['all','Alle']];
+  const tabHtml=tabDefs.map(([k,l])=>`<button class="vac-tab${proposalTab===k?' active':''}" onclick="proposalTab='${k}';renderProposals()">${l}</button>`).join('');
+  let list=SHIFT_PROPOSALS.slice().sort((a,b)=>a.date<b.date?-1:1);
+  if(proposalTab!=='all') list=list.filter(p=>p.status===proposalTab);
+  const pendingCount=SHIFT_PROPOSALS.filter(p=>p.status==='pending').length;
+  pg.innerHTML=`
+    <div class="vac-topbar">
+      <div class="vac-stats-strip">
+        <div class="vac-stat-card"><div class="vac-stat-icon" style="background:rgba(20,184,166,.1);color:#14b8a6"><span class="ms">event_available</span></div><div><div class="vac-stat-label">Offene Vorschläge</div><div class="vac-stat-num">${pendingCount}</div></div></div>
+      </div>
+    </div>
+    <div class="vac-tabs-bar">${tabHtml}</div>
+    <div class="vac-table-card">
+      ${list.length?`<table class="vac-table"><thead><tr><th>Mitarbeiter</th><th>Tag</th><th>Schicht</th><th>Zeit</th><th>Bemerkung</th><th>Status</th><th>Aktionen</th></tr></thead><tbody>
+      ${list.map(p=>`<tr>
+        <td><strong style="color:var(--text-primary)">${p.empName}</strong><div style="font-size:.7rem;color:var(--text-muted)">${escapeHtml(p.dept||'')} · ${escapeHtml(getLocationName(p.location))}</div></td>
+        <td>${formatDateDE(p.date)}</td>
+        <td>${escapeHtml(p.shiftLabel)}</td>
+        <td style="font-family:'Space Mono',monospace">${p.from}–${p.to}</td>
+        <td style="font-size:.8rem;color:var(--text-muted)">${p.note||'—'}</td>
+        <td>${p.status==='approved'?'<span class="badge badge-success">Bestätigt</span>':p.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abgelehnt</span>'}</td>
+        <td class="vac-action-cell">${p.status==='pending'?`<button class="vac-btn-approve" onclick="approveProposal(${p.id})" title="Schicht anlegen und bestätigen"><span class="ms">check</span></button> <button class="vac-btn-reject" onclick="rejectProposal(${p.id})" title="Ablehnen"><span class="ms">close</span></button>`:'—'}</td>
+      </tr>`).join('')}
+      </tbody></table>`:`<p style="padding:20px;color:var(--text-muted)">Keine Vorschläge in diesem Bereich.</p>`}
+    </div>`;
+}
+
+/** Vorschlag genehmigen → echte Schicht anlegen + Status approved + Minijob benachrichtigen. */
+async function approveProposal(id){
+  if(!can('editSchedules'))return;
+  const p=SHIFT_PROPOSALS.find(x=>x.id===id);if(!p)return;
+  const emp=EMPS.find(e=>e.id===p.empId);if(!emp){toast('Mitarbeiter nicht gefunden','err');return;}
+  // Standort klären (ggf. bei Mehrfach-Standort nachfragen) – VOR dem Speichern.
+  const shiftLoc=await pickShiftLocation(emp);
+  if(!shiftLoc)return; // abgebrochen
+  // 1) Echte Schicht in Supabase anlegen (vor dem Status-Update, damit bei Fehler
+  //    kein "approved ohne Schicht" in der DB stehen bleibt).
+  const newShift={
+    id:Date.now()+Math.random()*1e6|0,
+    empId:emp.id, empName:emp.name, dept:emp.dept, location:shiftLoc,
+    date:p.date, from:p.from, to:p.to, label:p.shiftLabel,
+    colorClass:getDeptColorClass(emp.dept),
+    isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false
+  };
+  const res=await syncAddShift(newShift);
+  if(!res||res.ok===false){toast('Fehler beim Anlegen der Schicht: '+(res?.error||''),'err');return;}
+  // 2) Status approved (jetzt, da Schicht existiert) – optimistic + persist.
+  const prev=p.status;p.status='approved';
+  SHIFTS.push(newShift);
+  renderProposals();updateBadges();
+  const okStat=await syncProposalStatus(p.id,'approved',currentUser.id);
+  if(!okStat){p.status=prev;SHIFTS=SHIFTS.filter(s=>s!==newShift);toast('Fehler beim Speichern des Status – Schicht angelegt, bitte erneut prüfen','err');renderProposals();updateBadges();return;}
+  // 3) Minijob gezielt benachrichtigen (in-app; nur sichtbar, wenn online).
+  addNotif('success','Schicht bestätigt ✓',`${formatDateDE(p.date)} · ${p.from}–${p.to} (${p.shiftLabel}) wurde bestätigt.`,p.empId);
+  toast('Schicht angelegt & bestätigt');
+  renderProposals();updateBadges();renderSchedule();
+}
+
+/** Vorschlag ablehnen → Status rejected + Minijob benachrichtigen. */
+async function rejectProposal(id){
+  if(!can('editSchedules'))return;
+  const p=SHIFT_PROPOSALS.find(x=>x.id===id);if(!p)return;
+  const prev=p.status;p.status='rejected';renderProposals();updateBadges();
+  const ok=await syncProposalStatus(p.id,'rejected',currentUser.id);
+  if(!ok){p.status=prev;toast('Fehler beim Speichern','err');renderProposals();updateBadges();return;}
+  addNotif('warn','Schichtvorschlag abgelehnt',`${formatDateDE(p.date)} · ${p.shiftLabel} wurde leider abgelehnt.`,p.empId);
+  toast('Abgelehnt','err');
+  renderProposals();updateBadges();renderSchedule();
+}
+
+
 
 // ═══ SICK ═══
 function renderSick(){
@@ -7220,7 +7465,14 @@ function renderNotifs(){
 }
 function markAnnouncementRead(id){ localStorage.setItem('ann_read_'+id,'1'); renderNotifs(); updateBadges(); }
 function markRead(id){const n=NOTIFS.find(x=>x.id===id);if(n){n.unread=false;renderNotifs();updateBadges();}}
-function addNotif(type,title,text){NOTIFS.unshift({id:Date.now(),type,title,text,time:'Gerade eben',unread:true,forRole:['inhaber','manager']});updateBadges();}
+function addNotif(type,title,text,forEmpId){
+  // forEmpId (optional): gezielt an einen MA (z. B. Minijob-Bestätigung).
+  // Ohne forEmpId → wie bisher nur an Inhaber/Manager.
+  NOTIFS.unshift({id:Date.now(),type,title,text,time:'Gerade eben',unread:true,
+    forRole: forEmpId ? null : ['inhaber','manager'],
+    forEmpId: forEmpId || null});
+  updateBadges();
+}
 
 // ═══ MITTEILUNGEN ERSTELLEN (Admin) ═══
 function openAnnouncementModal(){
