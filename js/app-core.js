@@ -4568,9 +4568,6 @@ function openSelfServiceCell(empId, date) {
   // Für Minijob: "Verfügbar melden" als Hauptaktion → danach Schicht wählen.
   // Für alle anderen: "Nicht verfügbar melden" als Hauptaktion (wie bisher).
   const minijob = isMinijobEmp(empId);
-  // TEMP DEBUG – hilft herauszufinden, warum ein Minijob nicht erkannt wird.
-  const _dbgEmp = EMPS.find(x => x.id === empId);
-  console.log('[DEBUG openSelfServiceCell] empId=', empId, 'emp=', _dbgEmp, 'employmentType=', _dbgEmp?.employmentType, 'isMinijob=', minijob);
   const btnVerfuegbar = `<button class="btn ${minijob?'btn-primary':''}" style="width:100%;justify-content:flex-start" onclick="document.getElementById('selfServicePopup').remove();openProposalModal('${date}')"><span class="ms" style="font-size:18px">event_available</span> Verfügbar melden</button>`;
   const btnNichtVerf = `<button class="btn ${minijob?'':'btn-primary'}" style="width:100%;justify-content:flex-start" onclick="toggleUnavailable(${empId},'${date}');document.getElementById('selfServicePopup').remove()"><span class="ms" style="font-size:18px">event_busy</span> Nicht verfügbar melden</button>`;
   const btnUrlaub = `<button class="btn" style="width:100%;justify-content:flex-start" onclick="document.getElementById('selfServicePopup').remove();openVacationForDate('${date}')"><span class="ms" style="font-size:18px">beach_access</span> Urlaub beantragen</button>`;
@@ -4578,7 +4575,6 @@ function openSelfServiceCell(empId, date) {
   popup.innerHTML = `<div style="background:var(--bg-card);border-radius:18px;padding:22px;width:320px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <h3 style="font-size:.95rem;font-weight:700;margin:0 0 4px">${formatDateDE(date)}</h3>
     <p style="font-size:.78rem;color:var(--text-muted);margin:0 0 16px">Was möchtest du melden?</p>
-    <div style="font-size:.7rem;color:var(--danger);background:rgba(220,38,38,.08);border:1px dashed var(--danger);border-radius:8px;padding:6px 8px;margin:0 0 12px;font-family:monospace;word-break:break-all">DEBUG: empId=${empId} | employmentType=${JSON.stringify(_dbgEmp?.employmentType)} | dept=${JSON.stringify(_dbgEmp?.dept)} | isMinijob=${minijob}</div>
     <div style="display:flex;flex-direction:column;gap:8px">
       ${btns}
     </div>
@@ -4615,16 +4611,18 @@ function openVacationForDate(date) {
 
 // ═══ SCHICHTVORSCHLÄGE (Minijob: "Ich kann arbeiten") ═══
 /** Minijob erkennen – tolerant gegen Schreibweise (Minijob / Mini-Job / mini-job …).
- *  Grund: in der DB kann employment_type u. U. abweichend geschrieben sein
- *  (z. B. 'minijob', 'Mini-Job'); striktes === 'Minijob' würde diese MA übersehen. */
-function isMinijobType(employmentType){
-  const t = (employmentType||'').toLowerCase().replace(/[\s\-_]+/g,'');
-  return t === 'minijob' || t === 'minijob';
+ *  WICHTIG: In dieser App ist "Minijob" ein BEREICH (dept), keine Beschäftigungsart.
+ *  Das employment_type-Feld bleibt meist 'Vollzeit'. Daher primär auf dept=='Minijob'
+ *  geprüft, employment_type nur als Fallback. */
+function isMinijobType(value){
+  const t = (value||'').toLowerCase().replace(/[\s\-_]+/g,'');
+  return t === 'minijob';
 }
-/** Ist der MA (per ID) ein Minijob? */
+/** Ist der MA (per ID) ein Minijob? (Bereich 'Minijob' ODER employment_type 'Minijob') */
 function isMinijobEmp(empId){
   const e = EMPS.find(x => x.id === empId);
-  return !!e && isMinijobType(e.employmentType);
+  if (!e) return false;
+  return isMinijobType(e.dept) || isMinijobType(e.employmentType);
 }
 
 /** Eigene offenen Vorschläge für die kommende Woche (Mo–So der Folgewoche). */
@@ -4640,7 +4638,7 @@ function myProposalsNextWeek(){
 
 /** Sonntags-Erinnerung für Minijobs: "Trag ein, wann du nächste Woche arbeiten kannst." */
 function minijobSundayReminderHtml(me){
-  if (!me || !isMinijobType(me.employmentType)) return '';
+  if (!me || !(isMinijobType(me.dept) || isMinijobType(me.employmentType))) return '';
   // Nur sonntags zeigen (getDay()===0). Hinweis: app läuft in Browser-Zeit, ausreichend.
   if (new Date().getDay() !== 0) return '';
   // Nur zeigen, wenn für die nächste Woche noch kein Vorschlag vorliegt (nicht nerven).
