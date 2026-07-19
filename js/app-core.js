@@ -4610,10 +4610,17 @@ function openVacationForDate(date) {
 }
 
 // ═══ SCHICHTVORSCHLÄGE (Minijob: "Ich kann arbeiten") ═══
+/** Minijob erkennen – tolerant gegen Schreibweise (Minijob / Mini-Job / mini-job …).
+ *  Grund: in der DB kann employment_type u. U. abweichend geschrieben sein
+ *  (z. B. 'minijob', 'Mini-Job'); striktes === 'Minijob' würde diese MA übersehen. */
+function isMinijobType(employmentType){
+  const t = (employmentType||'').toLowerCase().replace(/[\s\-_]+/g,'');
+  return t === 'minijob' || t === 'minijob';
+}
 /** Ist der MA (per ID) ein Minijob? */
 function isMinijobEmp(empId){
   const e = EMPS.find(x => x.id === empId);
-  return !!e && e.employmentType === 'Minijob';
+  return !!e && isMinijobType(e.employmentType);
 }
 
 /** Eigene offenen Vorschläge für die kommende Woche (Mo–So der Folgewoche). */
@@ -4629,7 +4636,7 @@ function myProposalsNextWeek(){
 
 /** Sonntags-Erinnerung für Minijobs: "Trag ein, wann du nächste Woche arbeiten kannst." */
 function minijobSundayReminderHtml(me){
-  if (!me || me.employmentType !== 'Minijob') return '';
+  if (!me || !isMinijobType(me.employmentType)) return '';
   // Nur sonntags zeigen (getDay()===0). Hinweis: app läuft in Browser-Zeit, ausreichend.
   if (new Date().getDay() !== 0) return '';
   // Nur zeigen, wenn für die nächste Woche noch kein Vorschlag vorliegt (nicht nerven).
