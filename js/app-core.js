@@ -633,9 +633,14 @@ async function confirmMandatoryAnnouncement(annId){
 
 // Banner-HTML der Mitteilungen für das Dashboard
 function announcementBannerHtml(){
-  const list = visibleAnnouncements().filter(a=>!localStorage.getItem('ann_dismissed_'+a.id));
-  if(!list.length) return '';
   const canManage = can('manageAnnouncements');
+  // Verwalter (Inhaber/Manager) sehen IMMER alle aktiven Mitteilungen – auch lokal
+  // "ausgeblendete" – sonst könnten sie eine versehentlich weggeklickte Mitteilung
+  // nicht mehr für alle zurückziehen (der 🗑-Button sitzt auf dem Banner).
+  const list = canManage
+    ? visibleAnnouncements()
+    : visibleAnnouncements().filter(a=>!localStorage.getItem('ann_dismissed_'+a.id));
+  if(!list.length) return '';
   return list.map(a=>{
     const locLbl = annLocLabel(a.location);
     const isImg = a.attachmentUrl && /\.(jpg|jpeg|png|webp|gif)$/i.test(a.attachmentName||a.attachmentUrl);
