@@ -4408,17 +4408,18 @@ function renderSchedule(){
           }
         }
 
-        // Schichtvorschlag (Minijob-Angebot) anzeigen, wenn kein Dienst gesetzt
+        // Schichtvorschlag (Minijob-Angebot) anzeigen, wenn kein Dienst gesetzt.
+        // WICHTIG: genehmigte Vorschläge werden NICHT hier gezeigt – daraus wurde
+        // beim Genehmigen eine echte Schicht angelegt (die oben in dayS erscheint).
+        // Hier nur noch offene (⏳) und abgelehnte (✕) Vorschläge darstellen.
         if (empObj && !dayS.length) {
           const prop = SHIFT_PROPOSALS.find(p => p.empId === empObj.id && p.date === ds);
-          if (prop) {
+          if (prop && prop.status !== 'approved') {
             const isOwn = empObj.id === currentUser.empId;
             const canEditProp = can('editSchedules');
             // Farbe nach Status
-            const cls = prop.status === 'approved' ? 'is-vacation' :
-                        prop.status === 'rejected' ? 'is-sick' : '';
-            const badge = prop.status === 'approved' ? '✓' :
-                          prop.status === 'rejected' ? '✕' : '⏳';
+            const cls = prop.status === 'rejected' ? 'is-sick' : '';
+            const badge = prop.status === 'rejected' ? '✕' : '⏳';
             const click = isOwn ? `onclick="openProposalModal('${ds}')" style="cursor:pointer" title="Vorschlag ansehen"` :
                           canEditProp ? `onclick="navigate('proposals')" style="cursor:pointer" title="Zur Genehmigung"` : '';
             h += `<div class="shift-block compact-block ${cls}" ${click} data-sid="prop-${prop.id}">
