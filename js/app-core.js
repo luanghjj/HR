@@ -4167,11 +4167,9 @@ function renderSchedule(){
   const isEmp=currentUser.role==='mitarbeiter';
   const me=EMPS.find(e=>e.id===currentUser.empId);
 
-  // Mobile: standardmäßig Tagesansicht beim ersten Öffnen (Wochenraster ist
-  // auf dem Handy schwer lesbar). Nutzer kann jederzeit auf Woche umschalten.
-  if(window.innerWidth<=900 && scheduleView==='week' && !window._schedMobileDefaulted){
-    scheduleView='day'; window._schedMobileDefaulted=true;
-  }
+  // Mobile: Wochenansicht bleibt Standard (wie am Desktop). Das Wochenraster
+  // nutzt auf dem Handy die volle Breite und scrollt horizontal über die 7 Tage
+  // (erste Spalte "Name" bleibt fixiert). Nutzer kann jederzeit auf Tag wechseln.
 
   // Mitarbeiter/Azubi ohne verknüpften Mitarbeiter-Datensatz: Plan bleibt sonst leer.
   if(!can('seeAllSchedules') && !me){

@@ -946,6 +946,18 @@
   #schedC .table-wrap th,
   #schedC .table-wrap td { padding: 8px 8px; font-size: 0.8rem; }
 
+  /* Volle Breite: Desktop-Regel zieht die (ausgeblendete) Sidebar-Breite ab
+     (calc(100vw - sidebar - 64px)) → auf dem Handy blieb das Raster viel zu
+     schmal. Hier volle Viewport-Breite, horizontales Scrollen über die 7 Tage. */
+  .sc2-grid-wrap {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 16px;
+  }
+  /* Tagesspalten breit genug zum bequemen Lesen (statt gequetscht) */
+  .sc2-grid-wrap table thead th:not(:first-child),
+  .sc2-grid-wrap table tbody td:not(:first-child) { min-width: 128px; }
+
   /* Wochenraster: Schicht-Blöcke kompakter auf kleinem Display */
   .sc2-grid-wrap .shift-cell { min-height: 50px; padding: 2px; }
   .sc2-grid-wrap .shift-block,
