@@ -47,9 +47,17 @@
     font-size: 1.3rem;
   }
 
-  /* Main content: no margin */
+  /* Main content: no margin.
+     min-width:0 ist entscheidend: .main ist flex:1-Kind von .app (display:flex).
+     Ohne min-width:0 (Default min-width:auto) weigert sich das Flex-Kind, unter
+     seine Inhaltsbreite zu schrumpfen → die breite max-content-Tabelle zieht die
+     ganze Seite breiter als den Viewport → Browser zoomt raus, kein Scroll-Kasten.
+     max-width:100vw + overflow-x:hidden kappen zusätzlich. */
   .main {
     margin-left: 0;
+    min-width: 0;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 
   /* Show hamburger button */
