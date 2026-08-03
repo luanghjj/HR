@@ -220,7 +220,7 @@ async function loadDataFromSupabase() {
         from: s.shift_from?.substring(0,5) || '09:00',
         to: s.shift_to?.substring(0,5) || '17:00',
         label: s.label || '',
-        colorClass: s.label === 'Schule' ? 'schule' : (s.color_class || getDeptColorClass(s.dept)),
+        colorClass: s.color_class || getShiftColorClass(s.label, s.dept),
         isSick: s.is_sick || false,
         isVacation: s.is_vacation || false,
         isLate: s.is_late || false,
@@ -432,6 +432,36 @@ async function loadDataFromSupabase() {
         console.log('[Data] ✓ Aushilfe max shifts/week:', AUSHILFE_MAX_SHIFTS_PER_WEEK);
       }
     } catch (_) { /* table may not exist yet, use default 1 */ }
+
+    // Load Schicht-Vorlagen (Presets) pro Standort – graceful, Tabelle kann
+    // noch fehlen. ABSICHTLICH NICHT liteLoad-gated: auch Minijob/Azubi
+    // brauchen die Vorlagen im "Verfügbar melden"-Dialog.
+    try {
+      const { data: presets, error: prErr } = await sb
+        .from('shift_presets').select('*').order('sort_order').order('id');
+      if (!prErr && presets && presets.length > 0) {
+        SHIFT_PRESETS_BY_LOC = {};
+        presets.forEach(p => {
+          const loc = p.location || '';
+          if (!SHIFT_PRESETS_BY_LOC[loc]) SHIFT_PRESETS_BY_LOC[loc] = [];
+          SHIFT_PRESETS_BY_LOC[loc].push({
+            id: p.id,
+            location: loc,
+            label: p.label,
+            from: (p.shift_from || '09:00').substring(0, 5),
+            to: (p.shift_to || '17:00').substring(0, 5),
+            colorClass: p.color_class || '',
+            sortOrder: p.sort_order ?? 0
+          });
+        });
+        console.log('[Data] ✓ Schicht-Vorlagen:', presets.length, 'in',
+          Object.keys(SHIFT_PRESETS_BY_LOC).length, 'Standorten');
+      }
+      // else: statischer SHIFT_PRESETS_SEED aus config.js bleibt Fallback
+    } catch (_) { /* table may not exist yet, use seed */ }
+    // Immer aufrufen – normalisiert auch den Seed-Pfad und garantiert,
+    // dass SHIFT_TEMPLATES nie leer ist.
+    resolveShiftTemplates();
 
     // Load Verfügbarkeit (Nicht verfügbar) – aktueller + nächste 3 Monate
     try {

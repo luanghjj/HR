@@ -186,7 +186,7 @@
       <div class="header-left">
         <button class="btn" style="display:none" id="menuBtn" onclick="toggleSidebar()"><span class="ms">menu</span></button>
         <h1 class="page-title" id="pageTitle">Dashboard</h1>
-        <select class="location-select" id="locationSelect" onchange="currentLocation=this.value;renderPage(getCurrentPage())"></select>
+        <select class="location-select" id="locationSelect" onchange="currentLocation=this.value;resolveShiftTemplates();renderPage(getCurrentPage())"></select>
       </div>
       <div class="header-right">
         <span style="font-size:.78rem;color:var(--text-muted)" id="dateDisplay"></span>

@@ -144,6 +144,71 @@ function getDeptColorClass(deptName) {
   return { Küche: 'kitchen', Service: 'service', Bar: 'bar', Sushi: 'sushi', Ausbildung: 'azubi', Verwaltung: 'verwaltung', Minijob: 'minijob', Aushilfe: 'aushilfe' }[deptName] || '';
 }
 
+/**
+ * Farb-Klasse für eine Schicht bestimmen.
+ * Hat die zugehörige Vorlage eine eigene colorClass (z. B. 'schule'),
+ * gewinnt diese – sonst die Bereichsfarbe. Dadurch behält eine als
+ * "Schule" markierte Vorlage die blaue "S"-Darstellung, auch wenn sie
+ * anders heisst.
+ * @param {string} label    Schicht-Label (Vorlagenname)
+ * @param {string} deptName Bereich des Mitarbeiters
+ * @returns {string} CSS-Klasse ('schule', 'kitchen', … oder '')
+ */
+function getShiftColorClass(label, deptName) {
+  // Alt-Daten + Berufsschul-Autofill schreiben das Label direkt
+  if (label === 'Schule') return 'schule';
+  const tpl = SHIFT_TEMPLATES.find(t => t.label === label);
+  if (tpl && tpl.colorClass) return tpl.colorClass;
+  return getDeptColorClass(deptName);
+}
+
+/**
+ * SHIFT_TEMPLATES mit den Vorlagen des aktuellen Standorts füllen.
+ *
+ * WICHTIG: mutiert das Array IN PLACE (length = 0 + push). Alle Aufrufer
+ * greifen per Index zu (SHIFT_TEMPLATES[i]) – ein Neuzuweisen würde diese
+ * Referenzen brechen.
+ *
+ * Fallback-Kette:
+ *   Standort hat Vorlagen        → diese
+ *   'all' / Multi-Standort       → Vereinigung (pro Label der erste Treffer)
+ *   nichts vorhanden             → SHIFT_PRESETS_SEED aus config.js
+ * Garantie: das Array ist nie leer (mehrere Aufrufer lesen
+ * SHIFT_TEMPLATES[0] ungeprüft).
+ */
+function resolveShiftTemplates() {
+  let list = [];
+  const loc = (typeof currentLocation !== 'undefined') ? currentLocation : 'all';
+
+  if (loc && loc !== 'all' && !loc.includes(',')) {
+    list = SHIFT_PRESETS_BY_LOC[loc] || [];
+  } else {
+    // 'all' oder Multi-Standort: Vereinigung über die relevanten Standorte
+    const ids = (loc && loc !== 'all')
+      ? loc.split(',').map(s => s.trim()).filter(Boolean)
+      : Object.keys(SHIFT_PRESETS_BY_LOC).sort();
+    const seen = new Set();
+    ids.forEach(id => (SHIFT_PRESETS_BY_LOC[id] || []).forEach(p => {
+      if (seen.has(p.label)) return;
+      seen.add(p.label);
+      list.push(p);
+    }));
+  }
+
+  // Kein Datensatz (Standort ungepflegt / Tabelle fehlt) → Standard-Seed
+  if (!list.length) list = SHIFT_PRESETS_SEED;
+
+  SHIFT_TEMPLATES.length = 0;
+  list.forEach(p => SHIFT_TEMPLATES.push({
+    id: p.id ?? null,
+    label: p.label,
+    from: p.from,
+    to: p.to,
+    colorClass: p.colorClass || ''
+  }));
+  return SHIFT_TEMPLATES;
+}
+
 /** Generate status badge HTML */
 function statusBadge(status) {
   const map = {

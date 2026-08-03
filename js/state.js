@@ -52,3 +52,9 @@ let AUSHILFE_SUBMISSIONS = [];       // from employee_submissions table
 let AUSHILFE_MAX_SHIFTS_PER_WEEK = 1; // configurable by owner, default 1
 let aushilfeSubmissionsFilter = 'all'; // filter for submissions list
 
+// Schicht-Vorlagen (Presets) – vom Inhaber PRO STANDORT gepflegt.
+// { origami: [{id,location,label,from,to,colorClass,sortOrder}], ... }
+// Wird von data-loader.js aus der Tabelle shift_presets gefüllt;
+// resolveShiftTemplates() (utils.js) leitet daraus SHIFT_TEMPLATES ab.
+let SHIFT_PRESETS_BY_LOC = {};
+

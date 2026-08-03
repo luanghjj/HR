@@ -52,6 +52,7 @@ const PAGE_TITLES = {
   ausbildung: 'Ausbildung',
   qr_generator: 'QR Check-in',
   locations: 'Standorte',
+  shift_presets: 'Schicht-Vorlagen',
   gehalt_dash: 'Gehalt Dashboard',
   gehalt_abr: 'Gehaltsabrechnung',
   gehalt_ma: 'Mitarbeiter (Gehalt)',
@@ -60,16 +61,35 @@ const PAGE_TITLES = {
   gehalt_smart: 'Smart Money'
 };
 
-// Shift templates
-const SHIFT_TEMPLATES = [
-  { label: 'Frühschicht',    from: '09:00', to: '15:00' },
-  { label: 'Spätschicht',    from: '15:00', to: '23:00' },
-  { label: 'Mittagsschicht', from: '11:00', to: '15:00' },
-  { label: 'Abendschicht',   from: '17:00', to: '23:00' },
-  { label: 'Ganztags',       from: '10:00', to: '22:00' },
-  { label: 'Schule',         from: '08:00', to: '15:00' },
-  { label: 'Manuell',        from: '09:00', to: '17:00' }
+// ═══════════════════════════════════════════════════════════
+// Schicht-Vorlagen (Presets)
+// ───────────────────────────────────────────────────────────
+// SHIFT_PRESETS_SEED = Standard-Zeiten. Dient nur als Fallback,
+// solange die Tabelle shift_presets leer ist oder noch nicht
+// existiert. Der Inhaber pflegt die echten Zeiten PRO STANDORT
+// unter System → Schicht-Vorlagen.
+//
+// colorClass trägt die Bedeutung, NICHT das Label: eine Vorlage mit
+// colorClass 'schule' wird im Plan als blauer "S"-Block dargestellt.
+//
+// Kein Eintrag "Manuell": das Vorlagen-Dropdown hat bereits einen
+// festen Eintrag "Manuell" (leerer Wert) – ein zweiter hier wäre
+// ein Duplikat in der Auswahlliste.
+// ═══════════════════════════════════════════════════════════
+const SHIFT_PRESETS_SEED = [
+  { label: 'Frühschicht',    from: '09:00', to: '15:00', colorClass: '' },
+  { label: 'Spätschicht',    from: '15:00', to: '23:00', colorClass: '' },
+  { label: 'Mittagsschicht', from: '11:00', to: '15:00', colorClass: '' },
+  { label: 'Abendschicht',   from: '17:00', to: '23:00', colorClass: '' },
+  { label: 'Ganztags',       from: '10:00', to: '22:00', colorClass: '' },
+  { label: 'Schule',         from: '08:00', to: '15:00', colorClass: 'schule' }
 ];
+
+// Aktive Vorlagen für den gewählten Standort.
+// WICHTIG: wird von resolveShiftTemplates() IN PLACE mutiert
+// (length = 0 + push) und NIEMALS neu zugewiesen – alle Aufrufer
+// greifen per Index darauf zu (SHIFT_TEMPLATES[i]).
+const SHIFT_TEMPLATES = SHIFT_PRESETS_SEED.map(p => ({ ...p }));
 
 // Checklist types
 const CHECKLIST_TYPES = [

@@ -498,6 +498,9 @@ async function syncUpdateShift(shift) {
       shift_to: shift.to,
       label: shift.label || ''
     };
+    // Farb-Klasse mitschicken, damit ein Vorlagenwechsel (z. B. Schule →
+    // Frühschicht) auch die Darstellung nachzieht.
+    if (shift.colorClass != null) payload.color_class = shift.colorClass;
     // Eigene Pause nur mitschicken, wenn gesetzt (Spalte evtl. noch nicht da → kein Bruch)
     if (shift.pauseMinutes != null) payload.pause_minutes = shift.pauseMinutes;
     const { error } = await sb.from('shifts').update(payload).eq('id', shift.id);
@@ -963,3 +966,139 @@ async function syncFutureVacsSicksForEmp(empId, newLoc) {
 }
 
 
+
+// ═══ SCHICHT-VORLAGEN (shift_presets) ═══
+// Vom Inhaber gepflegte Vorlagen-Zeiten PRO STANDORT.
+// Alle Helper: kein toast, kein throw – nur console.warn + Boolean-Rückgabe.
+// Nach jeder Änderung wird resolveShiftTemplates() aufgerufen, damit
+// SHIFT_TEMPLATES (und damit alle Dropdowns) sofort aktuell sind.
+
+/**
+ * Neue Vorlage anlegen.
+ * @param {Object} p - { location, label, from, to, colorClass, sortOrder }
+ * @returns {boolean}
+ */
+async function syncAddShiftPreset(p) {
+  try {
+    const { data, error } = await sb.from('shift_presets').insert({
+      location:    p.location,
+      label:       p.label,
+      shift_from:  p.from,
+      shift_to:    p.to,
+      color_class: p.colorClass || '',
+      sort_order:  p.sortOrder ?? 0,
+      created_by:  window.currentUser?.id || null
+    }).select().single();
+    if (error) { console.warn('[Sync] Add preset error:', error.message); return false; }
+    p.id = data.id;
+    if (!SHIFT_PRESETS_BY_LOC[p.location]) SHIFT_PRESETS_BY_LOC[p.location] = [];
+    SHIFT_PRESETS_BY_LOC[p.location].push({ ...p });
+    resolveShiftTemplates();
+    console.log('[Sync] ✓ Vorlage angelegt:', p.label, '@', p.location);
+    return true;
+  } catch (e) { console.warn('[Sync] Preset add:', e.message); return false; }
+}
+
+/**
+ * Vorlage aktualisieren (Zeiten, Typ, Reihenfolge).
+ * @param {number} id
+ * @param {Object} fields - { label?, from?, to?, colorClass?, sortOrder? }
+ * @returns {boolean}
+ */
+async function syncUpdateShiftPreset(id, fields) {
+  try {
+    const payload = {};
+    if (fields.label      !== undefined) payload.label       = fields.label;
+    if (fields.from       !== undefined) payload.shift_from  = fields.from;
+    if (fields.to         !== undefined) payload.shift_to    = fields.to;
+    if (fields.colorClass !== undefined) payload.color_class = fields.colorClass;
+    if (fields.sortOrder  !== undefined) payload.sort_order  = fields.sortOrder;
+    if (!Object.keys(payload).length) return true;   // nichts zu tun
+    const { error } = await sb.from('shift_presets').update(payload).eq('id', id);
+    if (error) { console.warn('[Sync] Update preset error:', error.message); return false; }
+    Object.values(SHIFT_PRESETS_BY_LOC).forEach(list => {
+      const row = list.find(x => x.id === id);
+      if (row) Object.assign(row, fields);
+    });
+    resolveShiftTemplates();
+    console.log('[Sync] ✓ Vorlage aktualisiert:', id);
+    return true;
+  } catch (e) { console.warn('[Sync] Preset update:', e.message); return false; }
+}
+
+/**
+ * Vorlage löschen. Bereits erstellte Schichten bleiben unberührt.
+ * @param {number} id
+ * @returns {boolean}
+ */
+async function syncDeleteShiftPreset(id) {
+  try {
+    const { error } = await sb.from('shift_presets').delete().eq('id', id);
+    if (error) { console.warn('[Sync] Delete preset error:', error.message); return false; }
+    Object.keys(SHIFT_PRESETS_BY_LOC).forEach(loc => {
+      SHIFT_PRESETS_BY_LOC[loc] = SHIFT_PRESETS_BY_LOC[loc].filter(x => x.id !== id);
+    });
+    resolveShiftTemplates();
+    console.log('[Sync] ✓ Vorlage gelöscht:', id);
+    return true;
+  } catch (e) { console.warn('[Sync] Preset delete:', e.message); return false; }
+}
+
+/**
+ * Reihenfolge mehrerer Vorlagen speichern.
+ * @param {Array} items - [{ id, sortOrder }]
+ * @returns {boolean}
+ */
+async function syncReorderShiftPresets(items) {
+  try {
+    for (const it of items) {
+      const { error } = await sb.from('shift_presets')
+        .update({ sort_order: it.sortOrder }).eq('id', it.id);
+      if (error) { console.warn('[Sync] Reorder preset error:', error.message); return false; }
+      Object.values(SHIFT_PRESETS_BY_LOC).forEach(list => {
+        const row = list.find(x => x.id === it.id);
+        if (row) row.sortOrder = it.sortOrder;
+      });
+    }
+    Object.keys(SHIFT_PRESETS_BY_LOC).forEach(loc => {
+      SHIFT_PRESETS_BY_LOC[loc].sort((a, b) => (a.sortOrder - b.sortOrder) || (a.id - b.id));
+    });
+    resolveShiftTemplates();
+    console.log('[Sync] ✓ Reihenfolge gespeichert:', items.length, 'Vorlagen');
+    return true;
+  } catch (e) { console.warn('[Sync] Preset reorder:', e.message); return false; }
+}
+
+/**
+ * Standard-Vorlagen für einen Standort anlegen (wenn dieser noch keine hat).
+ * Ermöglicht einen neuen Standort ohne SQL-Lauf.
+ * @param {string} location
+ * @returns {boolean}
+ */
+async function syncSeedShiftPresets(location) {
+  try {
+    const rows = SHIFT_PRESETS_SEED.map((p, i) => ({
+      location,
+      label:       p.label,
+      shift_from:  p.from,
+      shift_to:    p.to,
+      color_class: p.colorClass || '',
+      sort_order:  (i + 1) * 10,
+      created_by:  window.currentUser?.id || null
+    }));
+    const { data, error } = await sb.from('shift_presets').insert(rows).select();
+    if (error) { console.warn('[Sync] Seed presets error:', error.message); return false; }
+    SHIFT_PRESETS_BY_LOC[location] = (data || []).map(d => ({
+      id: d.id,
+      location,
+      label: d.label,
+      from: (d.shift_from || '').substring(0, 5),
+      to: (d.shift_to || '').substring(0, 5),
+      colorClass: d.color_class || '',
+      sortOrder: d.sort_order ?? 0
+    }));
+    resolveShiftTemplates();
+    console.log('[Sync] ✓ Standard-Vorlagen angelegt für', location);
+    return true;
+  } catch (e) { console.warn('[Sync] Seed presets:', e.message); return false; }
+}

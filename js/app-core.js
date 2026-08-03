@@ -77,6 +77,7 @@ function buildSidebar(){
     sectionStart('system', 'System');
     html+=`<div class="nav-item" onclick="navigate('access',this)">${mi('admin_panel_settings')} Zugangsverwaltung<span class="nav-badge" id="pendingBadge" style="display:none">0</span></div>`;
     html+=`<div class="nav-item" onclick="navigate('locations',this)">${mi('location_city')} Standorte</div>`;
+    html+=`<div class="nav-item" onclick="navigate('shift_presets',this)">${mi('more_time')} Schicht-Vorlagen</div>`;
     html+=`<div class="nav-item" onclick="navigate('qr_generator',this)">${mi('qr_code_2')} QR Check-in</div>`;
     sectionEnd();
   }
@@ -128,6 +129,8 @@ function buildLocationSelect(){
     }
   }
   sel.value=currentLocation;
+  // Vorlagen zum (ggf. korrigierten) Standort nachziehen
+  resolveShiftTemplates();
 }
 
 // permBanner() defined in utils.js
@@ -208,7 +211,7 @@ function renderPage(p){
   const c=document.getElementById('contentArea');
 
   c.innerHTML='<div class="page active" id="page-'+p+'"></div>';
-  ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,aushilfe_planung:renderAushilfePlanung,proposals:renderProposals,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung,qr_generator:renderQrGenerator,locations:renderLocations})[p]?.();
+  ({dashboard:renderDashboard,employees:renderEmployees,departments:renderDepts,schedule:renderSchedule,aushilfe_planung:renderAushilfePlanung,proposals:renderProposals,vacation:renderVacation,sick:renderSick,documents:renderDocuments,access:renderAccess,calendar:renderCalendar,reports:renderReports,checklists:renderChecklists,ausbildung:renderAusbildung,qr_generator:renderQrGenerator,locations:renderLocations,shift_presets:renderShiftPresets})[p]?.();
 }
 
 // ═══ SHIFTS (loaded from Supabase via data-loader.js) ═══
@@ -4150,7 +4153,7 @@ async function ensureShiftsLoaded(){
       SHIFTS.push({
         id:s.id, empId:s.emp_id, empName:s.emp_name, dept:s.dept, location:s.location,
         date:s.shift_date, from:s.shift_from?.substring(0,5)||'09:00', to:s.shift_to?.substring(0,5)||'17:00',
-        label:s.label||'', colorClass:s.label==='Schule'?'schule':(s.color_class||getDeptColorClass(s.dept)),
+        label:s.label||'', colorClass:s.color_class||getShiftColorClass(s.label,s.dept),
         isSick:s.is_sick||false, isVacation:s.is_vacation||false, isLate:s.is_late||false,
         lateMin:s.late_min||0, vacHalf:s.vac_half||false, pauseMinutes:(s.pause_minutes??null)
       });
@@ -4523,7 +4526,7 @@ function onDrop(e){e.preventDefault();e.currentTarget.classList.remove('drag-ove
     // Standort der Schicht beibehalten, wenn der Ziel-MA dort arbeitet; sonst dessen ersten Standort
     const empLocs=(emp.location||'').split(',').map(l=>l.trim()).filter(Boolean);
     const newLoc=empLocs.includes(sh.location)?sh.location:(empLocs[0]||emp.location);
-    sh.empId=emp.id;sh.empName=emp.name;sh.dept=emp.dept;sh.location=newLoc;sh.colorClass=getDeptColorClass(emp.dept);
+    sh.empId=emp.id;sh.empName=emp.name;sh.dept=emp.dept;sh.location=newLoc;sh.colorClass=getShiftColorClass(sh.label,emp.dept);
   }
   sh.date=nd;
   syncUpdateShift(sh);toast('Schicht verschoben ✓');renderSchedule();}
@@ -4676,7 +4679,7 @@ function openProposalModal(date){
   if (!me) { toast('Kein Mitarbeiterprofil','err'); return; }
   // Existierenden eigenen Vorschlag für diesen Tag laden (zum Bearbeiten/Löschen)
   const existing = SHIFT_PROPOSALS.find(p => p.empId === me.id && p.date === date);
-  const tmplOpts = SHIFT_TEMPLATES.map((t,i) => `<option value="${i}" ${existing&&existing.shiftLabel===t.label?'selected':''}>${t.label} (${t.from}–${t.to})</option>`).join('');
+  const tmplOpts = SHIFT_TEMPLATES.map((t,i) => `<option value="${i}" ${existing&&existing.shiftLabel===t.label?'selected':''}>${escapeHtml(t.label)} (${t.from}–${t.to})</option>`).join('');
   openModal('Verfügbar melden – ' + formatDateDE(date), `
     <p style="font-size:.82rem;color:var(--text-muted);margin:0 0 14px">Trag ein, an welchem Tag und mit welcher Schicht du arbeiten kannst. Dein Chef bestätigt dann die Schicht.</p>
     <div class="form-group"><label class="form-label">Schicht</label>
@@ -4748,7 +4751,7 @@ function quickAddShift(empName, date, empId) {
     || EMPS.find(e => e.name === empName);
   if (!emp) return;
 
-  const tmplOpts = SHIFT_TEMPLATES.map((t, i) => `<option value="${i}">${t.label} (${t.from}–${t.to})</option>`).join('');
+  const tmplOpts = SHIFT_TEMPLATES.map((t, i) => `<option value="${i}">${escapeHtml(t.label)} (${t.from}–${t.to})</option>`).join('');
   const dateLabel = formatDateDE(date);
 
   document.getElementById('modalTitle').textContent = 'Schicht hinzufügen';
@@ -4765,10 +4768,13 @@ function quickAddShift(empName, date, empId) {
     </div>
     <div class="form-group full">
       <label class="form-label">Vorlage</label>
-      <select class="form-select" id="qaTmpl" onchange="const t=SHIFT_TEMPLATES[this.value];if(t){document.getElementById('qaFrom').value=t.from;document.getElementById('qaTo').value=t.to;}">
-        <option value="">— Manuell —</option>
-        ${tmplOpts}
-      </select>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select class="form-select" id="qaTmpl" style="flex:1" onchange="const t=SHIFT_TEMPLATES[this.value];if(t){document.getElementById('qaFrom').value=t.from;document.getElementById('qaTo').value=t.to;}">
+          <option value="">— Manuell —</option>
+          ${tmplOpts}
+        </select>
+        ${can('manageAccess')?`<button type="button" class="btn btn-sm" onclick="openShiftPresetsFromModal()" title="Vorlagen-Zeiten verwalten" style="flex:0 0 auto"><span class="ms" style="font-size:17px">settings</span></button>`:''}
+      </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="form-group"><label class="form-label">Von</label><input class="form-input" type="time" id="qaFrom" value="09:00"></div>
@@ -4795,7 +4801,7 @@ async function saveQuickShift() {
   const newShift = {
     id: Date.now()+Math.random()*1e6|0,
     empId: emp.id, empName: emp.name, dept: emp.dept, location: shiftLoc,
-    date, from, to, label, colorClass: getDeptColorClass(emp.dept),
+    date, from, to, label, colorClass: getShiftColorClass(label, emp.dept),
     isSick: false, isVacation: false, isLate: false, lateMin: 0, vacHalf: false
   };
   // Optimistisch: sofort anzeigen, dann im Hintergrund speichern
@@ -4836,7 +4842,7 @@ async function pasteShiftTo(empName, date, empId){
   const shiftLoc=(currentLocation!=='all'&&empLocs.includes(currentLocation))?currentLocation:(empLocs[0]||emp.location);
   // Ruhetag prüfen
   if(!getVacTypeForDate(date, shiftLoc)){ toast('Ruhetag – keine Schicht möglich','warn'); return; }
-  const ns={id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:shiftLoc,date,from:src.from,to:src.to,label:src.label,colorClass:getDeptColorClass(emp.dept),isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false};
+  const ns={id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:shiftLoc,date,from:src.from,to:src.to,label:src.label,colorClass:getShiftColorClass(src.label,emp.dept),isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false};
   SHIFTS.push(ns);
   await syncAddShift(ns);
   toast(`Schicht kopiert → ${emp.name.split(' ')[0]} ${formatDateDE(date)}`,'success');
@@ -4899,7 +4905,7 @@ function shiftBlockTap(shiftId, originalAction) {
 function editShift(id){
   const s=SHIFTS.find(x=>x.id===id);if(!s)return;
   const emp=EMPS.find(x=>x.id===s.empId);
-  const tmplOpts=SHIFT_TEMPLATES.map((t,i)=>`<option value="${i}"${t.label===s.label?' selected':''}>${t.label} (${t.from}–${t.to})</option>`).join('');
+  const tmplOpts=SHIFT_TEMPLATES.map((t,i)=>`<option value="${i}"${t.label===s.label?' selected':''}>${escapeHtml(t.label)} (${t.from}–${t.to})</option>`).join('');
   document.getElementById('modalTitle').textContent='Schicht bearbeiten';
   document.getElementById('modalBody').innerHTML=`<div class="form-grid">
     <div class="form-group full">
@@ -4938,7 +4944,7 @@ function updateShiftFromModal(id){
   const tmplIdx=document.getElementById('edShiftTmpl').value;
   if(!nd||!nf||!nt){toast('Bitte alle Felder ausfüllen','err');return;}
   s.date=nd;s.from=nf;s.to=nt;
-  if(tmplIdx!==''){s.label=SHIFT_TEMPLATES[tmplIdx].label;}
+  if(tmplIdx!==''){s.label=SHIFT_TEMPLATES[tmplIdx].label;s.colorClass=getShiftColorClass(s.label,s.dept);}
   // Eigene Pause: leer → null (Standard des MA); Zahl → nur diese Schicht
   const pRaw=(document.getElementById('edShiftPause')?.value||'').trim();
   const prevPause=s.pauseMinutes;
@@ -5074,7 +5080,7 @@ function generateStandardWeek() {
         toCreate.push({
           empId: emp.id, empName: emp.name, dept: dept || emp.dept || '', location: loc,
           date: ds, from: sh.from, to: sh.to, label: sh.label,
-          colorClass: getDeptColorClass(dept || ''),
+          colorClass: getShiftColorClass(sh.label, dept || ''),
           isSick: false, isVacation: false, isLate: false, lateMin: 0
         });
         empSet.add(emp.id);
@@ -5486,12 +5492,18 @@ function buildAushilfeGrid(days, slots, allLabels, DOW_SHORT) {
   // Body rows: one per shift label
   let bodyRows = '';
   allLabels.forEach(label => {
-    let cells = `<div class="ag-row-label">${label}</div>`;
+    // Vorlagennamen sind frei wählbar → HTML-Attribute escapen, und für den
+    // Inline-Handler zusätzlich URL-kodieren (schützt vor Apostrophen).
+    const lblSafe = escapeHtml(label);
+    // encodeURIComponent lässt ' unangetastet → explizit nachkodieren,
+    // sonst bricht ein Apostroph im Namen den Inline-Handler.
+    const lblArg = encodeURIComponent(label).replace(/'/g, '%27');
+    let cells = `<div class="ag-row-label">${lblSafe}</div>`;
     days.forEach(d => {
       const dateStr = isoDate(d);
       const slot = slots.find(s => s.date === dateStr && s.shiftLabel === label);
       if (!slot) {
-        cells += `<div class="ag-cell empty" onclick="openAushilfeSlotModal('${dateStr}','${label}')" title="Slot für ${label} am ${dateStr} erstellen">
+        cells += `<div class="ag-cell empty" onclick="openAushilfeSlotModal('${dateStr}',decodeURIComponent('${lblArg}'))" title="Slot für ${lblSafe} am ${dateStr} erstellen">
           <span class="ag-cell-add ms">add</span>
         </div>`;
       } else if (slot.status === 'open') {
@@ -5531,7 +5543,7 @@ function openAushilfeSlotModal(preDate, preLabel) {
   const deptOpts = [...new Set(EMPS.map(e => e.dept).filter(Boolean))].sort()
     .map(d => `<option value="${d}">${d}</option>`).join('');
   const locOpts = LOCS.map(l => `<option value="${l.id}" ${l.id === currentLocation ? 'selected' : ''}>${l.name}</option>`).join('');
-  const tmplOpts = SHIFT_TEMPLATES.map(t => `<option value="${t.label}" data-from="${t.from}" data-to="${t.to}">${t.label} (${t.from}–${t.to})</option>`).join('');
+  const tmplOpts = SHIFT_TEMPLATES.map(t => `<option value="${escapeHtml(t.label)}" data-from="${t.from}" data-to="${t.to}">${escapeHtml(t.label)} (${t.from}–${t.to})</option>`).join('');
 
   openModal('Aushilfe-Slot erstellen', `
     <form id="aushilfeSlotForm" style="display:flex;flex-direction:column;gap:14px">
@@ -5867,7 +5879,7 @@ async function approveProposal(id){
     id:Date.now()+Math.random()*1e6|0,
     empId:emp.id, empName:emp.name, dept:emp.dept, location:shiftLoc,
     date:p.date, from:p.from, to:p.to, label:p.shiftLabel,
-    colorClass:getDeptColorClass(emp.dept),
+    colorClass:getShiftColorClass(p.shiftLabel,emp.dept),
     isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false
   };
   const res=await syncAddShift(newShift);
@@ -7590,7 +7602,7 @@ function openModal(type, bodyHtml, footerHtml){
       </div>
       <div id="shiftModeDay" class="form-group full"><label class="form-label">Datum</label><input class="form-input" type="date" id="mSD" value="${isoDate(scheduleDate)}"></div>
       <div id="shiftTimesGlobal">
-        <div class="form-group"><label class="form-label">Vorlage</label><select class="form-select" id="mST" onchange="applyTmpl()"><option value="">Manuell</option>${SHIFT_TEMPLATES.map((t,i)=>`<option value="${i}">${t.label}</option>`).join('')}</select></div>
+        <div class="form-group"><label class="form-label">Vorlage</label><div style="display:flex;gap:8px;align-items:center"><select class="form-select" id="mST" onchange="applyTmpl()" style="flex:1"><option value="">Manuell</option>${SHIFT_TEMPLATES.map((t,i)=>`<option value="${i}">${escapeHtml(t.label)} (${t.from}–${t.to})</option>`).join('')}</select>${can('manageAccess')?`<button type="button" class="btn btn-sm" onclick="openShiftPresetsFromModal()" title="Vorlagen-Zeiten verwalten" style="flex:0 0 auto"><span class="ms" style="font-size:17px">settings</span></button>`:''}</div></div>
         <div class="form-group"><label class="form-label">Von</label><input class="form-input" type="time" id="mSF" value="09:00"></div>
         <div class="form-group"><label class="form-label">Bis</label><input class="form-input" type="time" id="mSTo" value="17:00"></div>
       </div>
@@ -7634,7 +7646,7 @@ function openModal(type, bodyHtml, footerHtml){
               <input class="form-input plan-von" data-idx="${i}" type="time" value="${i<5?'09:00':''}" style="font-size:.8rem;padding:4px 6px;flex:1">
               <span style="font-size:.75rem;color:var(--text-muted)">–</span>
               <input class="form-input plan-bis" data-idx="${i}" type="time" value="${i<5?'17:00':''}" style="font-size:.8rem;padding:4px 6px;flex:1">
-              <select class="form-select plan-tmpl" data-idx="${i}" onchange="applyPlanTmpl(${i})" style="font-size:.72rem;padding:3px 4px;width:70px"><option value="">—</option>${SHIFT_TEMPLATES.map((t,j)=>`<option value="${j}">${t.label}</option>`).join('')}</select>
+              <select class="form-select plan-tmpl" data-idx="${i}" onchange="applyPlanTmpl(${i})" style="font-size:.72rem;padding:3px 4px;width:70px"><option value="">—</option>${SHIFT_TEMPLATES.map((t,j)=>`<option value="${j}">${escapeHtml(t.label)}</option>`).join('')}</select>
             </div>
           </div>`).join('')}</div>
         </div>
@@ -7832,7 +7844,7 @@ async function saveShift(){
     for(const s of dayDefs){
       const vt=getVacTypeForDate(s.date, shiftLoc);
       if(!vt){blockedSet.add(formatDateDE(s.date));continue;}
-      const cc=s.label==='Schule'?'schule':getDeptColorClass(emp.dept);
+      const cc=getShiftColorClass(s.label, emp.dept);
       newShifts.push({id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:shiftLoc,date:s.date,from:s.from,to:s.to,label:s.label,colorClass:cc,isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false});
     }
   }
@@ -8022,7 +8034,7 @@ function applySavedTemplate(){
       const matching=empsInLoc.filter(e=>e.dept===ts.dept);
       matching.forEach(emp=>{
         if(!SHIFTS.find(s=>s.empId===emp.id&&s.date===ds)){
-          SHIFTS.push({id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:emp.location,date:ds,from:ts.from,to:ts.to,label:ts.label,colorClass:getDeptColorClass(emp.dept),isSick:false,isVacation:false,isLate:false,lateMin:0});
+          SHIFTS.push({id:Date.now()+Math.random()*1e6|0,empId:emp.id,empName:emp.name,dept:emp.dept,location:emp.location,date:ds,from:ts.from,to:ts.to,label:ts.label,colorClass:getShiftColorClass(ts.label,emp.dept),isSick:false,isVacation:false,isLate:false,lateMin:0});
           count++;
         }
       });
@@ -9314,6 +9326,193 @@ async function deleteLocation(locId){
   buildLocationSelect();
   renderLocations();
   toast('Standort gelöscht ✓', 'success');
+}
+
+// ═══ SCHICHT-VORLAGEN (Presets pro Standort, Inhaber-only) ═══
+// Die Zeiten der Vorlagen (Frühschicht, Spätschicht, …) sind pro Standort
+// einstellbar: Origami öffnet später als Enso. Zusätzlich können Vorlagen
+// angelegt und gelöscht werden.
+
+/** Standort, dessen Vorlagen die Seite gerade bearbeitet */
+function currentPresetLoc(){
+  const sel=document.getElementById('spLoc');
+  if(sel && sel.value) return sel.value;
+  if(currentLocation && currentLocation!=='all' && !currentLocation.includes(','))
+    return currentLocation;
+  return LOCS[0]?.id || '';
+}
+
+function renderShiftPresets(){
+  const pg=document.getElementById('page-shift_presets');
+  if(!pg)return;
+  if(!can('manageAccess')){pg.innerHTML=permBanner('Schicht-Vorlagen sind nur für Inhaber verfügbar.');return;}
+
+  const loc=currentPresetLoc();
+  pg.innerHTML=`
+    <div class="form-group" style="max-width:340px">
+      <label class="form-label">Standort</label>
+      <select class="form-select" id="spLoc" onchange="renderShiftPresetsFor(this.value)">
+        ${LOCS.map(l=>`<option value="${l.id}"${l.id===loc?' selected':''}>${escapeHtml(l.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div id="spBody"></div>`;
+  renderShiftPresetsFor(loc);
+}
+
+function renderShiftPresetsFor(loc){
+  const body=document.getElementById('spBody');
+  if(!body)return;
+  const list=(SHIFT_PRESETS_BY_LOC[loc]||[]).slice()
+    .sort((a,b)=>(a.sortOrder-b.sortOrder)||(a.id-b.id));
+
+  // Standort noch ungepflegt → Standard-Vorlagen anbieten
+  if(!list.length){
+    body.innerHTML=`
+      <div class="table-wrap" style="padding:24px;text-align:center">
+        <div style="font-size:2rem;margin-bottom:8px">🕒</div>
+        <div style="font-weight:700;margin-bottom:6px">Noch keine Vorlagen für ${escapeHtml(getLocationName(loc))}</div>
+        <div style="font-size:.84rem;color:var(--text-muted);margin-bottom:16px">
+          Solange nichts hinterlegt ist, gelten die Standard-Zeiten aus der Konfiguration.
+        </div>
+        <button class="btn btn-primary" onclick="seedShiftPresetsFor('${loc}')">
+          <span class="ms" style="font-size:16px">auto_fix_high</span> Standard-Vorlagen anlegen
+        </button>
+      </div>
+      <div style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:8px;font-size:.82rem;color:var(--text-muted)">
+        💡 Die Zeiten gelten <strong>nur für diesen Standort</strong>. Jeder Standort kann eigene Zeiten haben.
+      </div>`;
+    return;
+  }
+
+  const rows=list.map((p,i)=>`<tr>
+    <td style="white-space:nowrap">
+      <button class="btn btn-sm" onclick="moveShiftPreset(${p.id},-1)" title="Nach oben" ${i===0?'disabled':''}><span class="ms" style="font-size:16px">arrow_upward</span></button>
+      <button class="btn btn-sm" onclick="moveShiftPreset(${p.id},1)" title="Nach unten" ${i===list.length-1?'disabled':''}><span class="ms" style="font-size:16px">arrow_downward</span></button>
+    </td>
+    <td><strong style="font-size:.9rem">${escapeHtml(p.label)}</strong>${p.colorClass==='schule'?' <span class="badge badge-info">Schule</span>':''}</td>
+    <td><input class="form-input sp-from" type="time" data-id="${p.id}" value="${p.from}" style="width:120px"></td>
+    <td><input class="form-input sp-to" type="time" data-id="${p.id}" value="${p.to}" style="width:120px"></td>
+    <td>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-primary" onclick="saveShiftPresetRow(${p.id})" title="Speichern"><span class="ms" style="font-size:16px">save</span></button>
+        <button class="btn btn-sm btn-danger" onclick="deleteShiftPreset(${p.id})" title="Löschen"><span class="ms" style="font-size:16px">delete</span></button>
+      </div>
+    </td>
+  </tr>`).join('');
+
+  body.innerHTML=`
+    <div class="table-wrap">
+      <div class="table-header">
+        <span class="table-title">Schicht-Vorlagen – ${escapeHtml(getLocationName(loc))} (${list.length})</span>
+        <button class="btn btn-primary" onclick="addShiftPresetModal('${loc}')"><span class="ms" style="font-size:16px">add</span> Neue Vorlage</button>
+      </div>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th style="width:96px">Reihenfolge</th><th>Vorlage</th><th>Von</th><th>Bis</th><th>Aktionen</th>
+      </tr></thead><tbody>${rows}</tbody></table></div>
+    </div>
+    <div style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:8px;font-size:.82rem;color:var(--text-muted)">
+      💡 Die Zeiten gelten <strong>nur für ${escapeHtml(getLocationName(loc))}</strong> — jeder Standort kann eigene Zeiten haben.
+      Zeiten über Mitternacht (z. B. 22:00–06:00) sind erlaubt.
+      Änderungen wirken auf <strong>neue</strong> Schichten; bereits erstellte Schichten bleiben unverändert.
+    </div>`;
+}
+
+async function saveShiftPresetRow(id){
+  if(!can('manageAccess'))return;
+  const from=document.querySelector(`.sp-from[data-id="${id}"]`)?.value;
+  const to=document.querySelector(`.sp-to[data-id="${id}"]`)?.value;
+  if(!from||!to){toast('Bitte Von und Bis ausfüllen','err');return;}
+  const ok=await syncUpdateShiftPreset(id,{from,to});
+  if(!ok){toast('Fehler beim Speichern','err');return;}
+  const loc=currentPresetLoc();
+  renderShiftPresetsFor(loc);
+  toast(`✓ Zeiten gespeichert: ${from}–${to}`);
+}
+
+function addShiftPresetModal(loc){
+  if(!can('manageAccess'))return;
+  openModal('Neue Vorlage – '+getLocationName(loc), `
+    <div class="form-group"><label class="form-label">Name</label>
+      <input class="form-input" id="spNewName" placeholder="z.B. Nachtschicht"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group"><label class="form-label">Von</label>
+        <input class="form-input" type="time" id="spNewFrom" value="09:00"></div>
+      <div class="form-group"><label class="form-label">Bis</label>
+        <input class="form-input" type="time" id="spNewTo" value="17:00"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Typ</label>
+      <select class="form-select" id="spNewType">
+        <option value="">Normale Schicht (Bereichsfarbe)</option>
+        <option value="schule">Schule / Berufsschule (blauer "S"-Block)</option>
+      </select>
+    </div>
+  `, `<button class="btn" onclick="closeModal()">Abbrechen</button><button class="btn btn-primary" onclick="saveNewShiftPreset('${loc}')">Speichern</button>`);
+}
+
+async function saveNewShiftPreset(loc){
+  if(!can('manageAccess'))return;
+  const label=(document.getElementById('spNewName').value||'').trim();
+  const from=document.getElementById('spNewFrom').value;
+  const to=document.getElementById('spNewTo').value;
+  const colorClass=document.getElementById('spNewType').value;
+  if(!label){toast('Bitte einen Namen eingeben','err');return;}
+  if(!from||!to){toast('Bitte Von und Bis ausfüllen','err');return;}
+  if((SHIFT_PRESETS_BY_LOC[loc]||[]).some(p=>p.label===label)){
+    toast('Name bereits vergeben','err');return;
+  }
+  // Ans Ende sortieren
+  const maxOrder=(SHIFT_PRESETS_BY_LOC[loc]||[]).reduce((m,p)=>Math.max(m,p.sortOrder||0),0);
+  const ok=await syncAddShiftPreset({location:loc,label,from,to,colorClass,sortOrder:maxOrder+10});
+  if(!ok){toast('Fehler beim Speichern','err');return;}
+  closeModal();
+  renderShiftPresetsFor(loc);
+  toast(`✓ Vorlage "${label}" angelegt`);
+}
+
+async function deleteShiftPreset(id){
+  if(!can('manageAccess'))return;
+  const loc=currentPresetLoc();
+  const p=(SHIFT_PRESETS_BY_LOC[loc]||[]).find(x=>x.id===id);
+  if(!p)return;
+  if(!confirm(`Vorlage "${p.label}" für ${getLocationName(loc)} wirklich löschen?\n\nBereits erstellte Schichten bleiben erhalten.`))return;
+  const ok=await syncDeleteShiftPreset(id);
+  if(!ok){toast('Fehler beim Löschen','err');return;}
+  renderShiftPresetsFor(loc);
+  toast('Vorlage gelöscht ✓','success');
+}
+
+async function moveShiftPreset(id,dir){
+  if(!can('manageAccess'))return;
+  const loc=currentPresetLoc();
+  const list=(SHIFT_PRESETS_BY_LOC[loc]||[]).slice()
+    .sort((a,b)=>(a.sortOrder-b.sortOrder)||(a.id-b.id));
+  const i=list.findIndex(p=>p.id===id);
+  const j=i+dir;
+  if(i<0||j<0||j>=list.length)return;
+  // Positionen tauschen und die ganze Liste neu durchnummerieren (10, 20, …),
+  // damit auch gleiche/fehlende sort_order-Werte sauber werden.
+  const tmp=list[i];list[i]=list[j];list[j]=tmp;
+  const items=list.map((p,k)=>({id:p.id,sortOrder:(k+1)*10}));
+  const ok=await syncReorderShiftPresets(items);
+  if(!ok){toast('Fehler beim Speichern der Reihenfolge','err');return;}
+  renderShiftPresetsFor(loc);
+}
+
+async function seedShiftPresetsFor(loc){
+  if(!can('manageAccess'))return;
+  const ok=await syncSeedShiftPresets(loc);
+  if(!ok){toast('Fehler – Tabelle "shift_presets" vorhanden?','err');return;}
+  renderShiftPresetsFor(loc);
+  toast('Standard-Vorlagen angelegt ✓','success');
+}
+
+// Zahnrad neben der Vorlagen-Auswahl: der Modal-Container existiert nur EINMAL
+// global – ein verschachteltes Modal ist unmöglich. Daher: Modal schließen und
+// zur Verwaltungsseite wechseln.
+function openShiftPresetsFromModal(){
+  closeModal();
+  navigate('shift_presets');
+  toast('Vorlagen verwalten – danach Schicht erneut anlegen');
 }
 
 // ═══ QR GENERATOR (Admin-only) ═══
