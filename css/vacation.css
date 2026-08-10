@@ -208,6 +208,15 @@
 }
 .vac-btn-reject:hover { background: rgba(239,68,68,.22); }
 .vac-btn-approve .ms,.vac-btn-reject .ms { font-size: .95rem; }
+/* Zeit-Zelle als Button (Inhaber kann Zeit/Ca ändern beim Genehmigen) */
+.ap-zeit-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 8px; cursor: pointer;
+  background: rgba(99,102,241,.08); border: 1px solid transparent;
+  color: var(--text-primary); font: inherit; font-size: .85rem;
+  transition: background .12s, border-color .12s;
+}
+.ap-zeit-btn:hover { background: rgba(99,102,241,.16); border-color: rgba(99,102,241,.35); }
 .vac-see-all {
   width: 100%; margin-top: 12px; padding: 8px;
   background: none; border: none; cursor: pointer;

@@ -5856,7 +5856,9 @@ function renderProposals(){
         <td><strong style="color:var(--text-primary)">${p.empName}</strong><div style="font-size:.7rem;color:var(--text-muted)">${escapeHtml(p.dept||'')} · ${escapeHtml(getLocationName(p.location))}</div></td>
         <td>${formatDateDE(p.date)}</td>
         <td>${escapeHtml(p.shiftLabel)}</td>
-        <td style="font-family:'Space Mono',monospace">${p.from}–${p.to}</td>
+        <td>${p.status==='pending'
+          ?`<button class="ap-zeit-btn" onclick="openApproveProposalModal(${p.id})" title="Zeit ändern oder Ca wählen"><span style="font-family:'Space Mono',monospace">${p.from}–${p.to}</span><span class="ms" style="font-size:14px;opacity:.6">edit</span></button>`
+          :`<span style="font-family:'Space Mono',monospace">${p.from}–${p.to}</span>`}</td>
         <td style="font-size:.8rem;color:var(--text-muted)">${p.note||'—'}</td>
         <td>${p.status==='approved'?'<span class="badge badge-success">Bestätigt</span>':p.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abgelehnt</span>'}</td>
         <td class="vac-action-cell">${p.status==='pending'?`<button class="vac-btn-approve" onclick="approveProposal(${p.id})" title="Schicht anlegen und bestätigen"><span class="ms">check</span></button> <button class="vac-btn-reject" onclick="rejectProposal(${p.id})" title="Ablehnen"><span class="ms">close</span></button>`:'—'}</td>
@@ -5865,11 +5867,19 @@ function renderProposals(){
     </div>`;
 }
 
-/** Vorschlag genehmigen → echte Schicht anlegen + Status approved + Minijob benachrichtigen. */
-async function approveProposal(id){
+/** Vorschlag genehmigen → echte Schicht anlegen + Status approved + Minijob benachrichtigen.
+ *  override (optional): {from,to,label} – vom Inhaber im Zeit-Modal geänderte Werte.
+ *  Wird die Zeit/Ca geändert, wird sie auch am Vorschlag persistiert (Historie/Anzeige). */
+async function approveProposal(id, override){
   if(!can('editSchedules'))return;
   const p=SHIFT_PROPOSALS.find(x=>x.id===id);if(!p)return;
   const emp=EMPS.find(e=>e.id===p.empId);if(!emp){toast('Mitarbeiter nicht gefunden','err');return;}
+  // Vom Inhaber gewählte Zeit/Ca übernehmen (falls über das Modal bestätigt).
+  const from = override?.from || p.from;
+  const to   = override?.to   || p.to;
+  const label= override?.label|| p.shiftLabel;
+  if(!from || !to){toast('Bitte Zeiten ausfüllen','err');return;}
+  const changed = override && (from!==p.from || to!==p.to || label!==p.shiftLabel);
   // Standort klären (ggf. bei Mehrfach-Standort nachfragen) – VOR dem Speichern.
   const shiftLoc=await pickShiftLocation(emp);
   if(!shiftLoc)return; // abgebrochen
@@ -5878,22 +5888,75 @@ async function approveProposal(id){
   const newShift={
     id:Date.now()+Math.random()*1e6|0,
     empId:emp.id, empName:emp.name, dept:emp.dept, location:shiftLoc,
-    date:p.date, from:p.from, to:p.to, label:p.shiftLabel,
-    colorClass:getShiftColorClass(p.shiftLabel,emp.dept),
+    date:p.date, from, to, label,
+    colorClass:getShiftColorClass(label,emp.dept),
     isSick:false,isVacation:false,isLate:false,lateMin:0,vacHalf:false
   };
   const res=await syncAddShift(newShift);
   if(!res||res.ok===false){toast('Fehler beim Anlegen der Schicht: '+(res?.error||''),'err');return;}
   // 2) Status approved (jetzt, da Schicht existiert) – optimistic + persist.
-  const prev=p.status;p.status='approved';
+  const prev=p.status;const prevFrom=p.from,prevTo=p.to,prevLabel=p.shiftLabel;
+  p.status='approved';p.from=from;p.to=to;p.shiftLabel=label;
   SHIFTS.push(newShift);
   renderProposals();updateBadges();
   const okStat=await syncProposalStatus(p.id,'approved',currentUser.id);
-  if(!okStat){p.status=prev;SHIFTS=SHIFTS.filter(s=>s!==newShift);toast('Fehler beim Speichern des Status – Schicht angelegt, bitte erneut prüfen','err');renderProposals();updateBadges();return;}
+  if(!okStat){p.status=prev;p.from=prevFrom;p.to=prevTo;p.shiftLabel=prevLabel;SHIFTS=SHIFTS.filter(s=>s!==newShift);toast('Fehler beim Speichern des Status – Schicht angelegt, bitte erneut prüfen','err');renderProposals();updateBadges();return;}
+  // Geänderte Zeit/Ca am Vorschlag persistieren (best effort, blockiert nicht).
+  if(changed){try{await sb.from('shift_proposals').update({shift_label:label,shift_from:from,shift_to:to}).eq('id',p.id);}catch(e){console.warn('[Proposal] update fields',e.message);}}
   // 3) Minijob gezielt benachrichtigen (in-app; nur sichtbar, wenn online).
-  addNotif('success','Schicht bestätigt ✓',`${formatDateDE(p.date)} · ${p.from}–${p.to} (${p.shiftLabel}) wurde bestätigt.`,p.empId);
+  addNotif('success','Schicht bestätigt ✓',`${formatDateDE(p.date)} · ${from}–${to} (${label}) wurde bestätigt.`,p.empId);
   toast('Schicht angelegt & bestätigt');
   renderProposals();updateBadges();renderSchedule();
+}
+
+/** Vorlagen (Schicht-Presets) für einen bestimmten Standort holen – unabhängig von
+ *  currentLocation, damit im Genehmigungs-Modal immer die Ca des Vorschlag-Standorts erscheinen. */
+function presetsForLocation(loc){
+  const id=(loc||'').split(',').map(s=>s.trim()).filter(Boolean)[0]||'';
+  let list=(id && SHIFT_PRESETS_BY_LOC[id]) ? SHIFT_PRESETS_BY_LOC[id] : [];
+  if(!list.length){ // Fallback: Vereinigung aller Standorte, sonst Seed
+    const seen=new Set();list=[];
+    Object.keys(SHIFT_PRESETS_BY_LOC).sort().forEach(k=>(SHIFT_PRESETS_BY_LOC[k]||[]).forEach(p=>{if(!seen.has(p.label)){seen.add(p.label);list.push(p);}}));
+  }
+  if(!list.length) list=(typeof SHIFT_PRESETS_SEED!=='undefined'?SHIFT_PRESETS_SEED:[]);
+  return list;
+}
+
+/** Zeit-/Ca-Modal beim Genehmigen: Inhaber kann Zeit frei ändern ODER eine Ca des
+ *  Standorts wählen; danach "Übernehmen & bestätigen" → approveProposal(id, override). */
+function openApproveProposalModal(id){
+  if(!can('editSchedules'))return;
+  const p=SHIFT_PROPOSALS.find(x=>x.id===id);if(!p)return;
+  const presets=presetsForLocation(p.location);
+  window._apPresets=presets; window._apId=id;
+  // Passt die aktuelle Zeit exakt zu einer Vorlage? → diese vorauswählen, sonst "Eigene Zeit".
+  const matchIdx=presets.findIndex(t=>t.from===p.from && t.to===p.to && t.label===p.shiftLabel);
+  const opts=presets.map((t,i)=>`<option value="${i}"${i===matchIdx?' selected':''}>${escapeHtml(t.label)} (${t.from}–${t.to})</option>`).join('');
+  openModal('Zeit / Ca bestätigen – '+p.empName, `
+    <p style="font-size:.82rem;color:var(--text-muted);margin:0 0 14px">Wähle eine Ca für <strong>${escapeHtml(getLocationName(p.location))}</strong> oder trag die Zeit von Hand ein. Beim Bestätigen wird die Schicht mit dieser Zeit in den Plan übernommen.</p>
+    <div class="form-group"><label class="form-label">Ca (Vorlage)</label>
+      <select class="form-select" id="apTmpl" onchange="const t=window._apPresets[this.value];if(t){document.getElementById('apFrom').value=t.from;document.getElementById('apTo').value=t.to;document.getElementById('apLabel').value=t.label;}">
+        ${opts}
+        <option value="custom"${matchIdx<0?' selected':''}>Eigene Zeit …</option>
+      </select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group"><label class="form-label">Von</label><input class="form-input" type="time" id="apFrom" value="${p.from}"></div>
+      <div class="form-group"><label class="form-label">Bis</label><input class="form-input" type="time" id="apTo" value="${p.to}"></div>
+    </div>
+    <input type="hidden" id="apLabel" value="${escapeHtml(p.shiftLabel)}">
+  `, `<button class="btn" onclick="closeModal()">Abbrechen</button>
+     <button class="btn btn-primary" onclick="confirmApproveProposal()"><span class="ms" style="font-size:18px">check</span> Übernehmen &amp; bestätigen</button>`);
+}
+
+/** Aus dem Zeit-Modal die gewählten Werte lesen und den Vorschlag genehmigen. */
+function confirmApproveProposal(){
+  const id=window._apId;
+  const from=document.getElementById('apFrom').value;
+  const to=document.getElementById('apTo').value;
+  const label=document.getElementById('apLabel').value||'Schicht';
+  if(!from||!to){toast('Bitte Zeiten ausfüllen','err');return;}
+  closeModal();
+  approveProposal(id,{from,to,label});
 }
 
 /** Vorschlag ablehnen → Vorschlag löschen (verschwindet aus Plan & Liste) + Minijob benachrichtigen. */
