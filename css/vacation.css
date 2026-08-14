@@ -207,7 +207,14 @@
   transition: background .12s;
 }
 .vac-btn-reject:hover { background: rgba(239,68,68,.22); }
-.vac-btn-approve .ms,.vac-btn-reject .ms { font-size: .95rem; }
+.vac-btn-approve .ms,.vac-btn-reject .ms,.vac-btn-edit .ms { font-size: .95rem; }
+.vac-btn-edit {
+  width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(99,102,241,.1); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s;
+}
+.vac-btn-edit:hover { background: rgba(99,102,241,.22); }
 /* Zeit-Zelle als Button (Inhaber kann Zeit/Ca ändern beim Genehmigen) */
 .ap-zeit-btn {
   display: inline-flex; align-items: center; gap: 6px;

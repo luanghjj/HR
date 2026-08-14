@@ -93,6 +93,22 @@ async function syncVacationStatus(vacId, status) {
 }
 
 /**
+ * Update vacation dates/days in Supabase
+ */
+async function syncUpdateVacation(vac) {
+  try {
+    const { error } = await sb.from('vacations').update({
+      from_date: vac.from,
+      to_date: vac.to,
+      days: vac.days
+    }).eq('id', vac.id);
+    if (error) { console.warn('[Sync] Vacation update error:', error.message); return false; }
+    console.log('[Sync] ✓ Vacation updated:', vac.id);
+    return true;
+  } catch (e) { console.warn('[Sync]', e.message); return false; }
+}
+
+/**
  * Neuen Schichtvorschlag (Minijob-Angebot) in Supabase anlegen
  */
 async function syncAddProposal(prop) {

@@ -5799,7 +5799,7 @@ function renderVacation(){
   }
   if(vacationTab==='requests'){
     let h=`<div class="vac-table-card"><table class="vac-table"><thead><tr><th>Mitarbeiter</th><th>Von</th><th>Bis</th><th>Tage</th><th>Status</th>${can('approveVacations')?'<th>Aktionen</th>':''}</tr></thead><tbody>`;
-    vacs.forEach(v=>{h+=`<tr><td><strong style="color:var(--text-primary)">${v.empName}</strong></td><td>${formatDateDE(v.from)}</td><td>${formatDateDE(v.to)}</td><td>${v.days}</td><td>${v.status==='approved'?'<span class="badge badge-success">OK</span>':v.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abg.</span>'}</td>${can('approveVacations')?`<td class="vac-action-cell">${v.status==='pending'?`<button class="vac-btn-approve" onclick="appVac(${v.id})" title="Antrag von ${v.empName} genehmigen" aria-label="Antrag von ${v.empName} genehmigen"><span class="ms">check</span></button> <button class="vac-btn-reject" onclick="rejVac(${v.id})" title="Antrag von ${v.empName} ablehnen" aria-label="Antrag von ${v.empName} ablehnen"><span class="ms">close</span></button>`:'—'}</td>`:''}</tr>`;});
+    vacs.forEach(v=>{h+=`<tr><td><strong style="color:var(--text-primary)">${v.empName}</strong></td><td>${formatDateDE(v.from)}</td><td>${formatDateDE(v.to)}</td><td>${v.days}</td><td>${v.status==='approved'?'<span class="badge badge-success">OK</span>':v.status==='pending'?'<span class="badge badge-warning">Offen</span>':'<span class="badge badge-danger">Abg.</span>'}</td>${can('approveVacations')?`<td class="vac-action-cell">${can('editSchedules')?`<button class="vac-btn-edit" onclick="editVac(${v.id})" title="Datum bearbeiten"><span class="ms">edit</span></button>`:''}${v.status==='pending'?`<button class="vac-btn-approve" onclick="appVac(${v.id})" title="Antrag von ${v.empName} genehmigen" aria-label="Antrag von ${v.empName} genehmigen"><span class="ms">check</span></button> <button class="vac-btn-reject" onclick="rejVac(${v.id})" title="Antrag von ${v.empName} ablehnen" aria-label="Antrag von ${v.empName} ablehnen"><span class="ms">close</span></button>`:'—'}</td>`:''}</tr>`;});
     h+=`</tbody></table></div>`;vc.innerHTML=h;return;
   }
   if(vacationTab==='overview'){
@@ -5820,6 +5820,51 @@ function renderVacation(){
 
 async function appVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(!v)return;const prev=v.status;v.status='approved';renderVacation();updateBadges();const ok=await syncVacationStatus(v.id,'approved');if(!ok){v.status=prev;toast('Fehler beim Speichern – nicht genehmigt','err');renderVacation();updateBadges();return;}const e=EMPS.find(x=>x.id===v.empId);if(e){e.vacUsed+=v.days;const okF=await syncEmployeeField(e.id,'vacUsed',e.vacUsed);if(!okF){e.vacUsed-=v.days;}}addNotif('vacation','Urlaub genehmigt',v.empName);toast('Genehmigt');renderVacation();updateBadges();}
 async function rejVac(id){if(!can('approveVacations'))return;const v=VACS.find(x=>x.id===id);if(!v)return;const prev=v.status;v.status='rejected';renderVacation();updateBadges();const ok=await syncVacationStatus(v.id,'rejected');if(!ok){v.status=prev;toast('Fehler beim Speichern','err');renderVacation();updateBadges();return;}addNotif('vacation','Urlaub abgelehnt',v.empName);toast('Abgelehnt','err');renderVacation();updateBadges();}
+
+function editVac(id){
+  if(!can('editSchedules'))return;
+  const v=VACS.find(x=>x.id===id);if(!v)return;
+  document.getElementById('modalTitle').textContent='Urlaub bearbeiten';
+  document.getElementById('modalBody').innerHTML=`<div class="form-grid">
+    <div class="form-group full"><div class="form-label">Mitarbeiter</div><div class="form-input" style="background:var(--bg-secondary);cursor:default">${v.empName}</div></div>
+    <div class="form-group"><label class="form-label">Von</label><input class="form-input" type="date" id="edVacFrom" value="${v.from}"></div>
+    <div class="form-group"><label class="form-label">Bis</label><input class="form-input" type="date" id="edVacTo" value="${v.to}"></div>
+    <div class="form-group full"><div class="form-label">Aktuelle Tage</div><div class="form-input" style="background:var(--bg-secondary);cursor:default" id="edVacDays">${v.days} Tage</div></div>
+  </div>`;
+  document.getElementById('modalFooter').innerHTML=
+    `<button class="btn" onclick="closeModal()">Abbrechen</button>`+
+    `<button class="btn btn-primary" onclick="saveEditVac(${id})">Speichern</button>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+async function saveEditVac(id){
+  if(!can('editSchedules'))return;
+  const v=VACS.find(x=>x.id===id);if(!v)return;
+  const fr=document.getElementById('edVacFrom').value,to=document.getElementById('edVacTo').value;
+  if(!fr||!to){toast('Bitte Von- und Bis-Datum eingeben','err');return;}
+  if(to<fr){toast('Bis-Datum darf nicht vor Von-Datum liegen','err');return;}
+  const newDays=Math.ceil((new Date(to)-new Date(fr))/864e5)+1;
+  const prevFrom=v.from,prevTo=v.to,prevDays=v.days;
+  v.from=fr;v.to=to;v.days=newDays;
+  // Wenn genehmigt: vacUsed anpassen
+  let empAdj=false,prevVacUsed=0;
+  if(v.status==='approved'){
+    const e=EMPS.find(x=>x.id===v.empId);
+    if(e){prevVacUsed=e.vacUsed;e.vacUsed=e.vacUsed-prevDays+newDays;empAdj=true;}
+  }
+  renderVacation();updateBadges();
+  const ok=await syncUpdateVacation(v);
+  if(!ok){
+    v.from=prevFrom;v.to=prevTo;v.days=prevDays;
+    if(empAdj){const e=EMPS.find(x=>x.id===v.empId);if(e)e.vacUsed=prevVacUsed;}
+    toast('Fehler beim Speichern','err');renderVacation();updateBadges();return;
+  }
+  if(empAdj){
+    const e=EMPS.find(x=>x.id===v.empId);
+    if(e){const okF=await syncEmployeeField(e.id,'vacUsed',e.vacUsed);if(!okF){e.vacUsed=prevVacUsed;}}
+  }
+  closeModal();toast('Urlaub aktualisiert');renderVacation();updateBadges();
+}
 
 // ═══ SCHICHTVORSCHLÄGE – Admin-Ansicht (Genehmigen / Ablehnen) ═══
 function renderProposals(){
