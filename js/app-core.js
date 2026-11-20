@@ -4166,6 +4166,9 @@ async function schedNav(dir){if(scheduleView==='day')scheduleDate.setDate(schedu
 
 function renderSchedule(){
   const pg=document.getElementById('page-schedule');
+  // Nicht auf der Arbeitsplan-Seite (z. B. aus Schichtvorschläge aufgerufen) → nichts zu rendern.
+  // Ohne diese Prüfung wirft pg.innerHTML einen TypeError und bricht den Aufrufer ab.
+  if(!pg)return;
   const canEdit=can('editSchedules');const canExp=can('canExport');
   const isEmp=currentUser.role==='mitarbeiter';
   const me=EMPS.find(e=>e.id===currentUser.empId);
