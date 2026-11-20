@@ -4438,7 +4438,12 @@ function renderSchedule(){
           const av = AVAILABILITY.find(a => a.empId===empObj.id && a.date===ds);
           if (av) {
             const isOwn = empObj.id === currentUser.empId;
-            h+=`<div class="shift-block compact-block is-unavail" ${isOwn?`onclick="toggleUnavailable(${empObj.id},'${ds}')" style="cursor:pointer" title="Klicken zum Aufheben"`:'title="Nicht verfügbar"'}><span class="compact-letter">NV</span></div>`;
+            const nvClick = isOwn
+              ? `onclick="toggleUnavailable(${empObj.id},'${ds}')" style="cursor:pointer" title="Klicken zum Aufheben"`
+              : canEdit
+                ? `onclick="openAdminUnavailModal(${empObj.id},'${ds}')" style="cursor:pointer" title="Nicht verfügbar – klicken zum Bearbeiten"`
+                : 'title="Nicht verfügbar"';
+            h+=`<div class="shift-block compact-block is-unavail" ${nvClick}><span class="compact-letter">NV</span></div>`;
             cellHas = true;
           }
         }
@@ -4586,8 +4591,41 @@ function openSelfServiceCell(empId, date) {
   </div>`;
   document.body.appendChild(popup);
 }
+/** Admin/Inhaber: NV-Eintrag eines Mitarbeiters bearbeiten (aufheben oder Schicht eintragen). */
+function openAdminUnavailModal(empId, date) {
+  if (!can('editSchedules')) return;
+  const emp = EMPS.find(e => e.id === empId);
+  if (!emp) return;
+  const av = AVAILABILITY.find(a => a.empId === empId && a.date === date);
+  openModal('Nicht verfügbar – ' + emp.name, `
+    <p style="font-size:.85rem;margin:0 0 6px"><strong>${escapeHtml(emp.name)}</strong> hat sich für <strong>${formatDateDE(date)}</strong> als nicht verfügbar gemeldet.</p>
+    ${av?.reason ? `<p style="font-size:.8rem;color:var(--text-muted);margin:0">Grund: ${escapeHtml(av.reason)}</p>` : ''}
+  `, `<button class="btn" onclick="closeModal()">Abbrechen</button>
+     <button class="btn" style="color:var(--danger)" onclick="closeModal();toggleUnavailable(${empId},'${date}')">NV aufheben</button>
+     <button class="btn btn-primary" onclick="adminReplaceUnavailWithShift(${empId},'${date}')">NV aufheben &amp; Schicht eintragen</button>`);
+}
+/** NV entfernen und direkt den Dialog "Schicht hinzufügen" öffnen. */
+async function adminReplaceUnavailWithShift(empId, date) {
+  closeModal();
+  const ok = await toggleUnavailable(empId, date);
+  if (ok === false) return;
+  const emp = EMPS.find(e => e.id === empId);
+  if (emp) quickAddShift(emp.name, date, empId);
+}
 async function toggleUnavailable(empId, date) {
-  if (empId !== currentUser.empId) return;
+  const isAdminEdit = empId !== currentUser.empId;
+  if (isAdminEdit && !can('editSchedules')) return false;
+  if (isAdminEdit) {
+    // Admin darf nur bestehende NV-Einträge aufheben, nicht für andere neu anlegen.
+    const ex = AVAILABILITY.find(a => a.empId === empId && a.date === date);
+    if (!ex) return false;
+    AVAILABILITY = AVAILABILITY.filter(a => a !== ex);
+    renderSchedule();
+    const ok = await syncDeleteAvailability(ex.id);
+    if (!ok) { AVAILABILITY.push(ex); renderSchedule(); toast('Fehler beim Aufheben', 'err'); return false; }
+    toast('NV aufgehoben', 'warn');
+    return true;
+  }
   const emp = EMPS.find(e => e.id === empId);
   if (!emp) return;
   const existing = AVAILABILITY.find(a => a.empId === empId && a.date === date);
@@ -6009,10 +6047,18 @@ async function rejectProposal(id){
   if(!can('editSchedules'))return;
   const idx=SHIFT_PROPOSALS.findIndex(x=>x.id===id);if(idx<0)return;
   const p=SHIFT_PROPOSALS[idx];
+  // Doppelte offene Vorschläge desselben MA für denselben Tag gleich mit ablehnen,
+  // sonst taucht nach dem Ablehnen ein identischer Eintrag "wieder" auf.
+  const group=SHIFT_PROPOSALS.filter(x=>x.id===id||(x.empId===p.empId&&x.date===p.date&&x.status==='pending'));
+  const before=SHIFT_PROPOSALS.slice();
   // Optimistic: aus dem Speicher entfernen (kein Rest-Eintrag im Arbeitsplan).
-  SHIFT_PROPOSALS.splice(idx,1);renderProposals();updateBadges();renderSchedule();
-  const ok=await syncDeleteProposal(id);
-  if(!ok){SHIFT_PROPOSALS.splice(idx,0,p);toast('Fehler beim Ablehnen','err');renderProposals();updateBadges();renderSchedule();return;}
+  SHIFT_PROPOSALS=SHIFT_PROPOSALS.filter(x=>!group.includes(x));renderProposals();updateBadges();renderSchedule();
+  const results=await Promise.all(group.map(x=>syncDeleteProposal(x.id)));
+  if(results.some(r=>!r)){
+    const failed=group.filter((x,i)=>!results[i]);
+    SHIFT_PROPOSALS=before.filter(x=>!group.includes(x)||failed.includes(x));
+    toast('Fehler beim Ablehnen – bitte erneut versuchen','err');renderProposals();updateBadges();renderSchedule();return;
+  }
   addNotif('warn','Schichtvorschlag abgelehnt',`${formatDateDE(p.date)} · ${p.shiftLabel} wurde leider abgelehnt.`,p.empId);
   toast('Abgelehnt','err');
 }

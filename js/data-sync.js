@@ -149,9 +149,18 @@ async function syncProposalStatus(propId, status, decidedBy) {
  */
 async function syncDeleteProposal(propId) {
   try {
-    const { error } = await sb.from('shift_proposals').delete().eq('id', propId);
-    if (error) { console.warn('[Sync] Proposal delete error:', error.message); return false; }
-    return true;
+    // .select() → gelöschte Zeilen zurückgeben. Supabase meldet KEINEN Fehler,
+    // wenn 0 Zeilen gelöscht wurden (z. B. durch RLS) – das müssen wir selbst prüfen.
+    const { data, error } = await sb.from('shift_proposals').delete().eq('id', propId).select('id');
+    if (!error && data && data.length) return true;
+    if (error) console.warn('[Sync] Proposal delete error:', error.message);
+    // Fallback: als 'rejected' markieren – der Loader blendet abgelehnte aus.
+    const { data: upd, error: updErr } = await sb.from('shift_proposals')
+      .update({ status: 'rejected', decided_at: new Date().toISOString() })
+      .eq('id', propId).select('id');
+    if (!updErr && upd && upd.length) return true;
+    console.warn('[Sync] Proposal konnte weder gelöscht noch abgelehnt werden:', propId, updErr?.message || '0 Zeilen');
+    return false;
   } catch (e) { console.warn('[Sync]', e.message); return false; }
 }
 
@@ -563,10 +572,12 @@ async function syncAddAvailability(av) {
 }
 async function syncDeleteAvailability(avId) {
   try {
-    if (avId == null) return;
-    await sb.from('availability').delete().eq('id', avId);
+    if (avId == null) return false;
+    const { data, error } = await sb.from('availability').delete().eq('id', avId).select('id');
+    if (error || !data || !data.length) { console.warn('[Sync] Availability delete:', error?.message || '0 Zeilen'); return false; }
     console.log('[Sync] ✓ Availability deleted:', avId);
-  } catch (e) { console.warn('[Sync]', e.message); }
+    return true;
+  } catch (e) { console.warn('[Sync]', e.message); return false; }
 }
 
 // ═══ MITTEILUNGEN / ANNOUNCEMENTS ═══
